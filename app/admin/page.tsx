@@ -16,6 +16,7 @@ const [photos, setPhotos] = useState<any[]>([]);
 
 const [videoFile, setVideoFile] = useState<File | null>(null);
 const [videos, setVideos] = useState<any[]>([]);
+const [members, setMembers] = useState<any[]>([]);
 
   useEffect(() => {
     const admin =
@@ -28,6 +29,7 @@ const [videos, setVideos] = useState<any[]>([]);
   loadSettings();
   loadPhotos();
   loadVideos();
+  loadMembers();
 }, []);
 
 async function loadPhotos() {
@@ -53,6 +55,20 @@ async function loadVideos() {
 
   if (data) {
     setVideos(data);
+  }
+}
+
+
+async function loadMembers() {
+  const supabase = createClient();
+
+  const { data } = await supabase
+    .from("members")
+    .select("*")
+    .order("id", { ascending: false });
+
+  if (data) {
+    setMembers(data);
   }
 }
 
@@ -174,6 +190,28 @@ async function deleteVideo(id: number) {
   }
 
   loadVideos();
+}
+
+async function deleteMember(id: number) {
+  const supabase = createClient();
+
+  const confirmed = confirm(
+    "Delete this member?"
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await supabase
+    .from("members")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    alert("Delete failed");
+    return;
+  }
+
+  loadMembers();
 }
 
 async function saveSettings() {
@@ -478,6 +516,57 @@ async function loadSettings() {
   ))}
 </div>
 
+
+<h2 style={{ marginTop: "40px" }}>
+  Members
+</h2>
+
+<table
+  style={{
+    width: "100%",
+    borderCollapse: "collapse",
+  }}
+>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Photo</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {members.map((member) => (
+      <tr key={member.id}>
+        <td>{member.member_id}</td>
+
+        <td>{member.name}</td>
+
+        <td>
+          {member.photo_url ? (
+            <img
+              src={member.photo_url}
+              width="60"
+            />
+          ) : (
+            "No Photo"
+          )}
+        </td>
+
+        <td>
+          <button
+            onClick={() =>
+              deleteMember(member.id)
+            }
+          >
+            Delete
+          </button>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
 
 </div>
   );
