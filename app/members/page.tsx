@@ -121,91 +121,22 @@ async function checkBanStatus() {
     >
       {/* HEADER */}
 
-      <div
+   <div
   style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingBottom: "20px",
-    borderBottom: "1px solid #eee",
+    textAlign: "center",
     marginBottom: "40px",
   }}
 >
   <h1
     style={{
-      color: "#2e8b57",
+      color: "#7c3aed",
       fontSize: "48px",
+      fontWeight: "800",
       margin: 0,
     }}
   >
     MSpace
   </h1>
-
-  <div
-    style={{
-      display: "flex",
-      gap: "40px",
-      fontSize: "18px",
-      fontWeight: "600",
-      alignItems: "center",
-    }}
-  >
-    <span
-  style={{ cursor: "pointer" }}
-  onClick={() => {
-    document.body.scrollIntoView({
-      behavior: "smooth",
-    });
-  }}
->
-  Home
-</span>
-
-    <span
-      style={{ cursor: "pointer" }}
-      onClick={() =>
-        document
-          .getElementById("photos")
-          ?.scrollIntoView({ behavior: "smooth" })
-      }
-    >
-      Photos
-    </span>
-
-    <span
-      style={{ cursor: "pointer" }}
-      onClick={() =>
-        document
-          .getElementById("videos")
-          ?.scrollIntoView({ behavior: "smooth" })
-      }
-    >
-      Videos
-    </span>
-
-    <span
-      style={{ cursor: "pointer", color: "#2e8b57" }}
-      onClick={() => {
-        if (typeof window !== "undefined") {
-          (window as any).$crisp?.push(["do", "chat:open"]);
-        }
-      }}
-    >
-      Chat
-    </span>
-
-     <span
-  style={{ cursor: "pointer", color: "#2e8b57" }}
-  onClick={() => {
-    alert(
-      "Add MSpace to your Home Screen\n\n📱 iPhone:\n1. Tap Share\n2. Tap Add to Home Screen\n3. Tap Add\n\n🤖 Android:\n1. Tap Menu (⋮)\n2. Tap Add to Home Screen\n3. Tap Add"
-    );
-  }}
->
-  📱 Install
-</span>
-   
-  </div>
 </div>
 
 
@@ -221,8 +152,8 @@ async function checkBanStatus() {
     marginBottom: "60px",
     padding: "40px",
     borderRadius: "20px",
-    background:
-  "linear-gradient(135deg, #f8fbf8 0%, #ffffff 100%)",
+   background:
+"linear-gradient(135deg,#faf5ff 0%,#ffffff 100%)",
    border: "1px solid #e8e8e8",
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
   }}
@@ -239,7 +170,7 @@ async function checkBanStatus() {
     height: "220px",
     borderRadius: "50%",
     objectFit: "cover",
-    border: "6px solid white",
+    border: "6px solid #ede9fe",
     boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
   }}
 />
@@ -270,29 +201,102 @@ async function checkBanStatus() {
   "Welcome to MSpace. View my exclusive photos, watch my latest videos and chat with me directly."
 }
     </p>
+
+   <div
+  style={{
+    display: "flex",
+    gap: "60px",
+    marginTop: "25px",
+    marginBottom: "25px",
+  }}
+>
+  <div>
+    <h3
+      style={{
+        margin: 0,
+        fontSize: "30px",
+        fontWeight: "700",
+      }}
+    >
+      {photos.length}
+    </h3>
+
+    <p
+      style={{
+        margin: 0,
+        color: "#7c3aed",
+      }}
+    >
+      Photos
+    </p>
+  </div>
+
+  <div>
+    <h3
+      style={{
+        margin: 0,
+        fontSize: "30px",
+        fontWeight: "700",
+      }}
+    >
+      {videos.length}
+    </h3>
+
+    <p
+      style={{
+        margin: 0,
+        color: "#7c3aed",
+      }}
+    >
+      Videos
+    </p>
+  </div>
+</div>
+
+<button
+  onClick={() => {
+    if (typeof window !== "undefined") {
+      (window as any).$crisp?.push([
+        "do",
+        "chat:open",
+      ]);
+    }
+  }}
+  style={{
+    background:
+      "linear-gradient(90deg,#7c3aed,#9333ea)",
+    color: "#fff",
+    border: "none",
+    padding: "14px 30px",
+    borderRadius: "12px",
+    fontSize: "18px",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow:
+      "0 8px 20px rgba(124,58,237,0.3)",
+  }}
+>
+  Chat With Me
+</button>    
+     
   </div>
 
 </div>
         
 
-      <hr
-        style={{
-          margin: "40px 0",
-        }}
-      />
-
+      
       {/* PHOTOS */}
 
       <h2
   style={{
-    color: "#2e8b57",
+    color: "#7c3aed",
     fontSize: "42px",
     textAlign: "center",
     marginBottom: "40px",
     fontWeight: "700",
   }}
 >
-  Recent Photos
+  Photos
 </h2>
 
       <div
@@ -316,22 +320,19 @@ async function checkBanStatus() {
       border: "1px solid #e8e8e8",
       boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
       cursor: "pointer",
+      transition: "all 0.3s ease",
     }}
   />
 ))}
     
 </div>
-      <hr
-        style={{
-          margin: "40px 0",
-        }}
-      />
+      
 
       {/* VIDEOS */}
 
  <h2
   style={{
-    color: "#2e8b57",
+    color: "#7c3aed",
     fontSize: "42px",
     textAlign: "center",
     marginTop: "70px",
@@ -339,7 +340,7 @@ async function checkBanStatus() {
     fontWeight: "700",
   }}
 >
-  Latest Videos
+  Videos
 </h2>
 
 <div
@@ -347,7 +348,7 @@ async function checkBanStatus() {
   style={{
     display: "grid",
     gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "20px",
+    gap: "30px",
   }}
 >
   {videos.map((video) => (
@@ -385,6 +386,28 @@ async function checkBanStatus() {
   `}
 </Script>
 
+<footer
+  style={{
+    marginTop: "80px",
+    padding: "30px",
+    textAlign: "center",
+    borderTop: "1px solid #eee",
+    color: "#666",
+  }}
+>
+  <h3
+    style={{
+      color: "#7c3aed",
+      margin: 0,
+    }}
+  >
+    MSpace
+  </h3>
+
+  <p>
+    © 2026 Donald Lee. All Rights Reserved.
+  </p>
+</footer>
 </main>
   );
 }
