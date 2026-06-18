@@ -192,6 +192,73 @@ async function deleteVideo(id: number) {
   loadVideos();
 }
 
+async function toggleBan(
+  id: number,
+  banned: boolean
+) {
+  const supabase = createClient();
+
+  const { data: member } = await supabase
+    .from("members")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (!member) return;
+
+  const { error } = await supabase
+    .from("members")
+    .update({
+      banned: !banned,
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+ 
+
+  alert("Updated!");
+
+  loadMembers();
+}
+
+async function banDevice(member: any) {
+  const supabase = createClient();
+
+  if (!member.device_id) {
+    alert("No device ID found");
+    return;
+  }
+
+  const { error: deviceError } =
+    await supabase
+      .from("banned_devices")
+      .insert({
+        device_id: member.device_id,
+      });
+
+  if (deviceError) {
+    alert(deviceError.message);
+    return;
+  }
+
+  await supabase
+    .from("members")
+    .update({
+      banned: true,
+    })
+    .eq("device_id", member.device_id);
+
+  alert(
+    "Device banned and all accounts on this device were banned."
+  );
+
+  loadMembers();
+}
+
 async function deleteMember(id: number) {
   const supabase = createClient();
 
@@ -528,13 +595,15 @@ async function loadSettings() {
   }}
 >
   <thead>
-    <tr>
-      <th>ID</th>
-      <th>Name</th>
-      <th>Photo</th>
-      <th>Action</th>
-    </tr>
-  </thead>
+  <tr>
+  <th>ID</th>
+  <th>Name</th>
+  <th>Device ID</th>
+  <th>Photo</th>
+  <th>Status</th>
+  <th>Action</th>
+</tr>
+</thead>
 
   <tbody>
     {members.map((member) => (
@@ -542,6 +611,12 @@ async function loadSettings() {
         <td>{member.member_id}</td>
 
         <td>{member.name}</td>
+       
+        <td>
+         {member.device_id
+          ? member.device_id.slice(0, 8)
+          : "None"}
+        </td>
 
         <td>
           {member.photo_url ? (
@@ -555,14 +630,59 @@ async function loadSettings() {
         </td>
 
         <td>
-          <button
-            onClick={() =>
-              deleteMember(member.id)
-            }
-          >
-            Delete
-          </button>
-        </td>
+  {member.banned ? "🚫 Banned" : "✅ Active"}
+</td>
+
+<td>
+  <button
+    onClick={() =>
+      toggleBan(member.id, member.banned)
+    }
+    style={{
+      background: member.banned
+        ? "#28a745"
+        : "#ffc107",
+      color: "black",
+      border: "none",
+      padding: "6px 12px",
+      marginRight: "10px",
+      cursor: "pointer",
+    }}
+  >
+    {member.banned ? "Unban" : "Ban"}
+  </button>
+
+  <button
+    onClick={() =>
+      banDevice(member)
+    }
+    style={{
+      background: "#8b0000",
+      color: "white",
+      border: "none",
+      padding: "6px 12px",
+      marginRight: "10px",
+      cursor: "pointer",
+    }}
+  >
+    Ban Device
+  </button>
+
+  <button
+    onClick={() =>
+      deleteMember(member.id)
+    }
+    style={{
+      background: "#dc3545",
+      color: "white",
+      border: "none",
+      padding: "6px 12px",
+      cursor: "pointer",
+    }}
+  >
+    Delete
+  </button>
+</td>
       </tr>
     ))}
   </tbody>

@@ -2,9 +2,11 @@
 
 import Script from "next/script";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
 export default function MembersPage() {
+const router = useRouter();
 
   const [photos, setPhotos] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
@@ -16,6 +18,14 @@ export default function MembersPage() {
   loadProfile();
   loadPhotos();
   loadVideos();
+
+  checkBanStatus();
+
+  const interval = setInterval(() => {
+    checkBanStatus();
+  }, 5000);
+
+  return () => clearInterval(interval);
 }, []);
 
 async function loadProfile() {
@@ -69,6 +79,34 @@ async function loadVideos() {
 
   if (error) {
     console.log(error);
+  }
+}
+
+async function checkBanStatus() {
+  const memberId =
+    localStorage.getItem("mspace_member_id");
+
+  if (!memberId) {
+    router.push("/");
+    return;
+  }
+
+  const supabase = createClient();
+
+  const { data } = await supabase
+    .from("members")
+    .select("banned")
+    .eq("member_id", memberId)
+    .single();
+
+  if (data?.banned) {
+    alert("Your MSpace account has been banned.");
+
+    localStorage.removeItem(
+      "mspace_member_id"
+    );
+
+    router.push("/");
   }
 }
 
