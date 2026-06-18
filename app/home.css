@@ -90,3 +90,19 @@
     margin-top: 20px;
   }
 }
+
+@media (max-width: 768px) {
+  .stats-row {
+    margin-left: 0 !important;
+    justify-content: center !important;
+  }
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

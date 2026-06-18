@@ -13,7 +13,8 @@ export default function Home() {
   useState<File | null>(null);
   const [fileName, setFileName] = useState("");
   const [photoCount, setPhotoCount] = useState(0);
-const [videoCount, setVideoCount] = useState(0);
+  const [videoCount, setVideoCount] = useState(0);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   useEffect(() => {
   const memberId = localStorage.getItem("mspace_member_id");
@@ -98,11 +99,14 @@ useEffect(() => {
   loadLatestVideo();
 }, []);
 
-  async function joinMSpace() {
-    if (!name.trim()) {
-      alert("Please enter your name");
-      return;
-    }
+async function joinMSpace() {
+  setLoading(true);
+
+  if (!name.trim()) {
+    alert("Please enter your name");
+    setLoading(false);
+    return;
+  }
 
     const supabase = createClient();
     let deviceId =
@@ -138,6 +142,7 @@ const bannedDevice = bannedDevices?.find(
 
 if (bannedDevice) {
   alert("This device has been blocked.");
+  setLoading(false);
   return;
 }
 
@@ -151,6 +156,7 @@ if (existingMember?.banned) {
   alert(
     "Your MSpace account has been banned."
   );
+  setLoading(false);
   return;
 }
     const memberId = crypto.randomUUID();
@@ -174,10 +180,10 @@ if (photoFile) {
   console.log("UPLOAD ERROR:", uploadError);
 
   if (uploadError) {
-    alert(JSON.stringify(uploadError, null, 2));
-    return;
-  }
-
+  alert(JSON.stringify(uploadError, null, 2));
+  setLoading(false);
+  return;
+}
   photoUrl =
   `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avaters/${data.path}`;
 
@@ -198,6 +204,7 @@ console.log("PHOTO URL:", photoUrl);
 
 if (error) {
   alert("Error: " + error.message);
+  setLoading(false);
   return;
 }
 
@@ -207,6 +214,8 @@ localStorage.setItem(
 );
 
 setName("");
+
+setLoading(false);
 
 router.push("/members");
   }
@@ -245,16 +254,19 @@ return (
 
 </div>
 
-    <button
-  onClick={() => {
-    document
-      .getElementById("signup")
-      ?.scrollIntoView({ behavior: "smooth" });
-  }}
+<button
+onClick={() => {
+  document
+    .getElementById("join-form")
+    ?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+}}
   style={{
     background:
-  "linear-gradient(90deg, #7c3aed, #9333ea)",
-color: "white",
+      "linear-gradient(90deg, #7c3aed, #9333ea)",
+    color: "white",
     border: "none",
     padding: "12px 24px",
     borderRadius: "10px",
@@ -344,6 +356,7 @@ color: "white",
 {/* ADD PHOTO/VIDEO COUNTS HERE */}
 
 <div
+  className="stats-row"
   style={{
     display: "flex",
     justifyContent: "flex-start",
@@ -584,7 +597,7 @@ color: "white",
 </div>
 
 
-<div className="right-panel">
+<div id="join-form" className="right-panel">
 <div
   id="signup"
   style={{
@@ -765,24 +778,47 @@ color: "white",
   
 
   <button
-    onClick={joinMSpace}
-    style={{
-      width: "100%",
-      padding: "14px",
-      background:
-        "linear-gradient(90deg,#7c3aed,#9333ea)",
-      color: "#fff",
-      border: "none",
-      borderRadius: "12px",
-      fontSize: "18px",
-      fontWeight: "700",
-      cursor: "pointer",
-      boxShadow:
-        "0 8px 20px rgba(124,58,237,0.3)",
-    }}
-  >
-    Join MSpace
-  </button>
+  onClick={joinMSpace}
+  disabled={loading}
+  style={{
+    width: "100%",
+    padding: "14px",
+    background:
+      "linear-gradient(90deg,#7c3aed,#9333ea)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "12px",
+    fontSize: "18px",
+    fontWeight: "700",
+    opacity: loading ? 0.8 : 1,
+    cursor: loading ? "not-allowed" : "pointer",
+    boxShadow:
+      "0 8px 20px rgba(124,58,237,0.3)",
+  }}
+>
+  <>
+    {loading ? (
+      <>
+        <span
+          style={{
+            display: "inline-block",
+            width: "16px",
+            height: "16px",
+            border: "2px solid rgba(255,255,255,0.4)",
+            borderTop: "2px solid white",
+            borderRadius: "50%",
+            marginRight: "8px",
+            animation: "spin 1s linear infinite",
+            verticalAlign: "middle",
+          }}
+        />
+        Connecting...
+      </>
+    ) : (
+      "Join MSpace"
+    )}
+  </>
+</button>
 
   <p
     style={{
