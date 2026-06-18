@@ -13,6 +13,10 @@ const router = useRouter();
   const [profileName, setProfileName] = useState("");
   const [profileBio, setProfileBio] = useState("");
   const [profilePhoto, setProfilePhoto] = useState("");
+  const [selectedPhoto, setSelectedPhoto] = useState("");
+  const [showInstallButton, setShowInstallButton] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
   loadProfile();
@@ -22,11 +26,53 @@ const router = useRouter();
   checkBanStatus();
 
   const interval = setInterval(() => {
+    loadProfile();
+    loadPhotos();
+    loadVideos();
+
     checkBanStatus();
   }, 5000);
 
   return () => clearInterval(interval);
 }, []);
+
+
+ useEffect(() => {
+  const handler = (e: any) => {
+    e.preventDefault();
+
+    setDeferredPrompt(e);
+    setShowInstallButton(true);
+  };
+
+  window.addEventListener(
+    "beforeinstallprompt",
+    handler
+  );
+
+  return () =>
+    window.removeEventListener(
+      "beforeinstallprompt",
+      handler
+    );
+}, []);
+
+useEffect(() => {
+  const checkScreen = () => {
+    setIsMobile(window.innerWidth < 768);
+  };
+
+  checkScreen();
+
+  window.addEventListener("resize", checkScreen);
+
+  return () =>
+    window.removeEventListener(
+      "resize",
+      checkScreen
+    );
+}, []);
+
 
 async function loadProfile() {
   const supabase = createClient();
@@ -110,47 +156,74 @@ async function checkBanStatus() {
   }
 }
 
+async function installApp() {
+  if (!deferredPrompt) return;
+
+  deferredPrompt.prompt();
+
+  const choiceResult =
+    await deferredPrompt.userChoice;
+
+  if (choiceResult.outcome === "accepted") {
+    setShowInstallButton(false);
+  }
+}
   return (
     <main
-      style={{
-        fontFamily: "Arial, sans-serif",
-        padding: "30px",
-        maxWidth: "1200px",
-        margin: "0 auto",
-      }}
-    >
-      {/* HEADER */}
+  style={{
+    fontFamily: "Arial, sans-serif",
+    padding: "0px 5px",
+    width: "100%",
+    maxWidth: "none",
+    margin: 0,
+  }}
+>
+ {/* HEADER */}
 
    <div
   style={{
     textAlign: "center",
-    marginBottom: "40px",
+    marginTop: "-5px",
+    marginBottom: "-5px",
+    width: "100%",
   }}
 >
   <h1
-    style={{
-      color: "#7c3aed",
-      fontSize: "48px",
-      fontWeight: "800",
-      margin: 0,
-    }}
-  >
-    MSpace
-  </h1>
+  style={{
+    textAlign: "center",
+    fontSize: "25px",
+    fontWeight: "900",
+    letterSpacing: "-1px",
+    margin: "10px 0",
+    background:
+      "linear-gradient(135deg,#7c3aed,#a855f7,#c084fc)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+  }}
+>
+  MSpace
+</h1>
 </div>
-
 
       {/* PROFILE SECTION */}
 
  <div
   style={{
     display: "flex",
-    alignItems: "center",
-    gap: "40px",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: isMobile ? "15px" : "30px",
     justifyContent: "flex-start",
-    marginTop: "40px",
-    marginBottom: "60px",
-    padding: "40px",
+    marginTop: "0px",
+    marginBottom: "5px",
+    padding: isMobile
+  ? "15px"
+  : "8px 20px",
+    width: "95%",
+    maxWidth: "1400px",
+    marginLeft: "auto",
+    marginRight: "auto",
+    boxSizing: "border-box",
     borderRadius: "20px",
    background:
 "linear-gradient(135deg,#faf5ff 0%,#ffffff 100%)",
@@ -166,19 +239,26 @@ async function checkBanStatus() {
   }
   alt="Donald Lee"
   style={{
-    width: "220px",
-    height: "220px",
-    borderRadius: "50%",
-    objectFit: "cover",
+  width: isMobile ? "90px" : "160px",
+  height: isMobile ? "90px" : "160px",
+  borderRadius: "50%",
+  objectFit: "cover",
+  marginTop: isMobile ? "0px" : "0px",
     border: "6px solid #ede9fe",
     boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
   }}
 />
 
-  <div>
+<div
+  style={{
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+  }}
+>
     <h2
       style={{
-        fontSize: "48px",
+        fontSize: isMobile ? "24px" : "32px",
         margin: 0,
         color: "#111",
         whiteSpace: "nowrap",
@@ -189,111 +269,138 @@ async function checkBanStatus() {
 
     <p
       style={{
-        maxWidth: "600px",
+        maxWidth: isMobile ? "100%" : "430px",
         marginTop: "10px",
-        fontSize: "24px",
+        fontSize: isMobile ? "13px" : "18px",
         color: "#666",
-        lineHeight: "1.8",
+        lineHeight: "1.5",
       }}
     >
       {
   profileBio ||
-  "Welcome to MSpace. View my exclusive photos, watch my latest videos and chat with me directly."
+  "Welcome to my personal space. View my exclusive photos, watch my latest videos and chat with me directly."
 }
     </p>
 
-   <div
+ <div
   style={{
     display: "flex",
-    gap: "60px",
-    marginTop: "25px",
-    marginBottom: "25px",
+    justifyContent: "flex-start",
+    marginTop: "15px",
   }}
 >
-  <div>
-    <h3
+  <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "8px",
+    marginTop: "5px",
+  }}
+>
+    <div
       style={{
-        margin: 0,
-        fontSize: "30px",
+        display: "flex",
+        gap: isMobile ? "8px" : "30px",
+      }}
+    >
+      <div style={{ textAlign: "center" }}>
+       <div
+  style={{
+    fontSize: isMobile ? "16px" : "24px",
+    fontWeight: "800",
+    background:
+      "linear-gradient(90deg,#7c3aed,#a855f7)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    lineHeight: "1",
+  }}
+>
+  {photos.length}
+</div>
+        <div
+  style={{
+    fontSize: "13px",
+    color: "#555",
+    fontWeight: "600",
+    marginTop: "4px",
+  }}
+>
+  Photos
+</div>
+      </div>
+
+      <div style={{ textAlign: "center" }}>
+        <div
+  style={{
+    fontSize: isMobile ? "16px" : "24px",
+    fontWeight: "800",
+    background:
+      "linear-gradient(90deg,#7c3aed,#a855f7)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    lineHeight: "1",
+  }}
+>
+  {videos.length}
+</div>
+        <div
+  style={{
+    fontSize: "13px",
+    color: "#555",
+    fontWeight: "600",
+    marginTop: "4px",
+  }}
+>
+  Videos
+</div>
+      </div>
+    </div>
+
+    <button
+      onClick={() => {
+        if (typeof window !== "undefined") {
+          (window as any).$crisp?.push([
+            "do",
+            "chat:open",
+          ]);
+        }
+      }}
+      style={{
+        padding: isMobile ? "8px 16px" : "12px 30px",
+        borderRadius: isMobile ? "10px" : "14px",
+        fontSize: isMobile ? "14px" : "16px",
+        background:
+          "linear-gradient(90deg,#7c3aed,#9333ea)",
+        color: "#fff",
         fontWeight: "700",
+        cursor: "pointer",
+        boxShadow:
+           "0 4px 12px rgba(124,58,237,0.25)",
       }}
     >
-      {photos.length}
-    </h3>
-
-    <p
-      style={{
-        margin: 0,
-        color: "#7c3aed",
-      }}
-    >
-      Photos
-    </p>
-  </div>
-
-  <div>
-    <h3
-      style={{
-        margin: 0,
-        fontSize: "30px",
-        fontWeight: "700",
-      }}
-    >
-      {videos.length}
-    </h3>
-
-    <p
-      style={{
-        margin: 0,
-        color: "#7c3aed",
-      }}
-    >
-      Videos
-    </p>
+      💬 Chat With Me
+    </button>
   </div>
 </div>
 
-<button
-  onClick={() => {
-    if (typeof window !== "undefined") {
-      (window as any).$crisp?.push([
-        "do",
-        "chat:open",
-      ]);
-    }
-  }}
-  style={{
-    background:
-      "linear-gradient(90deg,#7c3aed,#9333ea)",
-    color: "#fff",
-    border: "none",
-    padding: "14px 30px",
-    borderRadius: "12px",
-    fontSize: "18px",
-    fontWeight: "700",
-    cursor: "pointer",
-    boxShadow:
-      "0 8px 20px rgba(124,58,237,0.3)",
-  }}
->
-  Chat With Me
-</button>    
-     
-  </div>
-
+</div>
 </div>
         
 
       
       {/* PHOTOS */}
 
-      <h2
+  <h2
   style={{
     color: "#7c3aed",
-    fontSize: "42px",
-    textAlign: "center",
-    marginBottom: "40px",
+    fontSize: "18px",
+    textAlign: "left",
+    marginTop: "4px",
+    marginBottom: "2px",
+    marginLeft: isMobile ? "10px" : "40px",
     fontWeight: "700",
+
   }}
 >
   Photos
@@ -303,8 +410,13 @@ async function checkBanStatus() {
   id="photos"
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "30px",
+    gridTemplateColumns: isMobile
+  ? "repeat(3, 1fr)"
+  : "repeat(6, 1fr)",
+    gap: "4px",
+    marginBottom: "2px",
+    paddingLeft: isMobile ? "10px" : "40px",
+    paddingRight: isMobile ? "10px" : "40px",
   }}
 >
   {photos.map((photo) => (
@@ -312,9 +424,16 @@ async function checkBanStatus() {
     key={photo.id}
     src={photo.image_url}
     alt="Photo"
+    onClick={() => setSelectedPhoto(photo.image_url)}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = "scale(1.03)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = "scale(1)";
+    }}
     style={{
       width: "100%",
-      height: "250px",
+      height: isMobile ? "95px" : "110px",
       objectFit: "cover",
       borderRadius: "20px",
       border: "1px solid #e8e8e8",
@@ -333,22 +452,28 @@ async function checkBanStatus() {
  <h2
   style={{
     color: "#7c3aed",
-    fontSize: "42px",
-    textAlign: "center",
-    marginTop: "70px",
-    marginBottom: "40px",
+    fontSize: "16px",
+    textAlign: "left",
+    marginTop: "0px",
+    marginBottom: "2px",
+    marginLeft: isMobile ? "10px" : "40px",
     fontWeight: "700",
+
   }}
 >
   Videos
 </h2>
 
-<div
+     <div
   id="videos"
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "30px",
+    gridTemplateColumns: isMobile
+  ? "repeat(3, 1fr)"
+  : "repeat(6, 1fr)",
+    gap: "12px", 
+    paddingLeft: isMobile ? "10px" : "40px",
+    paddingRight: isMobile ? "10px" : "40px",
   }}
 >
   {videos.map((video) => (
@@ -357,7 +482,7 @@ async function checkBanStatus() {
       controls
       style={{
         width: "100%",
-        height: "280px",
+        height: isMobile ? "95px" : "100px",
         objectFit: "cover",
         borderRadius: "20px",
         border: "1px solid #e8e8e8",
@@ -388,26 +513,67 @@ async function checkBanStatus() {
 
 <footer
   style={{
-    marginTop: "80px",
-    padding: "30px",
     textAlign: "center",
-    borderTop: "1px solid #eee",
+    marginTop: "4px",
+    padding: "8px 0",
     color: "#666",
+    fontSize: "12px",
+    borderTop: "1px solid #eee",
   }}
 >
-  <h3
+  © 2026 Donald Lee. All Rights Reserved.
+</footer>
+{selectedPhoto && (
+  <div
+    onClick={() => setSelectedPhoto("")}
     style={{
-      color: "#7c3aed",
-      margin: 0,
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      background: "rgba(0,0,0,0.9)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+      cursor: "pointer",
     }}
   >
-    MSpace
-  </h3>
+    <img
+      src={selectedPhoto}
+      alt=""
+      style={{
+        maxWidth: "95%",
+        maxHeight: "95%",
+        borderRadius: "12px",
+      }}
+    />
+  </div>
+)}
 
-  <p>
-    © 2026 Donald Lee. All Rights Reserved.
-  </p>
-</footer>
+{showInstallButton && (
+  <button
+    onClick={installApp}
+    style={{
+      position: "fixed",
+      bottom: "20px",
+      left: "20px",
+      zIndex: 9999,
+      padding: "10px 16px",
+      borderRadius: "999px",
+      border: "none",
+      background: "#7c3aed",
+      color: "#fff",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow:
+        "0 4px 12px rgba(0,0,0,0.2)",
+    }}
+  >
+    📱 Add App
+  </button>
+)}
 </main>
   );
 }
