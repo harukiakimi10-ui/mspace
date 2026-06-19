@@ -21,6 +21,7 @@ const router = useRouter();
   const [selectedVideoIndex, setSelectedVideoIndex] =
   useState<number | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [touchStartX, setTouchStartX] = useState(0);
 
   useEffect(() => {
   loadProfile();
@@ -496,23 +497,23 @@ async function installApp() {
     position: "relative",
   }}
 >
-    <video
+   <video
   muted
   playsInline
-  preload="metadata"
+  autoPlay
+  loop
+  preload="auto"
   controls={false}
-
-
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        pointerEvents: "none",
-        borderRadius: "20px",
-        border: "1px solid #e8e8e8",
-        boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
-      }}
-    >
+  style={{
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    pointerEvents: "none",
+    borderRadius: "20px",
+    border: "1px solid #e8e8e8",
+    boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
+  }}
+>
       <source
         src={video.video_url}
         type="video/mp4"
@@ -601,18 +602,32 @@ async function installApp() {
 )}
 
 {selectedIndex !== null && (
-  <div
-    onClick={() => setSelectedIndex(null)}
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.9)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 99999,
-    }}
-  >
+ <div
+  onClick={() => setSelectedIndex(null)}
+  onTouchStart={(e) => {
+    setTouchStartX(e.changedTouches[0].clientX);
+  }}
+  onTouchEnd={(e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+
+    if (diff > 50) {
+      setSelectedIndex(
+        selectedIndex === photos.length - 1
+          ? 0
+          : selectedIndex + 1
+      );
+    }
+
+    if (diff < -50) {
+      setSelectedIndex(
+        selectedIndex === 0
+          ? photos.length - 1
+          : selectedIndex - 1
+      );
+    }
+  }}
+>
     <button
       onClick={(e) => {
         e.stopPropagation();
@@ -702,17 +717,32 @@ async function installApp() {
   </div>
 )}
 
+
 {selectedVideoIndex !== null && (
- <div
+<div
   onClick={() => setSelectedVideoIndex(null)}
-  style={{
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.9)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 9999,
+  onTouchStart={(e) => {
+    setTouchStartX(e.changedTouches[0].clientX);
+  }}
+  onTouchEnd={(e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+
+    if (diff > 50) {
+      setSelectedVideoIndex(
+        selectedVideoIndex === videos.length - 1
+          ? 0
+          : selectedVideoIndex + 1
+      );
+    }
+
+    if (diff < -50) {
+      setSelectedVideoIndex(
+        selectedVideoIndex === 0
+          ? videos.length - 1
+          : selectedVideoIndex - 1
+      );
+    }
   }}
 >
     <button
