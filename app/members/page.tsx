@@ -601,37 +601,46 @@ async function installApp() {
   </button>
 )}
 
-{selectedIndex !== null && (
- <div
-  onClick={() => setSelectedIndex(null)}
-  onTouchStart={(e) => {
-    setTouchStartX(e.changedTouches[0].clientX);
-  }}
-  onTouchEnd={(e) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
 
-    if (diff > 50) {
-      setSelectedIndex(
-        selectedIndex === photos.length - 1
-          ? 0
-          : selectedIndex + 1
-      );
-    }
+ {selectedIndex !== null && (
+  <div
+    onClick={() => setSelectedIndex(null)}
+    onTouchStart={(e) => {
+      setTouchStartX(e.changedTouches[0].clientX);
+    }}
+    onTouchEnd={(e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX - touchEndX;
 
-    if (diff < -50) {
-      setSelectedIndex(
-        selectedIndex === 0
-          ? photos.length - 1
-          : selectedIndex - 1
-      );
-    }
-  }}
->
+      if (diff > 50) {
+        setSelectedIndex(
+          selectedIndex === photos.length - 1
+            ? 0
+            : selectedIndex + 1
+        );
+      }
+
+      if (diff < -50) {
+        setSelectedIndex(
+          selectedIndex === 0
+            ? photos.length - 1
+            : selectedIndex - 1
+        );
+      }
+    }}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.95)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 99999,
+    }}
+  >
     <button
       onClick={(e) => {
         e.stopPropagation();
-
         setSelectedIndex(
           selectedIndex === 0
             ? photos.length - 1
@@ -639,19 +648,12 @@ async function installApp() {
         );
       }}
       style={{
-  position: "fixed",
-  left: "20px",
-  top: "50%",
-  transform: "translateY(-50%)",
-  zIndex: 99999,
-  background: "#ffffff",
-  border: "none",
-  borderRadius: "50%",
-  width: "40px",
-  height: "40px",
-  fontSize: "22px",
-  cursor: "pointer",
-}}
+        position: "fixed",
+        left: "20px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        zIndex: 99999,
+      }}
     >
       ←
     </button>
@@ -669,7 +671,6 @@ async function installApp() {
     <button
       onClick={(e) => {
         e.stopPropagation();
-
         setSelectedIndex(
           selectedIndex === photos.length - 1
             ? 0
@@ -677,40 +678,24 @@ async function installApp() {
         );
       }}
       style={{
-  position: "fixed",
-  right: "20px",
-  top: "50%",
-  transform: "translateY(-50%)",
-  zIndex: 99999,
-  background: "#ffffff",
-  border: "none",
-  borderRadius: "50%",
-  width: "40px",
-  height: "40px",
-  fontSize: "22px",
-  cursor: "pointer",
-}}
+        position: "fixed",
+        right: "20px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        zIndex: 99999,
+      }}
     >
       →
     </button>
 
     <button
-      onClick={() =>
-        setSelectedIndex(null)
-      }
+      onClick={() => setSelectedIndex(null)}
       style={{
-  position: "fixed",
-  top: "20px",
-  right: "20px",
-  zIndex: 99999,
-  width: "40px",
-  height: "40px",
-  fontSize: "22px",
-  borderRadius: "50%",
-  background: "#fff",
-  border: "none",
-  cursor: "pointer",
-}}
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        zIndex: 99999,
+      }}
     >
       ✕
     </button>
@@ -744,17 +729,28 @@ async function installApp() {
       );
     }
   }}
+  style={{
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.95)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 99999,
+  }}
 >
-    <button
-      onClick={(e) => {
-  e.stopPropagation();
-        setSelectedVideoIndex(
-          selectedVideoIndex === 0
-            ? videos.length - 1
-            : selectedVideoIndex - 1
-        );
-      }}
-      style={{
+  ←
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+
+    setSelectedVideoIndex(
+      selectedVideoIndex === 0
+        ? videos.length - 1
+        : selectedVideoIndex - 1
+    );
+  }}
+  style={{
     position: "fixed",
     left: "20px",
     top: "50%",
