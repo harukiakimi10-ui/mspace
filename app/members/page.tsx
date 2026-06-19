@@ -204,14 +204,19 @@ async function openChat() {
   console.log("Member Error:", error);
 
   if (data) {
-    console.log("Sending to Crisp:", data);
+  console.log("Sending to Crisp:", data);
 
-(window as any).$crisp.push([
-  "set",
-  "user:nickname",
-  [data.name]
- ]);
+  (window as any).$crisp.push([
+    "set",
+    "user:nickname",
+    [data.name]
+  ]);
 
+  (window as any).$crisp.push([
+    "set",
+    "user:avatar",
+    [data.photo_url]
+  ]);
 }
 
 (window as any).$crisp.push([
