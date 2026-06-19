@@ -16,6 +16,10 @@ const router = useRouter();
   const [selectedPhoto, setSelectedPhoto] = useState("");
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [selectedIndex, setSelectedIndex] =
+  useState<number | null>(null);
+  const [selectedVideoIndex, setSelectedVideoIndex] =
+  useState<number | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
@@ -419,12 +423,14 @@ async function installApp() {
     paddingRight: isMobile ? "10px" : "40px",
   }}
 >
-  {photos.map((photo) => (
+  {photos.map((photo, index) => (
   <img
     key={photo.id}
     src={photo.image_url}
     alt="Photo"
-    onClick={() => setSelectedPhoto(photo.image_url)}
+    onClick={() =>
+  setSelectedIndex(index)
+}
     onMouseEnter={(e) => {
       e.currentTarget.style.transform = "scale(1.03)";
     }}
@@ -476,14 +482,32 @@ async function installApp() {
     paddingRight: isMobile ? "10px" : "40px",
   }}
 >
-  {videos.map((video) => (
+  {videos.map((video, index) => (
+  <div
+  key={video.id}
+  onClick={() => setSelectedVideoIndex(index)}
+  onTouchStart={() => setSelectedVideoIndex(index)}
+  style={{
+    cursor: "pointer",
+    width: "100%",
+    height: isMobile ? "95px" : "100px",
+    overflow: "hidden",
+    borderRadius: "20px",
+    position: "relative",
+  }}
+>
     <video
-      key={video.id}
-      controls
+  muted
+  playsInline
+  preload="metadata"
+  controls={false}
+
+
       style={{
         width: "100%",
-        height: isMobile ? "95px" : "100px",
+        height: "100%",
         objectFit: "cover",
+        pointerEvents: "none",
         borderRadius: "20px",
         border: "1px solid #e8e8e8",
         boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
@@ -494,6 +518,7 @@ async function installApp() {
         type="video/mp4"
       />
     </video>
+    </div>
   ))}
 </div>
 
@@ -573,6 +598,221 @@ async function installApp() {
   >
     📱 Add App
   </button>
+)}
+
+{selectedIndex !== null && (
+  <div
+    onClick={() => setSelectedIndex(null)}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.9)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 99999,
+    }}
+  >
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+
+        setSelectedIndex(
+          selectedIndex === 0
+            ? photos.length - 1
+            : selectedIndex - 1
+        );
+      }}
+      style={{
+  position: "fixed",
+  left: "20px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  zIndex: 99999,
+  background: "#ffffff",
+  border: "none",
+  borderRadius: "50%",
+  width: "40px",
+  height: "40px",
+  fontSize: "22px",
+  cursor: "pointer",
+}}
+    >
+      ←
+    </button>
+
+    <img
+      src={photos[selectedIndex].image_url}
+      alt=""
+      style={{
+        maxWidth: "95%",
+        maxHeight: "90vh",
+        objectFit: "contain",
+      }}
+    />
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+
+        setSelectedIndex(
+          selectedIndex === photos.length - 1
+            ? 0
+            : selectedIndex + 1
+        );
+      }}
+      style={{
+  position: "fixed",
+  right: "20px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  zIndex: 99999,
+  background: "#ffffff",
+  border: "none",
+  borderRadius: "50%",
+  width: "40px",
+  height: "40px",
+  fontSize: "22px",
+  cursor: "pointer",
+}}
+    >
+      →
+    </button>
+
+    <button
+      onClick={() =>
+        setSelectedIndex(null)
+      }
+      style={{
+  position: "fixed",
+  top: "20px",
+  right: "20px",
+  zIndex: 99999,
+  width: "40px",
+  height: "40px",
+  fontSize: "22px",
+  borderRadius: "50%",
+  background: "#fff",
+  border: "none",
+  cursor: "pointer",
+}}
+    >
+      ✕
+    </button>
+  </div>
+)}
+
+{selectedVideoIndex !== null && (
+ <div
+  onClick={() => setSelectedVideoIndex(null)}
+  style={{
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.9)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 9999,
+  }}
+>
+    <button
+      onClick={(e) => {
+  e.stopPropagation();
+        setSelectedVideoIndex(
+          selectedVideoIndex === 0
+            ? videos.length - 1
+            : selectedVideoIndex - 1
+        );
+      }}
+      style={{
+    position: "fixed",
+    left: "20px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 99999,
+    background: "#ffffff",
+    border: "none",
+    borderRadius: "50%",
+    width: "40px",
+    height: "40px",
+    fontSize: "22px",
+    cursor: "pointer",
+  }}
+>
+  ←
+</button>
+
+  <video
+  key={selectedVideoIndex}
+  controls
+  autoPlay
+  onClick={(e) => e.stopPropagation()}
+  style={{
+    maxWidth: "95%",
+    maxHeight: "90%",
+  }}
+>
+      <source
+        src={
+          videos[selectedVideoIndex]
+            .video_url
+        }
+        type="video/mp4"
+      />
+    </video>
+
+    <button
+      onClick={(e) => {
+  e.stopPropagation();
+        setSelectedVideoIndex(
+          selectedVideoIndex ===
+            videos.length - 1
+            ? 0
+            : selectedVideoIndex + 1
+        );
+      }}
+      
+  
+  style={{
+    position: "fixed",
+    right: "20px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 99999,
+    background: "#ffffff",
+    border: "none",
+    borderRadius: "50%",
+    width: "40px",
+    height: "40px",
+    fontSize: "22px",
+    cursor: "pointer",
+  }}
+>
+  →
+</button>
+
+    <button
+      onClick={() =>
+        setSelectedVideoIndex(null)
+      }
+      
+  style={{
+    position: "fixed",
+    top: "20px",
+    right: "20px",
+    zIndex: 99999,
+    width: "40px",
+    height: "40px",
+    fontSize: "22px",
+    borderRadius: "50%",
+    background: "#fff",
+    border: "none",
+    cursor: "pointer",
+  }}
+>
+  ✕
+</button>
+  </div>
 )}
 </main>
   );

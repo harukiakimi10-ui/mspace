@@ -15,6 +15,11 @@ export default function Home() {
   const [photoCount, setPhotoCount] = useState(0);
   const [videoCount, setVideoCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showInstallButton, setShowInstallButton] =
+  useState(false);
+
+const [deferredPrompt, setDeferredPrompt] =
+  useState<any>(null);
   const router = useRouter();
   useEffect(() => {
   const memberId = localStorage.getItem("mspace_member_id");
@@ -22,6 +27,25 @@ export default function Home() {
   if (memberId) {
     router.push("/members");
   }
+}, []);
+
+useEffect(() => {
+  const handler = (e: any) => {
+    e.preventDefault();
+    setDeferredPrompt(e);
+    setShowInstallButton(true);
+  };
+
+  window.addEventListener(
+    "beforeinstallprompt",
+    handler
+  );
+
+  return () =>
+    window.removeEventListener(
+      "beforeinstallprompt",
+      handler
+    );
 }, []);
 
 useEffect(() => {
@@ -98,6 +122,19 @@ useEffect(() => {
 
   loadLatestVideo();
 }, []);
+
+const installApp = async () => {
+  if (!deferredPrompt) return;
+
+  deferredPrompt.prompt();
+
+  const result =
+    await deferredPrompt.userChoice;
+
+  if (result.outcome === "accepted") {
+    setShowInstallButton(false);
+  }
+};
 
 async function joinMSpace() {
   setLoading(true);
@@ -882,6 +919,28 @@ onClick={() => {
   © 2026 Donald Lee. All Rights Reserved.
 </p>
 </footer>
+{showInstallButton && (
+  <button
+    onClick={installApp}
+    style={{
+      position: "fixed",
+      bottom: "20px",
+      left: "20px",
+      zIndex: 9999,
+      padding: "10px 16px",
+      borderRadius: "999px",
+      border: "none",
+      background: "#7c3aed",
+      color: "#fff",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow:
+        "0 4px 12px rgba(0,0,0,0.2)",
+    }}
+  >
+    📱 Add App
+  </button>
+)}
 </main>
 
 </>
