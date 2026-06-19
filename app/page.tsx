@@ -616,18 +616,23 @@ onClick={() => {
     </h3>
 
     {latestVideo && (
-      <video
-        controls
-        style={{
-          width: "100%",
-          height: "150px",
-          objectFit: "cover",
-          borderRadius: "10px",
-        }}
-      >
-        <source src={latestVideo} type="video/mp4" />
-      </video>
-    )}
+  <video
+    autoPlay
+    muted
+    loop
+    playsInline
+    controls={false}
+    style={{
+      width: "100%",
+      height: "150px",
+      objectFit: "cover",
+      borderRadius: "10px",
+      pointerEvents: "none",
+    }}
+  >
+    <source src={latestVideo} type="video/mp4" />
+  </video>
+)}
   </div>
 </div>
 </div> {/* closes left-panel */}

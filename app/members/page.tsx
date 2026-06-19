@@ -666,66 +666,78 @@ if (loading) {
     }}
   >
     <button
-      onClick={(e) => {
-        e.stopPropagation();
-        setSelectedIndex(
-          selectedIndex === 0
-            ? photos.length - 1
-            : selectedIndex - 1
-        );
-      }}
-      style={{
-        position: "fixed",
-        left: "20px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        zIndex: 99999,
-      }}
-    >
-      ←
-    </button>
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedIndex(
+      selectedIndex === 0
+        ? photos.length - 1
+        : selectedIndex - 1
+    );
+  }}
+  style={{
+    position: "fixed",
+    left: "20px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 99999,
+    background: "transparent",
+    border: "none",
+    fontSize: "25px",
+    cursor: "pointer",
+  }}
+>
+  ←
+</button>
 
-    <img
-      src={photos[selectedIndex].image_url}
-      alt=""
-      style={{
-        maxWidth: "95%",
-        maxHeight: "90vh",
-        objectFit: "contain",
-      }}
-    />
+<img
+  src={photos[selectedIndex].image_url}
+  alt=""
+  style={{
+    maxWidth: "95%",
+    maxHeight: "90vh",
+    objectFit: "contain",
+  }}
+/>
 
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        setSelectedIndex(
-          selectedIndex === photos.length - 1
-            ? 0
-            : selectedIndex + 1
-        );
-      }}
-      style={{
-        position: "fixed",
-        right: "20px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        zIndex: 99999,
-      }}
-    >
-      →
-    </button>
+<button
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedIndex(
+      selectedIndex === photos.length - 1
+        ? 0
+        : selectedIndex + 1
+    );
+  }}
+  style={{
+    position: "fixed",
+    right: "20px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 99999,
+    background: "transparent",
+    border: "none",
+    fontSize: "25px",
+    cursor: "pointer",
+  }}
+>
+  →
+</button>
 
-    <button
-      onClick={() => setSelectedIndex(null)}
-      style={{
-        position: "fixed",
-        top: "20px",
-        right: "20px",
-        zIndex: 99999,
-      }}
-    >
-      ✕
-    </button>
+<button
+  onClick={() => setSelectedIndex(null)}
+  style={{
+    position: "fixed",
+    top: "20px",
+    right: "20px",
+    zIndex: 99999,
+    background: "transparent",
+    border: "none",
+    fontSize: "25px",
+    cursor: "pointer",
+  }}
+>
+  ✕
+</button>
   </div>
 )}
 
@@ -779,29 +791,26 @@ if (loading) {
     );
   }}
   style={{
-    position: "fixed",
-    left: "20px",
-    top: "50%",
-    transform: "translateY(-50%)",
-    zIndex: 99999,
-    background: "#ffffff",
-    border: "none",
-    borderRadius: "50%",
-    width: "40px",
-    height: "40px",
-    fontSize: "22px",
-    cursor: "pointer",
-  }}
+  position: "fixed",
+  left: "20px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  zIndex: 99999,
+  background: "transparent",
+  border: "none",
+  fontSize: "25px",
+  color: "#000",
+  cursor: "pointer",
+}}
 >
   ←
 </button>
 
   <video
   key={selectedVideoIndex}
-  controls={false}
+  controls
   autoPlay
   playsInline
-  muted
   disablePictureInPicture
   controlsList="nofullscreen"
   onClick={(e) => e.stopPropagation()}
@@ -832,19 +841,17 @@ if (loading) {
       
   
   style={{
-    position: "fixed",
-    right: "20px",
-    top: "50%",
-    transform: "translateY(-50%)",
-    zIndex: 99999,
-    background: "#ffffff",
-    border: "none",
-    borderRadius: "50%",
-    width: "40px",
-    height: "40px",
-    fontSize: "22px",
-    cursor: "pointer",
-  }}
+  position: "fixed",
+  right: "20px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  zIndex: 99999,
+  background: "transparent",
+  border: "none",
+  fontSize: "25px",
+  color: "#000",
+  cursor: "pointer",
+}}
 >
   →
 </button>
@@ -855,18 +862,17 @@ if (loading) {
       }
       
   style={{
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    zIndex: 99999,
-    width: "40px",
-    height: "40px",
-    fontSize: "22px",
-    borderRadius: "50%",
-    background: "#fff",
-    border: "none",
-    cursor: "pointer",
-  }}
+  position: "fixed",
+  top: "20px",
+  right: "20px",
+  zIndex: 99999,
+  background: "transparent",
+  border: "none",
+  fontSize: "25px",
+  color: "#000",
+  cursor: "pointer",
+}}
+
 >
   ✕
 </button>
