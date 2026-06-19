@@ -22,11 +22,10 @@ const router = useRouter();
   useState<number | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  loadProfile();
-  loadPhotos();
-  loadVideos();
+  loadInitialData();
 
   checkBanStatus();
 
@@ -77,6 +76,17 @@ useEffect(() => {
       checkScreen
     );
 }, []);
+
+
+async function loadInitialData() {
+  await Promise.all([
+    loadProfile(),
+    loadPhotos(),
+    loadVideos(),
+  ]);
+
+  setLoading(false);
+}
 
 
 async function loadProfile() {
@@ -173,6 +183,23 @@ async function installApp() {
     setShowInstallButton(false);
   }
 }
+
+if (loading) {
+  return (
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        fontSize: "20px",
+      }}
+    >
+      Loading...
+    </div>
+  );
+}
+
   return (
     <main
   style={{
@@ -730,14 +757,15 @@ async function installApp() {
     }
   }}
   style={{
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.95)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 99999,
-  }}
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.95)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 99999,
+  touchAction: "pan-y",
+}}
 >
   ←
 <button
@@ -770,12 +798,16 @@ async function installApp() {
 
   <video
   key={selectedVideoIndex}
-  controls
+  controls={false}
   autoPlay
+  playsInline
+  muted
+  disablePictureInPicture
+  controlsList="nofullscreen"
   onClick={(e) => e.stopPropagation()}
   style={{
     maxWidth: "95%",
-    maxHeight: "90%",
+    maxHeight: "90vh",
   }}
 >
       <source
