@@ -24,6 +24,36 @@ const router = useRouter();
   const [touchStartX, setTouchStartX] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    appName: "MSpace",
+    photos: "Photos",
+    videos: "Videos",
+    chat: "Chat With Me",
+    install: "Install MSpace",
+    loading: "Loading...",
+    welcome:
+      "Welcome to my personal space. View my exclusive photos, watch my latest videos and chat with me directly.",
+  },
+
+  zh: {
+    appName: "星域",
+    photos: "照片",
+    videos: "视频",
+    chat: "与我聊天",
+    install: "安装星域",
+    loading: "加载中...",
+    welcome:
+      "欢迎来到我的个人空间。查看我的独家照片、观看最新视频，并直接与我聊天。",
+  },
+}[language];
+
   useEffect(() => {
   loadInitialData();
 
@@ -172,18 +202,39 @@ async function checkBanStatus() {
 }
 
 async function installApp() {
-  if (!deferredPrompt) return;
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
 
-  deferredPrompt.prompt();
+    const choiceResult =
+      await deferredPrompt.userChoice;
 
-  const choiceResult =
-    await deferredPrompt.userChoice;
+    if (choiceResult.outcome === "accepted") {
+      console.log("MSpace installed");
+    }
 
-  if (choiceResult.outcome === "accepted") {
-    setShowInstallButton(false);
+    return;
+  }
+
+  const isIOS =
+    /iPad|iPhone|iPod/.test(
+      navigator.userAgent
+    );
+
+  if (isIOS) {
+    alert(
+      "To install MSpace:\n\n" +
+      "1. Tap Share\n" +
+      "2. Tap Add to Home Screen\n" +
+      "3. Tap Add"
+    );
+  } else {
+    alert(
+      "To install MSpace:\n\n" +
+      "Open your browser menu and select:\n" +
+      "'Install App' or 'Add to Home Screen'"
+    );
   }
 }
-
 async function openChat() {
   const memberId =
     localStorage.getItem("mspace_member_id");
@@ -236,7 +287,7 @@ if (loading) {
         fontSize: "20px",
       }}
     >
-      Loading...
+      {t.loading}
     </div>
   );
 }
@@ -274,7 +325,7 @@ if (loading) {
     WebkitTextFillColor: "transparent",
   }}
 >
-  MSpace
+  {t.appName}
 </h1>
 </div>
 
@@ -350,8 +401,7 @@ if (loading) {
       }}
     >
       {
-  profileBio ||
-  "Welcome to my personal space. View my exclusive photos, watch my latest videos and chat with me directly."
+  profileBio || t.welcome
 }
     </p>
 
@@ -399,7 +449,7 @@ if (loading) {
     marginTop: "4px",
   }}
 >
-  Photos
+  {t.photos}
 </div>
       </div>
 
@@ -425,7 +475,7 @@ if (loading) {
     marginTop: "4px",
   }}
 >
-  Videos
+  {t.videos}
 </div>
       </div>
     </div>
@@ -445,7 +495,7 @@ if (loading) {
            "0 4px 12px rgba(124,58,237,0.25)",
       }}
     >
-      💬 Chat With Me
+      💬 {t.chat}
     </button>
   </div>
 </div>
@@ -469,7 +519,7 @@ if (loading) {
 
   }}
 >
-  Photos
+  {t.photos}
 </h2>
 
       <div
@@ -529,7 +579,7 @@ if (loading) {
 
   }}
 >
-  Videos
+  {t.videos}
 </h2>
 
      <div
@@ -641,25 +691,24 @@ if (loading) {
 
 {showInstallButton && (
   <button
-    onClick={installApp}
-    style={{
-      position: "fixed",
-      bottom: "20px",
-      left: "20px",
-      zIndex: 9999,
-      padding: "10px 16px",
-      borderRadius: "999px",
-      border: "none",
-      background: "#7c3aed",
-      color: "#fff",
-      fontWeight: "600",
-      cursor: "pointer",
-      boxShadow:
-        "0 4px 12px rgba(0,0,0,0.2)",
-    }}
-  >
-    📱 Add App
-  </button>
+  onClick={installApp}
+  style={{
+    position: "fixed",
+    bottom: "20px",
+    left: "20px",
+    zIndex: 9999,
+    padding: "10px 16px",
+    borderRadius: "999px",
+    border: "none",
+    background: "#7c3aed",
+    color: "#fff",
+    fontWeight: "600",
+    cursor: "pointer",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+  }}
+>
+  📱 {t.install}
+</button>
 )}
 
 

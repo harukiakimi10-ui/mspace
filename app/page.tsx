@@ -21,6 +21,56 @@ export default function Home() {
 const [deferredPrompt, setDeferredPrompt] =
   useState<any>(null);
   const router = useRouter();
+  const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    join: "Join MSpace",
+    joinDesc: "Join and start connecting",
+    name: "Name",
+    enterName: "Enter your name",
+    profilePhoto: "Profile Photo",
+    uploadPhoto: "Upload Profile Photo",
+    choosePhoto: "Choose Photo",
+    selected: "Selected",
+    connecting: "Connecting...",
+    addApp: "Add App",
+    recentPhotos: "Recent Photos",
+    latestVideo: "Latest Video",
+    photos: "Photos",
+    videos: "Videos",
+    welcomeTo: "Welcome to",
+    personalSpace: "Personal Space",
+    personalDesc:
+      "A place where I share my life moments and connect with friends.",
+  },
+
+  zh: {
+    join: "加入星域",
+    joinDesc: "加入并开始连接",
+    name: "姓名",
+    enterName: "请输入姓名",
+    profilePhoto: "头像照片",
+    uploadPhoto: "上传头像照片",
+    choosePhoto: "选择照片",
+    selected: "已选择",
+    connecting: "连接中...",
+    addApp: "安装星域",
+    recentPhotos: "最新照片",
+    latestVideo: "最新视频",
+    photos: "照片",
+    videos: "视频",
+    welcomeTo: "欢迎来到",
+    personalSpace: "个人空间",
+    personalDesc:
+      "这是我分享生活点滴并与朋友交流的地方。",
+  },
+}[language];
+
   useEffect(() => {
   const memberId = localStorage.getItem("mspace_member_id");
 
@@ -310,7 +360,7 @@ onClick={() => {
     cursor: "pointer",
   }}
 >
-  Join MSpace
+  {t.join}
 </button>
   </div>
 
@@ -355,7 +405,7 @@ onClick={() => {
         marginBottom: "10px",
       }}
     >
-      Welcome to
+      {t.welcomeTo}
     </p>
 
     <h2
@@ -370,7 +420,7 @@ onClick={() => {
     >
       Donald Lee's
       <br />
-      Personal Space
+      {t.personalSpace}
     </h2>
 
     <p
@@ -380,9 +430,7 @@ onClick={() => {
         lineHeight: "1.7",
       }}
     >
-      A place where I share my life moments,
-      <br />
-      and connect with friends.
+      {t.personalDesc}
     </p>
 
   </div>
@@ -460,7 +508,7 @@ onClick={() => {
           color: "#7c3aed",
         }}
       >
-        Photos
+        {t.photos}
       </p>
     </div>
   </div>
@@ -524,7 +572,7 @@ onClick={() => {
           color: "#7c3aed",
         }}
       >
-        Videos
+        {t.videos}
       </p>
     </div>
   </div>
@@ -571,7 +619,7 @@ onClick={() => {
         marginBottom: "12px",
       }}
     >
-      Recent Photos
+      {t.recentPhotos}
     </h3>
 
     <div
@@ -612,7 +660,7 @@ onClick={() => {
         marginBottom: "12px",
       }}
     >
-      Latest Video
+      {t.latestVideo}
     </h3>
 
     {latestVideo && (
@@ -662,7 +710,7 @@ onClick={() => {
       color: "#111827",
     }}
   >
-    Join MSpace
+    {t.join}
   </h2>
 
   <p
@@ -673,7 +721,7 @@ onClick={() => {
       fontSize: "18px",
     }}
   >
-    Join and start connecting
+    {t.joinDesc}
   </p>
 
   <label
@@ -685,12 +733,12 @@ onClick={() => {
     color: "#111827",
   }}
 >
-  Name
+  {t.name}
 </label>
 
   <input
     type="text"
-    placeholder="Enter your name"
+    placeholder={t.enterName}
     value={name}
     onChange={(e) => setName(e.target.value)}
     style={{
@@ -713,7 +761,7 @@ onClick={() => {
     color: "#111827",
   }}
 >
-  Profile Photo
+  {t.profilePhoto}
 </label>
 
   <div
@@ -762,7 +810,7 @@ onClick={() => {
     marginBottom: "5px",
   }}
 >
-  Upload Profile Photo
+  {t.uploadPhoto}
 </p>
 
 <p
@@ -787,7 +835,7 @@ onClick={() => {
     fontWeight: "600",
   }}
 >
-  Choose Photo
+  {t.choosePhoto}
 
   <input
     type="file"
@@ -813,7 +861,7 @@ onClick={() => {
       wordBreak: "break-all",
     }}
   >
-    Selected: {fileName}
+    {t.selected}: {fileName}
   </p>
 )}
   </div>
@@ -854,10 +902,10 @@ onClick={() => {
             verticalAlign: "middle",
           }}
         />
-        Connecting...
+        {t.connecting}
       </>
     ) : (
-      "Join MSpace"
+      t.join
     )}
   </>
 </button>
@@ -943,7 +991,7 @@ onClick={() => {
         "0 4px 12px rgba(0,0,0,0.2)",
     }}
   >
-    📱 Add App
+    📱 {t.addApp}
   </button>
 )}
 </main>
