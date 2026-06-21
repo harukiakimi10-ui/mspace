@@ -63,13 +63,28 @@ async function loadVideos() {
 async function loadMembers() {
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data: membersData } = await supabase
     .from("members")
     .select("*")
     .order("id", { ascending: false });
 
-  if (data) {
-    setMembers(data);
+  const { data: bannedDevices } = await supabase
+    .from("banned_devices")
+    .select("device_id");
+
+  if (membersData) {
+    const updatedMembers = membersData.map(
+      (member) => ({
+        ...member,
+        device_banned:
+          bannedDevices?.some(
+            (d) =>
+              d.device_id === member.device_id
+          ) || false,
+      })
+    );
+
+    setMembers(updatedMembers);
   }
 }
 
@@ -269,16 +284,30 @@ async function banDevice(member: any) {
     return;
   }
 
-  await supabase
-    .from("members")
-    .update({
-      banned: true,
-    })
-    .eq("device_id", member.device_id);
-
   alert(
     "Device banned and all accounts on this device were banned."
   );
+
+  loadMembers();
+}
+
+
+async function unbanDevice(member: any) {
+  alert("Member device: " + member.device_id);
+
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("banned_devices")
+    .delete()
+    .eq("device_id", member.device_id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("Device unbanned!");
 
   loadMembers();
 }
@@ -691,10 +720,23 @@ async function loadSettings() {
     {member.banned ? "Unban" : "Ban"}
   </button>
 
+  {member.device_banned ? (
   <button
-    onClick={() =>
-      banDevice(member)
-    }
+    onClick={() => unbanDevice(member)}
+    style={{
+      background: "#28a745",
+      color: "white",
+      border: "none",
+      padding: "6px 12px",
+      marginRight: "10px",
+      cursor: "pointer",
+    }}
+  >
+    Unban Device
+  </button>
+) : (
+  <button
+    onClick={() => banDevice(member)}
     style={{
       background: "#8b0000",
       color: "white",
@@ -706,6 +748,7 @@ async function loadSettings() {
   >
     Ban Device
   </button>
+)}
 
   <button
     onClick={() =>

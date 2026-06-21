@@ -184,13 +184,20 @@ async function checkBanStatus() {
 
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data: member, error } = await supabase
     .from("members")
-    .select("banned")
+    .select("*")
     .eq("member_id", memberId)
     .single();
 
-  if (data?.banned) {
+  if (error || !member) {
+    localStorage.removeItem("mspace_member_id");
+    router.push("/");
+    return;
+  }
+
+  // Account ban
+  if (member.banned) {
     alert("Your MSpace account has been banned.");
 
     localStorage.removeItem(
@@ -198,9 +205,30 @@ async function checkBanStatus() {
     );
 
     router.push("/");
+    return;
+  }
+
+  // Device ban
+  if (member.device_id) {
+    const { data: bannedDevice } =
+      await supabase
+        .from("banned_devices")
+        .select("*")
+        .eq("device_id", member.device_id)
+        .maybeSingle();
+
+    if (bannedDevice) {
+      alert("This device has been blocked.");
+
+      localStorage.removeItem(
+        "mspace_member_id"
+      );
+
+      router.push("/");
+      return;
+    }
   }
 }
-
 async function installApp() {
   if (deferredPrompt) {
     deferredPrompt.prompt();
