@@ -15,6 +15,7 @@ const [profilePhotoFile, setProfilePhotoFile] =
 const [photos, setPhotos] = useState<any[]>([]);
 
 const [videoFile, setVideoFile] = useState<File | null>(null);
+const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 const [videos, setVideos] = useState<any[]>([]);
 const [members, setMembers] = useState<any[]>([]);
 
@@ -121,38 +122,61 @@ async function uploadVideo() {
     return;
   }
 
+  if (!thumbnailFile) {
+    alert("Please select a thumbnail");
+    return;
+  }
+
   const supabase = createClient();
 
-  const fileName =
-    Date.now() + "-" + videoFile.name;
+  const videoFileName =
+    Date.now() + "-video-" + videoFile.name;
 
-  const { error: uploadError } =
+  const thumbnailFileName =
+    Date.now() + "-thumb-" + thumbnailFile.name;
+
+  const { error: videoError } =
     await supabase.storage
       .from("videos")
-      .upload(fileName, videoFile);
+      .upload(videoFileName, videoFile);
 
-  if (uploadError) {
-    console.log(uploadError);
-    alert(uploadError.message);
+  if (videoError) {
+    alert(videoError.message);
+    return;
+  }
+
+  const { error: thumbnailError } =
+    await supabase.storage
+      .from("Thumbnails")
+      .upload(thumbnailFileName, thumbnailFile);
+
+  if (thumbnailError) {
+    alert(thumbnailError.message);
     return;
   }
 
   const videoUrl =
-    `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/videos/${fileName}`;
+    `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/videos/${videoFileName}`;
+
+  const thumbnailUrl =
+    `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/Thumbnails/${thumbnailFileName}`;
 
   const { error } = await supabase
     .from("videos")
     .insert({
       video_url: videoUrl,
+      thumbnail_url: thumbnailUrl,
     });
 
   if (error) {
-    console.log(error);
     alert(error.message);
     return;
   }
 
   alert("Video uploaded!");
+
+  setVideoFile(null);
+  setThumbnailFile(null);
 
   loadVideos();
 }
@@ -444,6 +468,7 @@ async function loadSettings() {
   }
 />
 
+
 <button
   onClick={saveSettings}
   style={{
@@ -527,6 +552,20 @@ async function loadSettings() {
   accept="video/*"
   onChange={(e) =>
     setVideoFile(
+      e.target.files?.[0] || null
+    )
+  }
+/>
+
+
+<br />
+<br />
+
+<input
+  type="file"
+  accept="image/*"
+  onChange={(e) =>
+    setThumbnailFile(
       e.target.files?.[0] || null
     )
   }
