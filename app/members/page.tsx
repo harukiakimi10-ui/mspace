@@ -608,11 +608,12 @@ if (loading) {
     position: "relative",
   }}
 >
-   <video
-  muted
-  playsInline
-  preload="metadata"
-  controls={false}
+  <img
+  src={
+    video.thumbnail_url ||
+    "https://via.placeholder.com/300x200?text=Video"
+  }
+  alt="Video Thumbnail"
   style={{
     width: "100%",
     height: "100%",
@@ -622,12 +623,7 @@ if (loading) {
     border: "1px solid #e8e8e8",
     boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
   }}
->
-      <source
-        src={video.video_url}
-        type="video/mp4"
-      />
-    </video>
+/>
     </div>
   ))}
 </div>
