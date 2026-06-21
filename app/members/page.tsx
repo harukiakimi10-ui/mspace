@@ -611,9 +611,7 @@ if (loading) {
    <video
   muted
   playsInline
-  autoPlay
-  loop
-  preload="auto"
+  preload="metadata"
   controls={false}
   style={{
     width: "100%",
