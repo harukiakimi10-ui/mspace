@@ -236,58 +236,21 @@ async function installApp() {
   }
 }
 async function openChat() {
-  const memberId =
-    localStorage.getItem("mspace_member_id");
+  alert("Button clicked");
 
-  console.log("Member ID:", memberId);
   console.log("CRISP:", (window as any).$crisp);
 
-  if (!memberId) return;
+  if (!(window as any).$crisp) {
+    alert("Crisp not loaded");
+    return;
+  }
 
-  const supabase = createClient();
+  alert("Crisp loaded");
 
-  const { data, error } = await supabase
-    .from("members")
-    .select("name, photo_url")
-    .eq("member_id", memberId)
-    .single();
-
-  console.log("Member Data:", data);
-  console.log("Member Error:", error);
-
-  if (data) {
-  console.log("Sending to Crisp:", data);
-
-  (window as any).$crisp.push([
-    "set",
-    "user:nickname",
-    [data.name]
-  ]);
-
-  (window as any).$crisp.push([
-    "set",
-    "user:avatar",
-    [data.photo_url]
-  ]);
-}
-
-if (!(window as any).$crisp) {
-  alert("Crisp not loaded yet");
-  return;
-}
-
-(window as any).$crisp.push([
-  "do",
-  "chat:show"
-]);
-
-setTimeout(() => {
   (window as any).$crisp.push([
     "do",
     "chat:open"
   ]);
-}, 500);
-
 }
 
 if (loading) {
