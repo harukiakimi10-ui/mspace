@@ -236,16 +236,10 @@ async function installApp() {
   }
 }
 async function openChat() {
-  alert("Button clicked");
-
-  console.log("CRISP:", (window as any).$crisp);
-
   if (!(window as any).$crisp) {
     alert("Crisp not loaded");
     return;
   }
-
-  alert("Crisp loaded");
 
   (window as any).$crisp.push([
     "do",
