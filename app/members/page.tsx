@@ -237,30 +237,49 @@ async function installApp() {
 }
 async function openChat() {
   if (!(window as any).$crisp) {
-    alert("Crisp not loaded");
+    alert("Chat is loading...");
     return;
   }
 
+  // Open chat immediately
   (window as any).$crisp.push([
     "do",
     "chat:open"
   ]);
-}
 
-if (loading) {
-  return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        fontSize: "20px",
-      }}
-    >
-      {t.loading}
-    </div>
-  );
+  // Load member info in background
+  try {
+    const memberId =
+      localStorage.getItem("mspace_member_id");
+
+    if (!memberId) return;
+
+    const supabase = createClient();
+
+    const { data } = await supabase
+      .from("members")
+      .select("name, photo_url")
+      .eq("member_id", memberId)
+      .single();
+
+    if (data) {
+      (window as any).$crisp.push([
+        "set",
+        "user:nickname",
+        [data.name]
+      ]);
+
+      if (data.photo_url) {
+        (window as any).$crisp.push([
+          "set",
+          "user:avatar",
+          [data.photo_url]
+        ]);
+      }
+    }
+  } catch (error) {
+    console.log("Crisp update failed:", error);
+  }
 }
 
   return (
