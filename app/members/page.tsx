@@ -240,6 +240,7 @@ async function openChat() {
     localStorage.getItem("mspace_member_id");
 
   console.log("Member ID:", memberId);
+  console.log("CRISP:", (window as any).$crisp);
 
   if (!memberId) return;
 
@@ -270,10 +271,23 @@ async function openChat() {
   ]);
 }
 
+if (!(window as any).$crisp) {
+  alert("Crisp not loaded yet");
+  return;
+}
+
 (window as any).$crisp.push([
-   "do",
-   "chat:open"
+  "do",
+  "chat:show"
+]);
+
+setTimeout(() => {
+  (window as any).$crisp.push([
+    "do",
+    "chat:open"
   ]);
+}, 500);
+
 }
 
 if (loading) {
