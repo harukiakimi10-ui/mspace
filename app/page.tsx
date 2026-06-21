@@ -28,47 +28,75 @@ const [deferredPrompt, setDeferredPrompt] =
     : "en";
 
 const t = {
-  en: {
-    join: "Join MSpace",
-    joinDesc: "Join and start connecting",
-    name: "Name",
-    enterName: "Enter your name",
-    profilePhoto: "Profile Photo",
-    uploadPhoto: "Upload Profile Photo",
-    choosePhoto: "Choose Photo",
-    selected: "Selected",
-    connecting: "Connecting...",
-    addApp: "Add App",
-    recentPhotos: "Recent Photos",
-    latestVideo: "Latest Video",
-    photos: "Photos",
-    videos: "Videos",
-    welcomeTo: "Welcome to",
-    personalSpace: "Personal Space",
-    personalDesc:
-      "A place where I share my life moments and connect with friends.",
-  },
+en: {
+join: "Join MSpace",
+joinDesc: "Join and start connecting",
+name: "Name",
+enterName: "Enter your name",
+profilePhoto: "Profile Photo",
+uploadPhoto: "Upload Profile Photo",
+choosePhoto: "Choose Photo",
+selected: "Selected",
+connecting: "Connecting…",
+addApp: "Add App",
+recentPhotos: "Recent Photos",
+latestVideo: "Latest Video",
+photos: "Photos",
+videos: "Videos",
+welcomeTo: "Welcome to",
+personalSpace: "Personal Space",
+personalDesc:
+"A place where I share my life moments and connect with friends.",
 
-  zh: {
-    join: "加入星域",
-    joinDesc: "加入并开始连接",
-    name: "姓名",
-    enterName: "请输入姓名",
-    profilePhoto: "头像照片",
-    uploadPhoto: "上传头像照片",
-    choosePhoto: "选择照片",
-    selected: "已选择",
-    connecting: "连接中...",
-    addApp: "安装星域",
-    recentPhotos: "最新照片",
-    latestVideo: "最新视频",
-    photos: "照片",
-    videos: "视频",
-    welcomeTo: "欢迎来到",
-    personalSpace: "个人空间",
-    personalDesc:
-      "这是我分享生活点滴并与朋友交流的地方。",
-  },
+optional: "JPG, PNG or WebP • Optional",
+termsText: "By joining, you agree to our",
+terms: "Terms of Service",
+privacy: "Privacy Policy",
+enterNameAlert: "Please enter your name",
+blockedDevice: "This device has been blocked.",
+bannedAccount: "Your MSpace account has been banned.",
+error: "Error",
+copyright: "All Rights Reserved",
+appName: "MSpace",
+ownerSpace: "Donald Lee's",
+
+
+},
+
+zh: {
+join: "加入星域",
+joinDesc: "加入并开始交流",
+name: "姓名",
+enterName: "请输入您的姓名",
+profilePhoto: "头像照片",
+uploadPhoto: "上传头像照片",
+choosePhoto: "选择照片",
+selected: "已选择",
+connecting: "连接中…",
+addApp: "安装星域",
+recentPhotos: "最新照片",
+latestVideo: "最新视频",
+photos: "照片",
+videos: "视频",
+welcomeTo: "欢迎来到",
+personalSpace: "个人空间",
+personalDesc:
+"这是我分享生活点滴并与朋友交流的地方。",
+
+optional: "JPG、PNG 或 WebP • 可选",
+termsText: "加入即表示您同意我们的",
+terms: "服务条款",
+privacy: "隐私政策",
+enterNameAlert: "请输入您的姓名",
+blockedDevice: "此设备已被封锁。",
+bannedAccount: "您的星域账户已被封禁。",
+error: "错误",
+copyright: "版权所有",
+appName: "星域",
+ownerSpace: "Donald Lee的",
+
+
+},
 }[language];
 
   useEffect(() => {
@@ -190,7 +218,8 @@ async function joinMSpace() {
   setLoading(true);
 
   if (!name.trim()) {
-    alert("Please enter your name");
+    alert(t.enterNameAlert);
+
     setLoading(false);
     return;
   }
@@ -228,7 +257,8 @@ const bannedDevice = bannedDevices?.find(
 );
 
 if (bannedDevice) {
-  alert("This device has been blocked.");
+  alert(t.blockedDevice);
+
   setLoading(false);
   return;
 }
@@ -240,9 +270,8 @@ if (bannedDevice) {
   .single();
 
 if (existingMember?.banned) {
-  alert(
-    "Your MSpace account has been banned."
-  );
+  alert(t.bannedAccount);
+
   setLoading(false);
   return;
 }
@@ -290,7 +319,8 @@ console.log("PHOTO URL:", photoUrl);
   ]);
 
 if (error) {
-  alert("Error: " + error.message);
+    alert(`${t.error}: ${error.message}`);
+
   setLoading(false);
   return;
 }
@@ -331,7 +361,7 @@ return (
 >
  <img
   src="/MSpace-logo.jpg.jpeg"
-  alt="MSpace"
+  alt={t.appName}
   style={{
     height: "55px",
     width: "auto",
@@ -418,9 +448,9 @@ onClick={() => {
         color: "#111827",
       }}
     >
-      Donald Lee's
-      <br />
-      {t.personalSpace}
+      {t.ownerSpace}
+<br />
+{t.personalSpace}
     </h2>
 
     <p
@@ -821,7 +851,7 @@ onClick={() => {
     marginBottom: "10px",
   }}
 >
-  JPG, PNG or WebP • Optional
+  {t.optional}
 </p>
     <label
   style={{
@@ -911,35 +941,36 @@ onClick={() => {
 </button>
 
   <p
+  style={{
+    textAlign: "center",
+    marginTop: "12px",
+    color: "#6b7280",
+    fontSize: "14px",
+    lineHeight: "1.4",
+  }}
+>
+  {t.termsText}
+  <span
     style={{
-      textAlign: "center",
-      marginTop: "12px",
-      color: "#6b7280",
-      fontSize: "14px",
-      lineHeight: "1.4",
+      color: "#7c3aed",
+      fontWeight: "600",
     }}
   >
-    By joining, you agree to our
-    <span
-      style={{
-        color: "#7c3aed",
-        fontWeight: "600",
-      }}
-    >
-      {" "}Terms of Service
-    </span>
-    {" "}and{" "}
-    <span
-      style={{
-        color: "#7c3aed",
-        fontWeight: "600",
-      }}
-    >
-      Privacy Policy
-    </span>
-    .
-  </p>
-
+    {" "}{t.terms}
+  </span>
+  {" "}
+  {language === "zh" ? "和" : "and"}
+  {" "}
+  <span
+    style={{
+      color: "#7c3aed",
+      fontWeight: "600",
+    }}
+  >
+    {t.privacy}
+  </span>
+  .
+</p>
 </div> {/* closes signup card */}
 </div> {/* closes right-panel */}
 </div> {/* closes hero-section */}
@@ -960,7 +991,7 @@ onClick={() => {
     fontSize: "16px",
   }}
 >
-  MSpace
+  {t.appName}
 </h3>
 
   <p
@@ -969,7 +1000,7 @@ onClick={() => {
     fontSize: "13px",
   }}
 >
-  © 2026 Donald Lee. All Rights Reserved.
+ ©️ 2026 Donald Lee. {t.copyright}
 </p>
 </footer>
 {showInstallButton && (
