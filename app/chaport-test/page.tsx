@@ -36,6 +36,27 @@ export default function ChaportTest() {
       <div style={{ padding: 20 }}>
         <h1>MSpace Chaport Test</h1>
         <p>If the chat bubble appears, Chaport is loading correctly.</p>
+
+      <button
+  onClick={() => {
+    console.log("Button clicked");
+
+    if ((window as any).chaport) {
+      (window as any).chaport.q("open");
+    }
+  }}
+  style={{
+    background: "#9C27B0",
+    color: "white",
+    border: "none",
+    padding: "12px 24px",
+    borderRadius: "12px",
+    cursor: "pointer",
+    marginTop: "20px"
+  }}
+>
+  💬 Chat With Me
+</button>  
       </div>
     </>
   );
