@@ -535,7 +535,7 @@ async function loadSettings() {
     );
   }
 
-function getLastSeenText(lastSeen) {
+function getLastSeenText(lastSeen: string | null) {
   if (!lastSeen) return "Never";
 
   const diffMinutes = Math.floor(
@@ -871,7 +871,7 @@ function getLastSeenText(lastSeen) {
 </td>
 
 <td>
-  {getLastSeenText(member.last_seen)}
+  {getLastSeenText(member.last_seen)} 
 </td>
 
 <td>
