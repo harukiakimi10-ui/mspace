@@ -18,6 +18,10 @@ const [videoFile, setVideoFile] = useState<File | null>(null);
 const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 const [videos, setVideos] = useState<any[]>([]);
 const [members, setMembers] = useState<any[]>([]);
+const [visits, setVisits] = useState<any[]>([]);
+const [onlineCount, setOnlineCount] = useState(0);
+const [totalMembers, setTotalMembers] = useState(0);
+const [bannedCount, setBannedCount] = useState(0);
 
   useEffect(() => {
     const admin =
@@ -26,11 +30,19 @@ const [members, setMembers] = useState<any[]>([]);
     setIsAdmin(admin);
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
   loadSettings();
   loadPhotos();
   loadVideos();
   loadMembers();
+  loadVisits();
+
+  const interval = setInterval(() => {
+    loadMembers();
+    loadVisits();
+  }, 30000);
+
+  return () => clearInterval(interval);
 }, []);
 
 async function loadPhotos() {
@@ -72,19 +84,104 @@ async function loadMembers() {
     .from("banned_devices")
     .select("device_id");
 
+  const { data: visitsData } = await supabase
+  .from("page_visits")
+  .select("member_id, visited_at")
+  .order("visited_at", {
+    ascending: false,
+  });
+
+console.log("VISITS:", visitsData);
+membersData?.forEach((m) => {
+  const visit = visitsData?.find(
+    (v) => v.member_id === m.member_id
+  );
+
+  console.log({
+    name: m.name,
+    member_id: m.member_id,
+    foundVisit: !!visit,
+    lastVisit: visit?.visited_at,
+  });
+});
+
   if (membersData) {
-    const updatedMembers = membersData.map(
-      (member) => ({
-        ...member,
-        device_banned:
-          bannedDevices?.some(
-            (d) =>
-              d.device_id === member.device_id
-          ) || false,
-      })
+   const updatedMembers = membersData.map(
+  (member) => {
+    const lastVisit = visitsData?.find(
+      (v) => v.member_id === member.member_id
     );
 
-    setMembers(updatedMembers);
+    return {
+      ...member,
+      last_seen: lastVisit?.visited_at || null,
+      device_banned:
+        bannedDevices?.some(
+          (d) =>
+            d.device_id === member.device_id
+        ) || false,
+    };
+  }
+);
+
+
+const online = updatedMembers.filter((m) => {
+  if (!m.last_seen) return false;
+
+  const diffMinutes = Math.floor(
+    (Date.now() - new Date(m.last_seen).getTime()) / 60000
+  );
+
+  return diffMinutes < 5;
+}).length;
+
+setOnlineCount(online);
+setTotalMembers(updatedMembers.length);
+setBannedCount(
+  updatedMembers.filter((m) => m.banned).length
+);
+
+    const onlineNow = updatedMembers.filter((m) => {
+  if (!m.last_seen) return false;
+
+  const diffMinutes = Math.floor(
+    (Date.now() - new Date(m.last_seen).getTime()) / 60000
+  );
+
+  return diffMinutes < 5;
+}).length;
+
+setOnlineCount(onlineNow);
+setTotalMembers(updatedMembers.length);
+setBannedCount(
+  updatedMembers.filter((m) => m.banned).length
+);
+
+setMembers(updatedMembers);
+
+updatedMembers.forEach((m) => {
+  console.log(
+    m.name,
+    "LAST_SEEN:",
+    m.last_seen
+  );
+});
+  }
+}
+
+async function loadVisits() {
+  const supabase = createClient();
+
+  const { data } = await supabase
+    .from("page_visits")
+    .select("*")
+    .order("visited_at", {
+      ascending: false,
+    })
+    .limit(20);
+
+  if (data) {
+    setVisits(data);
   }
 }
 
@@ -438,9 +535,80 @@ async function loadSettings() {
     );
   }
 
+function getLastSeenText(lastSeen) {
+  if (!lastSeen) return "Never";
+
+  const diffMinutes = Math.floor(
+    (Date.now() - new Date(lastSeen).getTime()) / 60000
+  );
+
+  if (diffMinutes < 5) {
+    return "🟢 Online";
+  }
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  if (diffHours < 24) {
+    return `${diffHours} hr ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+
+  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+}
+
   return (
     <div style={{ padding: "40px" }}>
       <h1>MSpace Admin Panel</h1>
+
+ <div
+  style={{
+    display: "flex",
+    gap: "20px",
+    margin: "20px 0",
+    flexWrap: "wrap",
+  }}
+>
+  <div
+    style={{
+      background: "#e8f5e9",
+      padding: "15px",
+      borderRadius: "8px",
+      minWidth: "150px",
+    }}
+  >
+    <h3>🟢 Online</h3>
+    <p>{onlineCount}</p>
+  </div>
+
+  <div
+    style={{
+      background: "#e3f2fd",
+      padding: "15px",
+      borderRadius: "8px",
+      minWidth: "150px",
+    }}
+  >
+    <h3>👥 Members</h3>
+    <p>{totalMembers}</p>
+  </div>
+
+  <div
+    style={{
+      background: "#ffebee",
+      padding: "15px",
+      borderRadius: "8px",
+      minWidth: "150px",
+    }}
+  >
+    <h3>🚫 Banned</h3>
+    <p>{bannedCount}</p>
+  </div>
+</div>
 
       <p>✅ Logged in</p>
 
@@ -664,12 +832,13 @@ async function loadSettings() {
 >
   <thead>
   <tr>
-  <th>ID</th>
-  <th>Name</th>
-  <th>Device ID</th>
-  <th>Photo</th>
-  <th>Status</th>
-  <th>Action</th>
+  <th>Member ID</th>
+<th>Name</th>
+<th>Device</th>
+<th>Photo</th>
+<th>Status</th>
+<th>Last Seen</th>
+<th>Actions</th>
 </tr>
 </thead>
 
@@ -699,6 +868,10 @@ async function loadSettings() {
 
         <td>
   {member.banned ? "🚫 Banned" : "✅ Active"}
+</td>
+
+<td>
+  {getLastSeenText(member.last_seen)}
 </td>
 
 <td>
@@ -769,6 +942,39 @@ async function loadSettings() {
     ))}
   </tbody>
 </table>
+
+<h2 style={{ marginTop: "30px" }}>
+  Recent Visitors
+</h2>
+
+<div
+  style={{
+    background: "#fff",
+    padding: "15px",
+    borderRadius: "10px",
+    marginTop: "10px",
+  }}
+>
+  {visits.map((visit) => (
+    <div
+      key={visit.id}
+      style={{
+        padding: "10px 0",
+        borderBottom: "1px solid #eee",
+      }}
+    >
+      <strong>{visit.member_name}</strong>
+
+      <br />
+
+      <small>
+        {new Date(
+          visit.visited_at
+        ).toLocaleString()}
+      </small>
+    </div>
+  ))}
+</div>
 
 </div>
   );

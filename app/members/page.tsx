@@ -58,6 +58,7 @@ const t = {
   loadInitialData();
 
   checkBanStatus();
+  trackVisit();
 
   const interval = setInterval(() => {
     loadProfile();
@@ -229,6 +230,38 @@ async function checkBanStatus() {
     }
   }
 }
+
+async function trackVisit() {
+  try {
+    const memberId =
+      localStorage.getItem("mspace_member_id");
+
+    const deviceId =
+      localStorage.getItem("mspace_device_id");
+
+    if (!memberId) return;
+
+    const supabase = createClient();
+
+    const { data: member } = await supabase
+      .from("members")
+      .select("name")
+      .eq("member_id", memberId)
+      .single();
+
+    await supabase
+      .from("page_visits")
+      .insert({
+        member_id: memberId,
+        member_name: member?.name || "",
+        device_id: deviceId || "",
+      });
+  } catch (error) {
+    console.log("Visit tracking failed", error);
+  }
+}
+
+
 async function installApp() {
   if (deferredPrompt) {
     deferredPrompt.prompt();
@@ -308,6 +341,23 @@ async function openChat() {
   } catch (error) {
     console.log("Crisp update failed:", error);
   }
+}
+
+
+if (loading) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100vh",
+        fontSize: "18px",
+      }}
+    >
+      Loading...
+    </div>
+  );
 }
 
   return (

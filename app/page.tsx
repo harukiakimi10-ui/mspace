@@ -7,6 +7,8 @@ import { createClient } from "@/utils/supabase/client";
 
 export default function Home() {
   const [latestVideo, setLatestVideo] = useState("");
+  const [latestThumbnail, setLatestThumbnail] =
+  useState("");
   const [recentPhotos, setRecentPhotos] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [photoFile, setPhotoFile] =
@@ -128,21 +130,19 @@ useEffect(() => {
 
 useEffect(() => {
   async function loadCounts() {
-    const supabase = createClient();
+  const supabase = createClient();
 
-    const { data: photos } =
-      await supabase.storage
-        .from("photos")
-        .list();
+  const { count: photoCount } = await supabase
+    .from("photos")
+    .select("*", { count: "exact", head: true });
 
-    const { data: videos } =
-      await supabase.storage
-        .from("videos")
-        .list();
+  const { count: videoCount } = await supabase
+    .from("videos")
+    .select("*", { count: "exact", head: true });
 
-    setPhotoCount(photos?.length || 0);
-    setVideoCount(videos?.length || 0);
-  }
+  setPhotoCount(photoCount || 0);
+  setVideoCount(videoCount || 0);
+}
 
   loadCounts();
 }, []);
@@ -181,21 +181,17 @@ useEffect(() => {
   async function loadLatestVideo() {
     const supabase = createClient();
 
-    const { data } = await supabase.storage
+    const { data } = await supabase
       .from("videos")
-      .list("", {
-        limit: 100,
-        sortBy: {
-          column: "created_at",
-          order: "desc",
-        },
-      });
+      .select("*")
+      .order("id", { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!data?.length) return;
+    if (!data) return;
 
-    setLatestVideo(
-      `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/videos/${data[0].name}`
-    );
+    setLatestVideo(data.video_url);
+    setLatestThumbnail(data.thumbnail_url);
   }
 
   loadLatestVideo();
@@ -693,23 +689,17 @@ onClick={() => {
       {t.latestVideo}
     </h3>
 
-    {latestVideo && (
-  <video
-    autoPlay
-    muted
-    loop
-    playsInline
-    controls={false}
+ {latestThumbnail && (
+  <img
+    src={latestThumbnail}
+    alt="Latest Video"
     style={{
       width: "100%",
       height: "150px",
       objectFit: "cover",
       borderRadius: "10px",
-      pointerEvents: "none",
     }}
-  >
-    <source src={latestVideo} type="video/mp4" />
-  </video>
+  />
 )}
   </div>
 </div>
