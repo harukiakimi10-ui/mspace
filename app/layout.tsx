@@ -45,14 +45,18 @@ export default function RootLayout({
     >
      <body className="min-h-full flex flex-col">
 
-  <Script id="chaport-chat" strategy="afterInteractive">
-    {`
-      (function(w,d,v3){
-        w.chaportConfig = {
-          appId: '6a390ff1a2cd2e39938a1ec3'
-        };
+ <Script id="chaport-chat" strategy="afterInteractive">
+  {`
+    (function(w,d,v3){
+      w.chaportConfig = {
+        appId: '6a390ff1a2cd2e39938a1ec3',
 
-        if(w.chaport)return;
+        launcher: {
+          show: false
+        }
+      };
+
+      if(w.chaport)return;
         v3=w.chaport={};
         v3._q=[];
         v3._l={};

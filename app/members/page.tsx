@@ -702,20 +702,6 @@ if (loading) {
   ))}
 </div>
 
-<Script id="crisp-chat" strategy="afterInteractive">
-  {`
-    window.$crisp=[];
-    window.CRISP_WEBSITE_ID="edd48ae1-1428-46c9-a33f-ca9af43d3481";
-    (function(){
-      var d=document;
-      var s=d.createElement("script");
-      s.src="https://client.crisp.chat/l.js";
-      s.async=1;
-      d.getElementsByTagName("head")[0].appendChild(s);
-    })();
-  `}
-</Script>
-
 <footer
   style={{
     textAlign: "center",
