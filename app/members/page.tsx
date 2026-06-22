@@ -297,18 +297,17 @@ async function installApp() {
   }
 }
 async function openChat() {
-  if (!(window as any).$crisp) {
+  const chaport = (window as any).chaport;
+
+  if (!chaport) {
     alert("Chat is loading...");
     return;
   }
 
-  // Open chat immediately
-  (window as any).$crisp.push([
-    "do",
-    "chat:open"
-  ]);
+  // Open Chaport
+  chaport.q("open");
 
-  // Load member info in background
+  // Keep member lookup for now
   try {
     const memberId =
       localStorage.getItem("mspace_member_id");
@@ -323,23 +322,28 @@ async function openChat() {
       .eq("member_id", memberId)
       .single();
 
-    if (data) {
-      (window as any).$crisp.push([
-        "set",
-        "user:nickname",
-        [data.name]
-      ]);
+console.log("Member Name:", data?.name);
+console.log("Member Photo:", data?.photo_url);
 
-      if (data.photo_url) {
-        (window as any).$crisp.push([
-          "set",
-          "user:avatar",
-          [data.photo_url]
-        ]);
-      }
-    }
+if (data) {
+
+  console.log("Sending to Chaport:", {
+  name: data.name,
+  photo: data.photo_url
+});
+
+  chaport.q("setVisitorData", {
+    name: data.name,
+    avatar: data.photo_url,
+  });
+}
+
+chaport.q("open");
+
+  
+
   } catch (error) {
-    console.log("Crisp update failed:", error);
+    console.log("Chaport update failed:", error);
   }
 }
 
@@ -361,6 +365,8 @@ if (loading) {
 }
 
   return (
+  
+   
     <main
   style={{
     fontFamily: "Arial, sans-serif",
@@ -427,7 +433,7 @@ if (loading) {
   <img
   src={
     profilePhoto ||
-    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avaters/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
+    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
   }
   alt="Donald Lee"
   style={{
@@ -1024,8 +1030,6 @@ if (loading) {
   </div>
 )}
 </main>
-  );
+);
 }
-
-
 

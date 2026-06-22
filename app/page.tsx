@@ -279,7 +279,7 @@ if (existingMember?.banned) {
 if (photoFile) {
   const { data, error: uploadError } =
     await supabase.storage
-      .from("avaters")
+      .from("avatars")
       .upload(
         `${Date.now()}.jpg`,
         photoFile,
@@ -297,7 +297,7 @@ if (photoFile) {
   return;
 }
   photoUrl =
-  `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avaters/${data.path}`;
+  `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/${data.path}`;
 
 console.log("PHOTO URL:", photoUrl);
 }
@@ -410,7 +410,7 @@ onClick={() => {
  <div className="profile-row">
 
   <img
-    src="https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avaters/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
+    src="https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%2012.15.29%20PM.jpeg"
     alt="Donald Lee"
     style={{
       width: "160px",
