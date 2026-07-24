@@ -297,54 +297,7 @@ async function installApp() {
   }
 }
 async function openChat() {
-  const chaport = (window as any).chaport;
-
-  if (!chaport) {
-    alert("Chat is loading...");
-    return;
-  }
-
-  // Open Chaport
-  chaport.q("open");
-
-  // Keep member lookup for now
-  try {
-    const memberId =
-      localStorage.getItem("mspace_member_id");
-
-    if (!memberId) return;
-
-    const supabase = createClient();
-
-    const { data } = await supabase
-      .from("members")
-      .select("name, photo_url")
-      .eq("member_id", memberId)
-      .single();
-
-console.log("Member Name:", data?.name);
-console.log("Member Photo:", data?.photo_url);
-
-if (data) {
-
-  console.log("Sending to Chaport:", {
-  name: data.name,
-  photo: data.photo_url
-});
-
-  chaport.q("setVisitorData", {
-    name: data.name,
-    avatar: data.photo_url,
-  });
-}
-
-chaport.q("open");
-
-  
-
-  } catch (error) {
-    console.log("Chaport update failed:", error);
-  }
+  router.push("/chat");
 }
 
 
