@@ -4,7 +4,8 @@ export const metadata: Metadata = {
   title: "MSpace Admin",
   description: "MSpace Administration",
   applicationName: "MSpace Admin",
-  themeColor: "#5b21b6", // Purple
+  manifest: "/admin/manifest.webmanifest",
+  themeColor: "#5b21b6",
 };
 
 export default function AdminLayout({
