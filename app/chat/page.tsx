@@ -3,6 +3,15 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { useEffect, useRef, useState } from "react";
+import ImageViewer from "./ImageViewer";
+import VideoViewer from "./VideoViewer";
+import MessageMenu from "./MessageMenu";
+import MediaPreview from "./MediaPreview";
+import ChatHeader from "./ChatHeader";
+import ReplyPreview from "./ReplyPreview";
+import Messages from "./Messages";
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
 
 export default function ChatPage() {
 console.log("MEMBER PAGE LOADED");
@@ -12,6 +21,7 @@ console.log("MEMBER PAGE LOADED");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [message, setMessage] = useState("");
+  const [newMessageCount, setNewMessageCount] = useState(0);
 
   const [profileName, setProfileName] = useState("");
   const [profilePhoto, setProfilePhoto] = useState("");
@@ -22,12 +32,34 @@ console.log("MEMBER PAGE LOADED");
   const [admin, setAdmin] = useState<any>(null);  
   const [conversation, setConversation] = useState<any>(null);
 
+const [uploading, setUploading] = useState(false);
 
-  const messagesRef = useRef<HTMLDivElement>(null);
-  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
+const messagesRef = useRef<HTMLDivElement>(null);
+const fileInputRef = useRef<HTMLInputElement>(null);
+const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+const hasAutoScrolled = useRef(false);
+const loadingConversationRef = useRef(false);
+
+const [previewFile, setPreviewFile] = useState<File | null>(null);
+const [previewUrl, setPreviewUrl] = useState("");
+const [showPreview, setShowPreview] = useState(false);
+const [showImageViewer, setShowImageViewer] = useState(false);
+const [viewerImage, setViewerImage] = useState("");
+const [viewerName, setViewerName] = useState("");
+const [showVideoViewer, setShowVideoViewer] = useState(false);
+const [viewerVideo, setViewerVideo] = useState("");
+const [selectedMessage, setSelectedMessage] = useState<any>(null);
+const [showMessageMenu, setShowMessageMenu] = useState(false);
+const [menuX, setMenuX] = useState(0);
+const [menuY, setMenuY] = useState(0);
+const [replyMessage, setReplyMessage] = useState<any>(null);
+const [replyPreview, setReplyPreview] = useState("");
+const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   console.log("ADMIN STATE:", admin);
 
   useEffect(() => {
+    console.log("Main useEffect ran");
+
     loadConversation();
     loadProfile();
     loadAdminStatus();
@@ -96,7 +128,6 @@ return () => {
 };
 }, [conversationId]);
 
-
 useEffect(() => {
   if (!conversationId) return;
 
@@ -127,7 +158,7 @@ useEffect(() => {
   async (payload) => {
     console.log("CONVERSATION UPDATE:", payload);
 
-    await loadConversation();
+    setConversation(payload.new);
   }
 )
     .subscribe();
@@ -142,16 +173,24 @@ useEffect(() => {
 
     const channel = supabase
       .channel(`member-chat-${conversationId}`)
+      
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "messages",
           filter: `conversation_id=eq.${conversationId}`,
         },
+       
         async () => {
+          console.log("Messages table changed");
+          
           await loadMessages(conversationId);
+
+          if (showScrollButton) {
+          setNewMessageCount((count) => count + 1);
+        }
 
           if (
             document.visibilityState === "visible" &&
@@ -163,65 +202,101 @@ useEffect(() => {
           }
         }
       )
-      .subscribe();
+.on(
+  "postgres_changes",
+  {
+    event: "UPDATE",
+    schema: "public",
+    table: "messages",
+    filter: `conversation_id=eq.${conversationId}`,
+  },
+  async () => {
+    await loadMessages(conversationId);
+  }
+)
+.subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, showScrollButton]);
 
 useEffect(() => {
-  if (!initialLoad) return;
+  if (hasAutoScrolled.current) return;
   if (!messages.length) return;
 
   const el = messagesRef.current;
-
   if (!el) return;
 
   requestAnimationFrame(() => {
     el.scrollTop = el.scrollHeight;
+    hasAutoScrolled.current = true;
     setInitialLoad(false);
   });
-}, [messages, initialLoad]);
+}, [messages]);
 
 async function loadConversation() {
+if (loadingConversationRef.current) return;
+loadingConversationRef.current = true;
+
+console.log(">>> loadConversation START");
   const memberId = localStorage.getItem("mspace_member_id");
 
-  if (!memberId) return;
+  if (!memberId) {
+  loadingConversationRef.current = false;
+  return;
+}
 
-  let { data } = await supabase
+  const { data, error } = await supabase
+  .from("conversations")
+  .select("*")
+  .eq("member_id", memberId)
+  .order("created_at", { ascending: true })
+  .limit(1);
+
+console.log("Query returned:", data);
+
+let conversation = data?.[0];
+
+console.log("Conversation query data:", data);
+console.log("Conversation query error:", error);
+
+  if (!conversation) {
+
+  console.log(">>> INSERTING conversation");
+
+  const { data: newConversation } = await supabase
     .from("conversations")
-    .select("*")
-    .eq("member_id", memberId)
-    .maybeSingle();
+    .insert({
+      member_id: memberId,
+    })
+    .select()
+    .single();
 
-  if (!data) {
-    const { data: newConversation } = await supabase
-      .from("conversations")
-      .insert({
-        member_id: memberId,
-      })
-      .select()
-      .single();
+  conversation = newConversation;
 
-    data = newConversation;
-  }
+  console.log(">>> CREATED:", newConversation.id);
+}
 
-  if (!data) return;
+  if (!conversation) {
+  loadingConversationRef.current = false;
+  return;
+}
 
-  setConversationId(data.id);
-  setConversation(data);
-  console.log("Conversation state:", data);
+  setConversationId(conversation.id);
+  setConversation(conversation);
+  console.log("Conversation state:", conversation);
  
   setInitialLoad(true);
 
   await updateOnlineStatus(true);
 
-  await loadMessages(data.id);
+  await loadMessages(conversation.id);
 
-  setTimeout(async () => {
-    await markMessagesAsRead(data.id);
-  }, 200);
+setTimeout(async () => {
+  await markMessagesAsRead(conversation.id);
+}, 200);
+loadingConversationRef.current = false;
 }
 
 async function loadProfile() {
@@ -273,36 +348,42 @@ async function loadMessages(id: string) {
   const { data } = await supabase
     .from("messages")
     .select("*")
-    .eq("conversation_id", id)
-    .order("created_at", { ascending: true });
+.eq("conversation_id", id)
+.order("created_at", { ascending: true });
 
-  setMessages(data || []);
+  const filteredMessages = (data || []).filter(
+  (msg) => msg.deleted_for !== "member"
+);
 
-  setTimeout(() => {
-    const el = messagesRef.current;
+setMessages(filteredMessages);
 
-    if (!el) return;
+  const el = messagesRef.current;
 
-    const nearBottom =
-      el.scrollHeight -
-        el.scrollTop -
-        el.clientHeight <
-      80;
+const wasNearBottom =
+  el &&
+  el.scrollHeight -
+    el.scrollTop -
+    el.clientHeight <
+    80;
 
-    if (nearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, 0);
+setTimeout(() => {
+  if (!el) return;
+
+  if (wasNearBottom) {
+    el.scrollTop = el.scrollHeight;
+  }
+}, 0);
 }
 
 async function markMessagesAsRead(id: string) {
+console.log("markMessagesAsRead called");
   if (
     document.visibilityState !== "visible" ||
     !document.hasFocus()
   ) {
     return;
   }
-
+console.log("Updating messages to read...");
   await supabase
     .from("messages")
     .update({ is_read: true })
@@ -311,6 +392,7 @@ async function markMessagesAsRead(id: string) {
     .eq("is_read", false);
 
   await loadMessages(id);
+console.log("Finished updating read status");
 }
 
 async function sendMessage() {
@@ -326,6 +408,27 @@ async function sendMessage() {
       message_type: "text",
       content: message,
       is_read: false,
+
+      reply_to_id: replyMessage?.id ?? null,
+
+reply_preview:
+  replyMessage?.message_type === "text"
+    ? replyMessage.content
+    : replyMessage?.message_type === "image"
+      ? "📷 Photo"
+      : replyMessage?.message_type === "video"
+        ? "🎥 Video"
+        : null,
+
+reply_file_url:
+  replyMessage?.message_type === "image" ||
+  replyMessage?.message_type === "video"
+    ? replyMessage.file_url
+    : null,
+reply_thumbnail_url:
+  replyMessage?.message_type === "video"
+    ? replyMessage.reply_thumbnail_url
+    : null,
     })
     .select()
     .single();
@@ -333,6 +436,9 @@ async function sendMessage() {
   if (!data) return;
 
   setMessage("");
+
+  setReplyMessage(null);
+  setReplyPreview("");
 
   await loadMessages(conversationId);
 
@@ -345,6 +451,112 @@ async function sendMessage() {
 }
 
 
+async function uploadFile(file: File) {
+  if (!conversationId) return;
+
+  setUploading(true);
+  let thumbnailUrl: string | null = null;
+  try {
+    const filePath = `${conversationId}/${Date.now()}-${file.name}`;
+
+    console.log("Uploading:", filePath);
+
+    const { error: uploadError } = await supabase.storage
+      .from("photos")
+      .upload(filePath, file);
+
+    console.log("Storage error:", uploadError);
+
+    if (uploadError) {
+      alert(uploadError.message);
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("photos")
+      .getPublicUrl(filePath);
+
+if (file.type.startsWith("video/")) {
+  const video = document.createElement("video");
+
+  video.src = URL.createObjectURL(file);
+  video.muted = true;
+
+  await new Promise<void>((resolve) => {
+    video.onloadeddata = () => {
+      video.currentTime = 0.1;
+    };
+
+    video.onseeked = () => resolve();
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+
+  if (ctx) {
+    ctx.drawImage(video, 0, 0);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.8)
+    );
+
+    if (blob) {
+      const thumbnailPath =
+        `${conversationId}/thumb-${Date.now()}.jpg`;
+
+      await supabase.storage
+        .from("photos")
+        .upload(thumbnailPath, blob);
+
+      const { data: thumb } = supabase.storage
+        .from("photos")
+        .getPublicUrl(thumbnailPath);
+
+      thumbnailUrl = thumb.publicUrl;
+    }
+  }
+
+  URL.revokeObjectURL(video.src);
+}
+
+    console.log("Public URL:", data.publicUrl);
+
+    const { error } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender: "member",
+        message_type: file.type.startsWith("image/")
+  ? "image"
+  : file.type.startsWith("video/")
+  ? "video"
+  : "file",
+
+content: "",
+
+        file_url: data.publicUrl,
+        reply_thumbnail_url: thumbnailUrl,
+        file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+        is_read: false,
+      });
+
+    console.log("Insert error:", error);
+
+    await loadMessages(conversationId);
+  } finally {
+    setUploading(false);
+  }
+}
+
+
+
+
+
 function formatTime(date: string) {
   return new Date(date).toLocaleTimeString([], {
     hour: "numeric",
@@ -352,7 +564,8 @@ function formatTime(date: string) {
   });
 }
 
-function formatDateLabel(date: string) {
+        
+function formatDateLabel(date: string) {  
   const messageDate = new Date(date);
 
   const today = new Date();
@@ -405,7 +618,129 @@ function formatLastSeen(date: string) {
   });
 }
 
+function getEmojiCount(text: string) {
+  const trimmed = text.trim();
+
+  if (!trimmed) return 0;
+
+  const emojis = Array.from(
+    trimmed.matchAll(
+      /\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?/gu
+    )
+  );
+
+  const emojiText = emojis.map((m) => m[0]).join("");
+
+  if (emojiText !== trimmed.replace(/\s/g, "")) {
+    return 0;
+  }
+
+  return emojis.length;
+}
+
+
 return (
+  <>
+
+<ImageViewer
+  open={showImageViewer}
+  image={viewerImage}
+  name={viewerName}
+  onClose={() => setShowImageViewer(false)}
+/>
+
+<VideoViewer
+  open={showVideoViewer}
+  video={viewerVideo}
+  onClose={() => setShowVideoViewer(false)}
+/>
+
+<MessageMenu
+  open={showMessageMenu}
+  x={menuX}
+  y={menuY}
+  selectedMessage={selectedMessage}
+  currentUser="member"
+  onClose={() => setShowMessageMenu(false)}
+  onReply={() => {
+    setReplyMessage(selectedMessage);
+
+    if (selectedMessage?.message_type === "text") {
+      setReplyPreview(selectedMessage.content);
+    } else if (selectedMessage?.message_type === "image") {
+      setReplyPreview("📷 Photo");
+    } else if (selectedMessage?.message_type === "video") {
+      setReplyPreview("🎥 Video");
+    }
+
+    setShowMessageMenu(false);
+  }}
+  onCopy={() => {
+    navigator.clipboard.writeText(
+      selectedMessage?.content || ""
+    );
+    setShowMessageMenu(false);
+  }}
+
+onDeleteForMe={async () => {
+  if (!selectedMessage) return;
+
+  await supabase
+    .from("messages")
+    .update({
+      deleted_for: "member",
+    })
+    .eq("id", selectedMessage.id);
+
+  setShowMessageMenu(false);
+
+  if (conversationId) {
+    await loadMessages(conversationId);
+  }
+}}
+onDeleteForEveryone={async () => {
+  if (!selectedMessage) return;
+
+  if (selectedMessage.sender !== "member") {
+    setShowMessageMenu(false);
+    return;
+  }
+
+  await supabase
+    .from("messages")
+    .update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("id", selectedMessage.id);
+
+  setShowMessageMenu(false);
+
+  if (conversationId) {
+    await loadMessages(conversationId);
+  }
+}}
+/>
+
+<MediaPreview
+  open={showPreview}
+  previewFile={previewFile}
+  previewUrl={previewUrl}
+  onCancel={() => {
+    setShowPreview(false);
+    setPreviewFile(null);
+    setPreviewUrl("");
+  }}
+  onSend={async () => {
+    if (!previewFile) return;
+
+    await uploadFile(previewFile);
+
+    setShowPreview(false);
+    setPreviewFile(null);
+    setPreviewUrl("");
+  }}
+/>
     <main
       style={{
         height: "100vh",
@@ -416,70 +751,14 @@ return (
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "15px",
-          background: "linear-gradient(90deg,#7c3aed,#9333ea)",
-          color: "#fff",
-          boxShadow: "0 2px 10px rgba(0,0,0,.15)",
-        }}
-      >
-        <button
-  onClick={() => router.push("/members")}
-  style={{
-    background: "transparent",
-    border: "none",
-    color: "#fff",
-    fontSize: "18px",
-    cursor: "pointer",
-    marginRight: "15px",
-  }}
->
-  ←
-</button>
-
-<img
-  src={
-    profilePhoto ||
-    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
-  }
-  alt={profileName || "Donald Lee"}
-  style={{
-    width: "46px",
-    height: "46px",
-    borderRadius: "50%",
-    objectFit: "cover",
-    marginRight: "12px",
-  }}
+      <ChatHeader
+  profileName={profileName}
+  profilePhoto={profilePhoto}
+  admin={admin}
+  conversation={conversation}
+  formatLastSeen={formatLastSeen}
+  onBack={() => router.push("/members")}
 />
-
-<div>
-  <div
-    style={{
-      fontWeight: "bold",
-      fontSize: "18px",
-    }}
-  >
-    {profileName || "Donald Lee"}
-  </div>
-
-  <div
-  style={{
-    fontSize: "13px",
-  }}
->
- {conversation?.admin_typing
-  ? "Typing..."
-  : admin?.is_online
-    ? "Online"
-    : admin?.last_seen
-      ? `Last seen ${formatLastSeen(admin.last_seen)}`
-     : "Offline"}
-</div>
-</div>
-      </div>
 
       {/* Messages */}
 
@@ -501,6 +780,9 @@ return (
         el.clientHeight;
 
       setShowScrollButton(distanceFromBottom > 80);
+      if (distanceFromBottom <= 80) {
+  setNewMessageCount(0);
+}
     }}
     style={{
       height: "100%",
@@ -523,99 +805,33 @@ return (
       <br />
       Welcome to MSpace.
     </div>
-
-    {messages.map((msg, index) => {
-  const previous = index > 0 ? messages[index - 1] : null;
-
-  return (
-    <div key={msg.id}>
-      {isNewDay(msg, previous) && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            margin: "20px 0",
-          }}
-        >
-          <div
-            style={{
-              background: "#dfe9f5",
-              color: "#54656f",
-              padding: "7px 16px",
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              boxShadow: "0 1px 2px rgba(0,0,0,.08)",
-            }}
-          >
-            {formatDateLabel(msg.created_at)}
-          </div>
-        </div>
-      )}
-      <div
-        key={msg.id}
-        style={{
-          display: "flex",
-          justifyContent:
-            msg.sender === "member"
-              ? "flex-end"
-              : "flex-start",
-          marginBottom: 15,
-        }}
-      >
-        <div
-          style={{
-            background:
-              msg.sender === "member"
-                ? "#7c3aed"
-                : "#ffffff",
-            color:
-              msg.sender === "member"
-                ? "#fff"
-                : "#000",
-            padding: "12px 16px",
-            borderRadius: 16,
-            maxWidth: "70%",
-            width: "fit-content",
-            wordBreak: "break-word",
-            boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-          }}
-        >
-          <div>{msg.content}</div>
-
-<div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
-    gap: 3,
-    marginTop: 6,
-    fontSize: 11,
-    lineHeight: 1,
-    opacity: 0.8,
-  }}
->
-  <span>{formatTime(msg.created_at)}</span>
-
-  {msg.sender === "member" && (
-    <span
-      style={{
-        color: msg.is_read ? "#53bdeb" : "#d1d5db",
-        fontWeight: 700,
-      }}
-    >
-      {msg.is_read ? "✓✓" : "✓"}
-    </span>
-  )}
-</div>
-        </div>
-      </div>
-    </div>
-  );
-})}
+<Messages
+  messages={messages}
+  currentUser="member"
+  formatTime={formatTime}
+  formatDateLabel={formatDateLabel}
+  isNewDay={isNewDay}
+  setViewerImage={setViewerImage}
+  setViewerName={setViewerName}
+  setShowImageViewer={setShowImageViewer}
+  setViewerVideo={setViewerVideo}
+  setShowVideoViewer={setShowVideoViewer}
+  setSelectedMessage={setSelectedMessage}
+  setMenuX={setMenuX}
+  setMenuY={setMenuY}
+  setShowMessageMenu={setShowMessageMenu}
+/>
   </div>
 
   {showScrollButton && (
+<div
+  style={{
+    position: "absolute",
+    right: 20,
+    bottom: 20,
+    zIndex: 100,
+  }}
+>
     <button
       onClick={() =>
         messagesRef.current?.scrollTo({
@@ -624,9 +840,7 @@ return (
         })
       }
       style={{
-        position: "absolute",
-        right: 20,
-        bottom: 20,
+        position: "relative",
 
         width: 36,
         height: 36,
@@ -636,6 +850,8 @@ return (
 
         background: "#f5f5f5",
         color: "#000",
+
+        overflow: "visible",
 
         fontSize: 16,
         fontWeight: 700,
@@ -651,22 +867,132 @@ return (
         zIndex: 100,
       }}
     >
-      ↓
-    </button>
-  )}
+       ↓
+    
+
+    {newMessageCount > 0 && (
+  <span
+  style={{
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: "50%",
+    background: "#000",
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 700,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    
+  }}
+>
+  {newMessageCount}
+</span>
+)}
+</button>
 </div>
+)}
+</div>
+
+
 
       {/* Input */}
 
-      <div
-        style={{
-          display: "flex",
-          gap: "10px",
-          padding: "15px",
-          background: "#fff",
-          borderTop: "1px solid #ddd",
-        }}
-      >
+     <div
+  style={{
+    background: "#fff",
+    borderTop: "1px solid #ddd",
+  }}
+>
+
+  <ReplyPreview
+  replyMessage={replyMessage}
+  replyPreview={replyPreview}
+  onCancel={() => {
+    setReplyMessage(null);
+    setReplyPreview("");
+  }}
+/>
+
+  <div
+    style={{
+      display: "flex",
+      gap: "10px",
+      padding: "15px",
+      alignItems: "center",
+    }}
+  >
+
+    <input
+  ref={fileInputRef}
+  type="file"
+  accept="image/*,video/*"
+  hidden
+  onChange={(e) => {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  setPreviewFile(file);
+  setPreviewUrl(URL.createObjectURL(file));
+  setShowPreview(true);
+
+  e.target.value = "";
+}}
+/>
+
+<button
+  onClick={() => fileInputRef.current?.click()}
+  disabled={uploading}
+  style={{
+  width: "45px",
+  height: "45px",
+  borderRadius: "50%",
+  border: "none",
+  background: "#eee",
+  cursor: "pointer",
+  fontSize: "20px",
+  marginLeft: "45px",
+}}
+>
+  {uploading ? "..." : "📎"}
+</button>
+
+
+<button
+  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+  style={{
+    background: "transparent",
+    border: "none",
+    fontSize: "24px",
+    cursor: "pointer",
+    marginRight: "8px",
+  }}
+>
+  😊
+</button>
+
+{showEmojiPicker && (
+  <div
+    style={{
+      position: "absolute",
+      bottom: "60px",
+      left: "0",
+      zIndex: 1000,
+    }}
+  >
+    <Picker
+  data={data}
+  onEmojiSelect={(emoji: any) => {
+    setMessage((prev) => prev + emoji.native);
+  }}
+/>
+  </div>
+)}
+
         <input
         value={message}
         onChange={async (e) => {
@@ -735,7 +1061,9 @@ console.log("Error:", error);
         >
           ➤
         </button>
+        </div>
       </div>
-    </main>
-  );
+   </main>
+</>
+);
 }

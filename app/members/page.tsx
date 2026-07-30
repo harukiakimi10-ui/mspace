@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/client";
 
 export default function MembersPage() {
 const router = useRouter();
+const supabase = createClient();
 
   const [photos, setPhotos] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
@@ -23,6 +24,7 @@ const router = useRouter();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const language =
   typeof navigator !== "undefined" &&
@@ -108,12 +110,34 @@ useEffect(() => {
     );
 }, []);
 
+useEffect(() => {
+  const channel = supabase
+    .channel("members-unread")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+      },
+      () => {
+        loadUnreadCount();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
 
 async function loadInitialData() {
   await Promise.all([
     loadProfile(),
     loadPhotos(),
     loadVideos(),
+    loadUnreadCount(),
   ]);
 
   setLoading(false);
@@ -317,6 +341,36 @@ if (loading) {
   );
 }
 
+async function loadUnreadCount() {
+  const memberId = localStorage.getItem("mspace_member_id");
+
+  if (!memberId) return;
+
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  if (!conversation) {
+    setUnreadCount(0);
+    return;
+  }
+
+  const { count } = await supabase
+    .from("messages")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .eq("conversation_id", conversation.id)
+    .eq("sender", "admin")
+    .eq("is_read", false);
+
+ console.log("Unread count:", count);
+  setUnreadCount(count ?? 0);
+}
+
   return (
   
    
@@ -508,22 +562,53 @@ if (loading) {
     </div>
 
     <button
-      onClick={openChat}
+  onClick={openChat}
+  style={{
+    position: "relative",
+
+    padding: isMobile ? "8px 16px" : "12px 30px",
+    borderRadius: isMobile ? "10px" : "14px",
+    fontSize: isMobile ? "14px" : "16px",
+    background:
+      "linear-gradient(90deg,#7c3aed,#9333ea)",
+    color: "#fff",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow:
+      "0 4px 12px rgba(124,58,237,0.25)",
+  }}
+>
+  💬 {t.chat}
+
+  {unreadCount > 0 && (
+    <div
       style={{
-        padding: isMobile ? "8px 16px" : "12px 30px",
-        borderRadius: isMobile ? "10px" : "14px",
-        fontSize: isMobile ? "14px" : "16px",
-        background:
-          "linear-gradient(90deg,#7c3aed,#9333ea)",
+        position: "absolute",
+        top: -8,
+        right: -8,
+
+        minWidth: 22,
+        height: 22,
+
+        borderRadius: 11,
+
+        background: "#25D366",
         color: "#fff",
-        fontWeight: "700",
-        cursor: "pointer",
-        boxShadow:
-           "0 4px 12px rgba(124,58,237,0.25)",
+
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+
+        fontSize: 12,
+        fontWeight: 700,
+
+        padding: "0 6px",
       }}
     >
-      💬 {t.chat}
-    </button>
+      {unreadCount}
+    </div>
+  )}
+</button>
   </div>
 </div>
 

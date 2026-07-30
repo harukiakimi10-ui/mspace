@@ -3,9 +3,20 @@ import { useRouter } from "next/navigation";
 type Conversation = {
   id: string;
   updated_at: string;
+  has_unread?: boolean;
+  unreadCount?: number;
+
   member?: {
     name: string;
     photo_url: string;
+    is_online?: boolean;
+  };
+
+  lastMessage?: {
+    content: string;
+    message_type: string;
+    sender: string;
+    created_at: string;
   };
 };
 
@@ -49,21 +60,85 @@ const router = useRouter();
             }}
           />
 
-          <div style={{ flex: 1 }}>
-            <strong>
-              {chat.member?.name || "Unknown Member"}
-            </strong>
+          <div style={{ flex: 1, minWidth: 0 }}>
 
-            <div
-              style={{
-                color: "#777",
-                fontSize: "13px",
-                marginTop: "4px",
-              }}
-            >
-              {new Date(chat.updated_at).toLocaleString()}
-            </div>
-          </div>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    <strong>
+      {chat.member?.name || "Unknown Member"}
+    </strong>
+
+    <span
+      style={{
+        fontSize: 12,
+        color: "#777",
+      }}
+    >
+      {chat.lastMessage
+        ? new Date(
+            chat.lastMessage.created_at
+          ).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : ""}
+    </span>
+  </div>
+
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: 4,
+    }}
+  >
+    <span
+      style={{
+        color: "#777",
+        fontSize: 13,
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+        maxWidth: "85%",
+      }}
+    >
+      {chat.lastMessage
+        ? chat.lastMessage.message_type === "image"
+          ? "📷 Photo"
+          : chat.lastMessage.message_type === "video"
+          ? "🎥 Video"
+          : chat.lastMessage.content
+        : ""}
+    </span>
+
+    {(chat.unreadCount ?? 0) > 0 && (
+  <div
+    style={{
+      minWidth: 20,
+      height: 20,
+      padding: "0 6px",
+      borderRadius: 999,
+      background: "#25D366",
+      color: "#fff",
+      fontSize: 11,
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      fontWeight: 700,
+    }}
+  >
+    {chat.unreadCount ?? 0}
+  </div>
+)}
+  </div>
+
+</div>
         </div>
       ))}
     </div>

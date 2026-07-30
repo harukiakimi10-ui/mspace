@@ -198,13 +198,16 @@ async function loadVisits() {
 async function loadConversations() {
   const supabase = createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("conversations")
     .select(`
       *,
       members(name, photo_url)
     `)
     .order("created_at", { ascending: false });
+
+  console.log("Supabase conversations:", data);
+  console.log("Supabase error:", error);
 
   if (data) {
     setConversations(data);
@@ -1059,6 +1062,7 @@ function getLastSeenText(lastSeen: string | null) {
       overflowY: "auto",
     }}
   >
+    <p>Total conversations: {conversations.length}</p>
     {conversations.map((conversation) => (
       <div
         key={conversation.id}

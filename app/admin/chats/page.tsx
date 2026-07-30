@@ -8,20 +8,46 @@ import { useEffect, useState } from "react";
 
 export default function AdminChatsPage() {
 
-const onlineCount = 0;
-const totalMembers = 0;
-const unreadCount = 0;
 
 const [conversations, setConversations] = useState<any[]>([]);
 const [selectedConversation, setSelectedConversation] = useState<any>(null);
 const [messages, setMessages] = useState<any[]>([]);
 const [reply, setReply] = useState("");
+const [onlineCount, setOnlineCount] = useState(0);
 
+const totalMembers = conversations.length;
+const unreadCount = conversations.filter(
+  (c) => c.has_unread
+).length;
 
 const supabase = createClient();
 
 useEffect(() => {
   loadConversations();
+
+  const channel = supabase
+    .channel("admin-conversations")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "messages",
+      },
+      () => {
+        console.log("Conversation list updated");
+        loadConversations();
+
+        if (selectedConversation) {
+          loadMessages(selectedConversation.id);
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }, []);
 
 useEffect(() => {
@@ -52,10 +78,13 @@ useEffect(() => {
 }, [selectedConversation]);
 
 async function loadConversations() {
+  console.time("loadConversations");
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
     .order("updated_at", { ascending: false });
+  console.log("Conversation count:", data?.length);
+console.log(data);
 
   if (error) {
     console.log(error);
@@ -65,22 +94,59 @@ async function loadConversations() {
 console.log("Supabase conversations:", data);
 console.log("Supabase error:", error);
 
-  const result = [];
+  const result: any[] = [];
 
-for (const conversation of data || []) {
-  const { data: member } = await supabase
-    .from("members")
-    .select("name, photo_url")
-    .eq("member_id", conversation.member_id)
-    .single();
+await Promise.all(
+  (data || []).map(async (conversation) => {
+    const { data: member } = await supabase
+      .from("members")
+      .select("name, photo_url, is_online")
+      .eq("member_id", conversation.member_id)
+      .single();
 
-  result.push({
-    ...conversation,
-    member,
-  });
-}
+    const { count } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("conversation_id", conversation.id)
+      .eq("sender", "member")
+      .eq("is_read", false);
 
+    const { data: lastMessage } = await supabase
+      .from("messages")
+      .select("content, message_type, sender, created_at")
+      .eq("conversation_id", conversation.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    result.push({
+      ...conversation,
+      member,
+      has_unread: (count || 0) > 0,
+      unreadCount: count || 0,
+      lastMessage,
+    });
+  })
+);
+
+console.log("Result length:", result.length);
+result.sort((a, b) => {
+  const aTime = a.lastMessage
+    ? new Date(a.lastMessage.created_at).getTime()
+    : 0;
+
+  const bTime = b.lastMessage
+    ? new Date(b.lastMessage.created_at).getTime()
+    : 0;
+
+  return bTime - aTime;
+});
 setConversations(result);
+setOnlineCount(
+  result.filter((c) => c.member?.is_online).length
+);
+
+console.timeEnd("loadConversations");
 }
 
 
@@ -120,6 +186,7 @@ console.log("Inserted admin message:", data);
 
   setReply("");
   loadMessages(selectedConversation.id);
+  loadConversations();
 }
 
   return (
@@ -136,8 +203,8 @@ console.log("Inserted admin message:", data);
     <div
   style={{
     borderTop: "1px solid #e5e7eb",
-    marginTop: "24px",
-    marginBottom: "24px",
+    marginTop: "20px",
+    marginBottom: "20px",
   }}
 />
 
@@ -147,6 +214,7 @@ console.log("Inserted admin message:", data);
           marginTop: "20px",
         }}
       >
+  
   <ConversationList
   conversations={conversations}
 />

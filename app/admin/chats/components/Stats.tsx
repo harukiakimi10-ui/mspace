@@ -15,7 +15,8 @@ export default function Stats({
         display: "flex",
         gap: "20px",
         margin: "25px 0",
-        flexWrap: "wrap",
+        flexWrap: "nowrap",
+justifyContent: "space-between",
       }}
     >
       <div
