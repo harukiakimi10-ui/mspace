@@ -2,7 +2,7 @@
   "name": "MSpace",
   "short_name": "MSpace",
   "description": "MSpace Social Platform",
-  "start_url": "/admin",
+  "start_url": "/members",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#7c3aed",
