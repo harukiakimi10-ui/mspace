@@ -1,3 +1,5 @@
+import { ChevronLeft } from "lucide-react";
+
 type ChatHeaderProps = {
   profileName: string;
   profilePhoto: string;
@@ -29,15 +31,18 @@ export default function ChatHeader({
       <button
         onClick={onBack}
         style={{
-          background: "transparent",
-          border: "none",
-          color: "#fff",
-          fontSize: "18px",
-          cursor: "pointer",
-          marginRight: "15px",
-        }}
+  background: "transparent",
+  border: "none",
+  color: "#fff",
+  cursor: "pointer",
+  marginRight: "10px",
+  padding: "8px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+}}
       >
-        ←
+        <ChevronLeft size={34} strokeWidth={3.2} />
       </button>
 
       <img

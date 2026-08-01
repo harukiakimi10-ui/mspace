@@ -41,20 +41,20 @@ const router = useRouter();
         key={chat.id}
         onClick={() => router.push(`/admin/chats/${chat.id}`)}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            padding: "16px",
-            borderBottom: "1px solid #eee",
-            cursor: "pointer",
-          }}
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  padding: "14px",
+  borderBottom: "1px solid #eee",
+  cursor: "pointer",
+}}
         >
           <img
             src={chat.member?.photo_url || "/avatar.png"}
             alt=""
             style={{
-              width: "50px",
-              height: "50px",
+              width: "54px",
+              height: "54px",
               borderRadius: "50%",
               objectFit: "cover",
             }}

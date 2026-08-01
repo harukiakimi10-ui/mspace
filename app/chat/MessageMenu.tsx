@@ -1,3 +1,11 @@
+import {
+  Reply,
+ Copy,
+  Trash2,
+  Trash,
+} from "lucide-react";
+
+
 type MessageMenuProps = {
   open: boolean;
   x: number;
@@ -39,56 +47,208 @@ export default function MessageMenu({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          position: "absolute",
-          top: y,
-          left: x,
-          background: "#fff",
-          borderRadius: "12px",
-          boxShadow: "0 8px 24px rgba(0,0,0,.2)",
-          minWidth: "220px",
-          overflow: "hidden",
-        }}
+  position: "absolute",
+  top: y,
+  left: x,
+
+  width: "190px",
+
+  background:
+    "linear-gradient(180deg,#ffffff,#faf5ff)",
+
+  border: "1px solid #ede9fe",
+
+  borderRadius: "18px",
+
+  boxShadow:
+    "0 18px 45px rgba(124,58,237,.18)",
+
+  backdropFilter: "blur(16px)",
+
+  padding: "8px",
+
+  overflow: "hidden",
+}}
       >
         <div
-          onClick={onReply}
-          style={{
-            padding: "14px 18px",
-            cursor: "pointer",
-          }}
-        >
-          ↩ Reply
-        </div>
+  onClick={onReply}
+  onMouseEnter={(e)=>{
+    e.currentTarget.style.background="#f5f3ff";
+  }}
+  onMouseLeave={(e)=>{
+    e.currentTarget.style.background="transparent";
+  }}
+  style={{
+    display:"flex",
+    alignItems:"center",
+    gap:"12px",
+
+    padding:"13px 14px",
+
+    borderRadius:"12px",
+
+    cursor:"pointer",
+
+    transition:"0.2s",
+
+    fontWeight:400,
+    fontSize: "14px",
+  }}
+>
+  <div
+  style={{
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+
+    background: "#f5f3ff",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    flexShrink: 0,
+  }}
+>
+  <Reply size={15} color="#7c3aed" />
+</div>
+  Reply
+</div>
 
         <div
   onClick={onCopy}
+  onMouseEnter={(e)=>{
+    e.currentTarget.style.background="#f5f3ff";
+  }}
+  onMouseLeave={(e)=>{
+    e.currentTarget.style.background="transparent";
+  }}
   style={{
-    padding: "14px 18px",
-    cursor: "pointer",
+    display:"flex",
+    alignItems:"center",
+    gap:"12px",
+
+    padding:"13px 14px",
+
+    borderRadius:"12px",
+
+    cursor:"pointer",
+
+    transition:"0.2s",
+
+    fontWeight:400,
+    fontSize: "14px",
   }}
 >
-  📋 Copy
+  <div
+  style={{
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+    background: "#f8f8f8",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    flexShrink: 0,
+  }}
+>
+  <Copy size={15} color="#555" />
+</div>
+  Copy
 </div>
 
         <div
   onClick={onDeleteForMe}
+  onMouseEnter={(e)=>{
+    e.currentTarget.style.background="#f5f3ff";
+  }}
+  onMouseLeave={(e)=>{
+    e.currentTarget.style.background="transparent";
+  }}
   style={{
-    padding: "14px 18px",
-    cursor: "pointer",
+    display:"flex",
+    alignItems:"center",
+    gap:"12px",
+
+    padding:"13px 14px",
+
+    borderRadius:"12px",
+
+    cursor:"pointer",
+
+    transition:"0.2s",
+
+    fontWeight:400,
+    fontSize: "14px",
   }}
 >
-  🗑 Delete for me
+  <div
+  style={{
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+    background: "#f8f8f8",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    flexShrink: 0,
+  }}
+>
+  <Trash2 size={15} color="#666" />
+</div>
+  Delete for me
 </div>
 
        {selectedMessage?.sender === currentUser && (
   <div
     onClick={onDeleteForEveryone}
+    onMouseEnter={(e)=>{
+      e.currentTarget.style.background="#fef2f2";
+    }}
+    onMouseLeave={(e)=>{
+      e.currentTarget.style.background="transparent";
+    }}
     style={{
-      padding: "14px 18px",
-      color: "#d32f2f",
-      cursor: "pointer",
+      display:"flex",
+      alignItems:"center",
+      gap:"12px",
+
+      padding:"13px 14px",
+
+      borderRadius:"12px",
+
+      cursor:"pointer",
+
+      transition:"0.2s",
+
+      color:"#ef4444",
+
+      fontWeight:500,
+      fontSize: "14px",
     }}
   >
-    ❌ Delete for everyone
+    <div
+  style={{
+    width: 30,
+    height: 30,
+    borderRadius: "50%",
+
+    background: "#fef2f2",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    flexShrink: 0,
+  }}
+>
+  <Trash size={15} color="#ef4444" />
+</div>
+    Delete for everyone
   </div>
 )}
       </div>

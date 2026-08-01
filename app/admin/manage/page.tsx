@@ -36,16 +36,17 @@ const [reply, setReply] = useState("");
   }, []);
 
  useEffect(() => {
+  if (localStorage.getItem("mspace_admin") !== "true") {
+    window.location.replace("/admin/login");
+    return;
+  }
+
   loadSettings();
   loadPhotos();
   loadVideos();
   loadMembers();
   loadVisits();
   loadConversations();
-
-
-
- 
 
   const interval = setInterval(() => {
     loadMembers();
@@ -630,75 +631,172 @@ function getLastSeenText(lastSeen: string | null) {
 }
 
   return (
-    <div style={{ padding: "40px" }}>
-      <h1>MSpace Admin Panel</h1>
+  <div style={{ padding: "20px" }}>
 
- <div
+    <div
   style={{
     display: "flex",
-    gap: "20px",
-    margin: "20px 0",
-    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+    gap: "10px",
   }}
 >
-  <div
+  <h1
     style={{
-      background: "#e8f5e9",
-      padding: "15px",
-      borderRadius: "8px",
-      minWidth: "150px",
+      fontSize: "24px",
+      margin: 0,
     }}
   >
-    <h3>🟢 Online</h3>
-    <p>{onlineCount}</p>
-  </div>
+    MSpace Admin Panel
+  </h1>
 
-  <div
-    style={{
-      background: "#e3f2fd",
-      padding: "15px",
-      borderRadius: "8px",
-      minWidth: "150px",
-    }}
-  >
-    <h3>👥 Members</h3>
-    <p>{totalMembers}</p>
-  </div>
-
-  <div
-    style={{
-      background: "#ffebee",
-      padding: "15px",
-      borderRadius: "8px",
-      minWidth: "150px",
-    }}
-  >
-    <h3>🚫 Banned</h3>
-    <p>{bannedCount}</p>
-  </div>
-</div>
-
-      <p>✅ Logged in</p>
-
- <button
+<div style={{ display: "flex", gap: "8px" }}>
+<button
   onClick={() => {
-    localStorage.removeItem("mspace_admin");
-    window.location.reload();
+    window.location.href = "/admin/chats";
   }}
   style={{
-    padding: "10px 16px",
-    background: "#dc3545",
+    background: "#6c757d",
     color: "white",
     border: "none",
+    padding: "8px 14px",
+    borderRadius: "8px",
     cursor: "pointer",
-    marginBottom: "20px",
+    marginRight: "8px",
   }}
 >
-  Logout
+  ← Chats
 </button>
 
-      <h2>Profile Settings</h2>
+  <button
+    onClick={() => {
+      localStorage.removeItem("mspace_admin");
+      window.location.href = "/admin/login";
+    }}
+    style={{
+      background: "#dc3545",
+      color: "#fff",
+      border: "none",
+      padding: "8px 14px",
+      borderRadius: "8px",
+      cursor: "pointer",
+      fontWeight: "bold",
+      fontSize: "14px",
+    }}
+  >
+    Logout
+  </button>
+</div>
+</div>
 
+    <div
+      style={{
+        display: "flex",
+        gap: "8px",
+        marginBottom: "25px",
+        flexWrap: "nowrap",
+        width: "100%",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          background: "#e8f5e9",
+          padding: "10px",
+          borderRadius: "8px",
+          minWidth: 0,
+        }}
+      >
+        <h3
+  style={{
+    margin: 0,
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#444",
+  }}
+>
+  🟢 Online
+</h3>
+
+        <p
+  style={{
+    margin: "6px 0 0",
+    fontSize: "22px",
+    fontWeight: "600",
+    color: "#555",
+  }}
+>
+  {onlineCount}
+</p>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          background: "#e3f2fd",
+          padding: "10px",
+          borderRadius: "8px",
+          minWidth: 0,
+        }}
+      >
+        <h3
+  style={{
+    margin: 0,
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#444",
+  }}
+>
+  👥 Members
+</h3>
+
+        <p
+  style={{
+    margin: "6px 0 0",
+    fontSize: "22px",
+    fontWeight: "600",
+    color: "#555",
+  }}
+>
+  {totalMembers}
+</p>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          background: "#ffebee",
+          padding: "10px",
+          borderRadius: "8px",
+          minWidth: 0,
+        }}
+      >
+        <h3
+  style={{
+    margin: 0,
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#444",
+  }}
+>
+  🚫 Banned
+</h3>
+
+        <p
+  style={{
+    margin: "6px 0 0",
+    fontSize: "22px",
+    fontWeight: "600",
+    color: "#555",
+  }}
+>
+  {bannedCount}
+</p>
+      </div>
+    </div>
+
+  
 <input
   type="text"
   placeholder="Profile Name"

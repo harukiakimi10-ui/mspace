@@ -1,3 +1,11 @@
+"use client";
+
+import {
+  Activity,
+  Users,
+  BellDot,
+} from "lucide-react";
+
 type StatsProps = {
   onlineCount: number;
   totalMembers: number;
@@ -9,50 +17,184 @@ export default function Stats({
   totalMembers,
   unreadCount,
 }: StatsProps) {
+  const cardStyle = {
+    flex: 1,
+
+    borderRadius: "18px",
+
+    padding: "12px",
+
+    minHeight: "78px",
+
+    display: "flex",
+    flexDirection: "column" as const,
+    justifyContent: "space-between",
+
+    boxSizing: "border-box" as const,
+
+    boxShadow: "0 14px 30px rgba(124,58,237,.10)",
+
+    border: "1px solid rgba(255,255,255,.7)",
+  };
+
+  const titleRow = {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  };
+
+  const labelStyle = {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#444",
+  };
+
+  const numberStyle = {
+  textAlign: "center" as const,
+  fontSize: "24px",
+  fontWeight: 700,
+  margin: "8px 0 0",
+  lineHeight: 1,
+  color: "#222",
+};
+
   return (
     <div
       style={{
         display: "flex",
-        gap: "20px",
-        margin: "25px 0",
-        flexWrap: "nowrap",
-justifyContent: "space-between",
+        gap: "10px",
+        marginTop: "4px",
+        marginBottom: "10px",
+        width: "100%",
       }}
     >
-      <div
-        style={{
-          background: "#e8f5e9",
-          padding: "20px",
-          borderRadius: "12px",
-          minWidth: "180px",
-        }}
-      >
-        <h3>🟢 Online</h3>
-        <h2>{onlineCount}</h2>
-      </div>
+      {/* ONLINE */}
 
       <div
         style={{
-          background: "#e3f2fd",
-          padding: "20px",
-          borderRadius: "12px",
-          minWidth: "180px",
+          ...cardStyle,
+          background:
+            "linear-gradient(135deg,#f0fdf4,#dcfce7)",
         }}
       >
-        <h3>👥 Members</h3>
-        <h2>{totalMembers}</h2>
+        <div style={titleRow}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              background: "#dcfce7",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Activity
+              size={16}
+              color="#16a34a"
+              strokeWidth={2.3}
+            />
+          </div>
+
+          <span style={labelStyle}>
+            Online
+          </span>
+        </div>
+
+        <div
+          style={{
+            ...numberStyle,
+            color: "#16a34a",
+          }}
+        >
+          {onlineCount}
+        </div>
       </div>
+
+      {/* MEMBERS */}
 
       <div
         style={{
-          background: "#ffebee",
-          padding: "20px",
-          borderRadius: "12px",
-          minWidth: "180px",
+          ...cardStyle,
+          background:
+            "linear-gradient(135deg,#eff6ff,#dbeafe)",
         }}
       >
-        <h3>🔴 Unread</h3>
-        <h2>{unreadCount}</h2>
+        <div style={titleRow}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              background: "#dbeafe",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Users
+              size={16}
+              color="#2563eb"
+              strokeWidth={2.3}
+            />
+          </div>
+
+          <span style={labelStyle}>
+            Members
+          </span>
+        </div>
+
+        <div
+          style={{
+            ...numberStyle,
+            color: "#2563eb",
+          }}
+        >
+          {totalMembers}
+        </div>
+      </div>
+
+      {/* UNREAD */}
+
+      <div
+        style={{
+          ...cardStyle,
+          background:
+            "linear-gradient(135deg,#fef2f2,#fee2e2)",
+        }}
+      >
+        <div style={titleRow}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              background: "#fee2e2",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <BellDot
+              size={16}
+              color="#dc2626"
+              strokeWidth={2.3}
+            />
+          </div>
+
+          <span style={labelStyle}>
+            Unread
+          </span>
+        </div>
+
+        <div
+          style={{
+            ...numberStyle,
+            color: "#dc2626",
+          }}
+        >
+          {unreadCount}
+        </div>
       </div>
     </div>
   );

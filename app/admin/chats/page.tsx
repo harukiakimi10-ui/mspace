@@ -23,6 +23,11 @@ const unreadCount = conversations.filter(
 const supabase = createClient();
 
 useEffect(() => {
+  if (localStorage.getItem("mspace_admin") !== "true") {
+    window.location.replace("/admin/login");
+    return;
+  }
+
   loadConversations();
 
   const channel = supabase
@@ -35,7 +40,6 @@ useEffect(() => {
         table: "messages",
       },
       () => {
-        console.log("Conversation list updated");
         loadConversations();
 
         if (selectedConversation) {
@@ -190,37 +194,52 @@ console.log("Inserted admin message:", data);
 }
 
   return (
-  <>
-    <Header />
-
-    <div style={{ padding: "30px" }}>
-      <Stats
-        onlineCount={onlineCount}
-        totalMembers={totalMembers}
-        unreadCount={unreadCount}
-      />
-
+  <div
+    style={{
+      height: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+      background: "#fff",
+    }}
+  >
+    {/* Fixed Header + Counters */}
     <div
-  style={{
-    borderTop: "1px solid #e5e7eb",
-    marginTop: "20px",
-    marginBottom: "20px",
-  }}
-/>
+      style={{
+        flexShrink: 0,
+        background: "#fff",
+        zIndex: 100,
+      }}
+    >
+      <Header />
+
+      <div style={{ padding: "8px 20px 0" }}>
+        <Stats
+          onlineCount={onlineCount}
+          totalMembers={totalMembers}
+          unreadCount={unreadCount}
+        />
+      </div>
 
       <div
         style={{
-          display: "flex",
-          marginTop: "20px",
+          borderTop: "1px solid #e5e7eb",
+          marginTop: "8px",
         }}
-      >
-  
-  <ConversationList
-  conversations={conversations}
-/>
-   
-      </div>
+      />
     </div>
-  </>
+
+    {/* Scrollable Conversation List */}
+    <div
+      style={{
+        flex: 1,
+        overflowY: "auto",
+      }}
+    >
+      <ConversationList
+        conversations={conversations}
+      />
+    </div>
+  </div>
 );
 }

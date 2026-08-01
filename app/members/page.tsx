@@ -4,6 +4,14 @@ import Script from "next/script";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { MessagesSquare } from "lucide-react";
+import {
+  MessageCircleMore,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-react";
+
 
 export default function MembersPage() {
 const router = useRouter();
@@ -578,7 +586,20 @@ async function loadUnreadCount() {
       "0 4px 12px rgba(124,58,237,0.25)",
   }}
 >
-  💬 {t.chat}
+  <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  }}
+>
+  <MessageCircleMore
+    size={22}
+    strokeWidth={2.5}
+  />
+
+  <span>{t.chat}</span>
+</div>
 
   {unreadCount > 0 && (
     <div
@@ -861,7 +882,11 @@ async function loadUnreadCount() {
     cursor: "pointer",
   }}
 >
-  ←
+ <ChevronLeft
+  size={28}
+  strokeWidth={2.6}
+  color="#111"
+/>
 </button>
 
 <img
@@ -895,7 +920,11 @@ async function loadUnreadCount() {
     cursor: "pointer",
   }}
 >
-  →
+  <ChevronRight
+  size={28}
+  strokeWidth={2.6}
+  color="#111"
+/>
 </button>
 
 <button
@@ -911,7 +940,11 @@ async function loadUnreadCount() {
     cursor: "pointer",
   }}
 >
-  ✕
+  <X
+  size={24}
+  strokeWidth={2.6}
+  color="#111"
+/>
 </button>
   </div>
 )}
@@ -954,7 +987,11 @@ async function loadUnreadCount() {
   touchAction: "pan-y",
 }}
 >
-  ←
+  <ChevronLeft
+  size={28}
+  strokeWidth={2.6}
+  color="#111"
+/>
 <button
   onClick={(e) => {
     e.stopPropagation();
@@ -978,7 +1015,11 @@ async function loadUnreadCount() {
   cursor: "pointer",
 }}
 >
-  ←
+  <ChevronLeft
+  size={28}
+  strokeWidth={2.6}
+  color="#111"
+/>
 </button>
 
   <video
@@ -1028,7 +1069,11 @@ async function loadUnreadCount() {
   cursor: "pointer",
 }}
 >
-  →
+  <ChevronRight
+  size={28}
+  strokeWidth={2.6}
+  color="#111"
+/>
 </button>
 
     <button
@@ -1049,7 +1094,11 @@ async function loadUnreadCount() {
 }}
 
 >
-  ✕
+  <X
+  size={24}
+  strokeWidth={2.6}
+  color="#111"
+/>
 </button>
   </div>
 )}

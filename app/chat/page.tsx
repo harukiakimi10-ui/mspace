@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -8,10 +9,13 @@ import VideoViewer from "./VideoViewer";
 import MessageMenu from "./MessageMenu";
 import MediaPreview from "./MediaPreview";
 import ChatHeader from "./ChatHeader";
+import ChatComposer from "./ChatComposer";
 import ReplyPreview from "./ReplyPreview";
 import Messages from "./Messages";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
+import { Paperclip, Smile, SendHorizontal } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 export default function ChatPage() {
 console.log("MEMBER PAGE LOADED");
@@ -32,6 +36,16 @@ console.log("MEMBER PAGE LOADED");
   const [admin, setAdmin] = useState<any>(null);  
   const [conversation, setConversation] = useState<any>(null);
 
+ const quickEmojis = [
+  "😀","😁","😂","🤣","😊","😍","🥰","😘",
+  "❤️","💜","👍","👌","🙏","👏","🔥","🎉",
+  "😭","😎","🤔","😅","🥳","✨","💯","😇",
+  "🤩","😉","😋","😜","😢","😡","😴","🤗",
+  "➕"
+];
+
+
+
 const [uploading, setUploading] = useState(false);
 
 const messagesRef = useRef<HTMLDivElement>(null);
@@ -39,6 +53,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 const hasAutoScrolled = useRef(false);
 const loadingConversationRef = useRef(false);
+const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
 const [previewFile, setPreviewFile] = useState<File | null>(null);
 const [previewUrl, setPreviewUrl] = useState("");
@@ -55,6 +70,7 @@ const [menuY, setMenuY] = useState(0);
 const [replyMessage, setReplyMessage] = useState<any>(null);
 const [replyPreview, setReplyPreview] = useState("");
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
   console.log("ADMIN STATE:", admin);
 
   useEffect(() => {
@@ -344,6 +360,47 @@ async function updateOnlineStatus(online: boolean) {
   }
 }
 
+function handleMessageInput(
+  e: React.ChangeEvent<HTMLTextAreaElement>
+) {
+  setMessage(e.target.value);
+
+  e.target.style.height = "0px";
+  e.target.style.height = `${Math.min(
+    e.target.scrollHeight,
+    140
+  )}px`;
+
+  if (!conversationId) return;
+
+  supabase
+    .from("conversations")
+    .update({
+      member_typing: true,
+    })
+    .eq(
+      "member_id",
+      localStorage.getItem("mspace_member_id")
+    );
+
+  if (typingTimeout.current) {
+    clearTimeout(typingTimeout.current);
+  }
+
+  typingTimeout.current = setTimeout(async () => {
+    await supabase
+      .from("conversations")
+      .update({
+        member_typing: false,
+      })
+      .eq(
+        "member_id",
+        localStorage.getItem("mspace_member_id")
+      );
+  }, 1000);
+}
+
+
 async function loadMessages(id: string) {
   const { data } = await supabase
     .from("messages")
@@ -395,6 +452,35 @@ console.log("Updating messages to read...");
 console.log("Finished updating read status");
 }
 
+
+function resetComposer() {
+  setMessage("");
+
+  if (messageInputRef.current) {
+    messageInputRef.current.style.height = "46px";
+  }
+
+  setShowEmojiPicker(false);
+  setShowFullEmojiPicker(false);
+
+  setReplyMessage(null);
+  setReplyPreview("");
+}
+
+function handleFileChange(
+  e: React.ChangeEvent<HTMLInputElement>
+) {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  setPreviewFile(file);
+  setPreviewUrl(URL.createObjectURL(file));
+  setShowPreview(true);
+
+  e.target.value = "";
+}
+
 async function sendMessage() {
   if (!conversationId) return;
 
@@ -429,17 +515,15 @@ reply_thumbnail_url:
   replyMessage?.message_type === "video"
     ? replyMessage.reply_thumbnail_url
     : null,
+reply_sender: replyMessage?.sender ?? null,
+
     })
     .select()
     .single();
 
   if (!data) return;
 
-  setMessage("");
-
-  setReplyMessage(null);
-  setReplyPreview("");
-
+  resetComposer();
   await loadMessages(conversationId);
 
   setTimeout(() => {
@@ -785,11 +869,10 @@ onDeleteForEveryone={async () => {
 }
     }}
     style={{
-      height: "100%",
-      overflowY: "auto",
-      padding: 20,
-      paddingBottom: 90,
-    }}
+  height: "100%",
+  overflowY: "auto",
+  padding: "20px 10px 90px",
+}}
   >
     <div
       style={{
@@ -808,6 +891,7 @@ onDeleteForEveryone={async () => {
 <Messages
   messages={messages}
   currentUser="member"
+  profileName={profileName}
   formatTime={formatTime}
   formatDateLabel={formatDateLabel}
   isNewDay={isNewDay}
@@ -833,65 +917,82 @@ onDeleteForEveryone={async () => {
   }}
 >
     <button
-      onClick={() =>
-        messagesRef.current?.scrollTo({
-          top: messagesRef.current.scrollHeight,
-          behavior: "smooth",
-        })
-      }
-      style={{
-        position: "relative",
+  onClick={() =>
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: "smooth",
+    })
+  }
+  style={{
+    position: "relative",
 
-        width: 36,
-        height: 36,
+    width: 36,
+    height: 36,
+
+    borderRadius: "50%",
+
+    border: "1px solid rgba(255,255,255,.35)",
+
+    background:
+      "linear-gradient(135deg,#ffffff,#f3f4f6)",
+
+    backdropFilter: "blur(14px)",
+
+    cursor: "pointer",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    boxShadow:
+       "0 6px 18px rgba(0,0,0,.16)",
+
+    transition: "all .2s ease",
+
+    zIndex: 100,
+  }}
+>
+  <ChevronDown
+  size={20}
+  strokeWidth={2.8}
+  color="#444"
+/>
+
+  {newMessageCount > 0 && (
+    <span
+      style={{
+        position: "absolute",
+        top: -4,
+        right: -4,
+
+        minWidth: 22,
+        height: 22,
 
         borderRadius: "50%",
-        border: "1px solid #d9d9d9",
 
-        background: "#f5f5f5",
-        color: "#000",
+        background:
+          "linear-gradient(135deg,#7c3aed,#9333ea)",
 
-        overflow: "visible",
+        color: "#fff",
 
-        fontSize: 16,
+        fontSize: 11,
         fontWeight: 700,
-
-        cursor: "pointer",
-
-        boxShadow: "0 2px 8px rgba(0,0,0,.15)",
 
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
 
-        zIndex: 100,
+        border: "2px solid white",
+
+        boxShadow:
+          "0 4px 12px rgba(124,58,237,.35)",
+
+        padding: "0 5px",
       }}
     >
-       ↓
-    
-
-    {newMessageCount > 0 && (
-  <span
-  style={{
-    position: "absolute",
-    top: -6,
-    right: -6,
-    width: 20,
-    height: 20,
-    borderRadius: "50%",
-    background: "#000",
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: 700,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    
-  }}
->
-  {newMessageCount}
-</span>
-)}
+      {newMessageCount}
+    </span>
+  )}
 </button>
 </div>
 )}
@@ -901,168 +1002,44 @@ onDeleteForEveryone={async () => {
 
       {/* Input */}
 
-     <div
-  style={{
-    background: "#fff",
-    borderTop: "1px solid #ddd",
-  }}
->
+      <ChatComposer
+  message={message}
+  setMessage={setMessage}
 
-  <ReplyPreview
+  currentUser="member"
+profileName={profileName}
+
   replyMessage={replyMessage}
   replyPreview={replyPreview}
-  onCancel={() => {
+  onCancelReply={() => {
     setReplyMessage(null);
     setReplyPreview("");
   }}
+
+  quickEmojis={quickEmojis}
+
+  showQuickEmoji={showEmojiPicker}
+  setShowQuickEmoji={setShowEmojiPicker}
+
+  showEmojiPicker={showEmojiPicker}
+  setShowEmojiPicker={setShowEmojiPicker}
+
+  showFullEmojiPicker={showFullEmojiPicker}
+  setShowFullEmojiPicker={setShowFullEmojiPicker}
+
+  messageInputRef={messageInputRef}
+
+  sendMessage={sendMessage}
+
+  onAttach={() => fileInputRef.current?.click()}
+  uploading={uploading}
+
+  fileInputRef={fileInputRef}
+  onFileChange={handleFileChange}
+
+  onInput={handleMessageInput}
+  onKeyDown={() => {}}
 />
-
-  <div
-    style={{
-      display: "flex",
-      gap: "10px",
-      padding: "15px",
-      alignItems: "center",
-    }}
-  >
-
-    <input
-  ref={fileInputRef}
-  type="file"
-  accept="image/*,video/*"
-  hidden
-  onChange={(e) => {
-  const file = e.target.files?.[0];
-
-  if (!file) return;
-
-  setPreviewFile(file);
-  setPreviewUrl(URL.createObjectURL(file));
-  setShowPreview(true);
-
-  e.target.value = "";
-}}
-/>
-
-<button
-  onClick={() => fileInputRef.current?.click()}
-  disabled={uploading}
-  style={{
-  width: "45px",
-  height: "45px",
-  borderRadius: "50%",
-  border: "none",
-  background: "#eee",
-  cursor: "pointer",
-  fontSize: "20px",
-  marginLeft: "45px",
-}}
->
-  {uploading ? "..." : "📎"}
-</button>
-
-
-<button
-  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-  style={{
-    background: "transparent",
-    border: "none",
-    fontSize: "24px",
-    cursor: "pointer",
-    marginRight: "8px",
-  }}
->
-  😊
-</button>
-
-{showEmojiPicker && (
-  <div
-    style={{
-      position: "absolute",
-      bottom: "60px",
-      left: "0",
-      zIndex: 1000,
-    }}
-  >
-    <Picker
-  data={data}
-  onEmojiSelect={(emoji: any) => {
-    setMessage((prev) => prev + emoji.native);
-  }}
-/>
-  </div>
-)}
-
-        <input
-        value={message}
-        onChange={async (e) => {
-  setMessage(e.target.value);
-
-  if (!conversationId) {
-  console.log("conversationId is NULL");
-  return;
-}
-
-console.log("conversationId =", conversationId);
-
- const { data, error, count } = await supabase
-  .from("conversations")
-  .update(
-    {
-      member_typing: true,
-    },
-    {
-      count: "exact",
-    }
-  )
-  .eq("member_id", localStorage.getItem("mspace_member_id"))
-  .select();
-
-console.log("====== TYPING TEST ======");
-console.log("Local member ID:", localStorage.getItem("mspace_member_id"));
-console.log("Rows updated:", count);
-console.log("Updated row:", data?.[0]);
-console.log("Error:", error);
-  if (typingTimeout.current) {
-    clearTimeout(typingTimeout.current);
-  }
-
-  typingTimeout.current = setTimeout(async () => {
-  await supabase
-    .from("conversations")
-    .update({
-      member_typing: false,
-    })
-    .eq("member_id", localStorage.getItem("mspace_member_id"));
-}, 1000);
-
-}}
-        placeholder="Type a message..."
-          style={{
-            flex: 1,
-            padding: "12px",
-            borderRadius: "25px",
-            border: "1px solid #ccc",
-            outline: "none",
-          }}
-        />
-
-        <button
-          onClick={sendMessage}
-          style={{
-            background: "#7c3aed",
-            color: "#fff",
-            border: "none",
-            borderRadius: "50%",
-            width: "45px",
-            height: "45px",
-            cursor: "pointer",
-          }}
-        >
-          ➤
-        </button>
-        </div>
-      </div>
    </main>
 </>
 );

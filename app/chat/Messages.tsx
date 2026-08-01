@@ -1,11 +1,14 @@
 "use client";
 
 import { Fragment } from "react";
+import { Camera, Video } from "lucide-react";
 
 type MessagesProps = {
   messages: any[];
 
   currentUser: "member" | "admin";
+
+  profileName: string;
 
   formatTime: (date: string) => string;
   formatDateLabel: (date: string) => string;
@@ -46,6 +49,7 @@ function getEmojiCount(text: string) {
 export default function Messages({
   messages,
   currentUser,
+  profileName,
   formatTime,
   formatDateLabel,
   isNewDay,
@@ -77,6 +81,8 @@ const formatDate = (date: string) => {
   const previous = index > 0 ? messages[index - 1] : null;
 
   const emojiCount = getEmojiCount(msg.content || "");
+
+  console.log(msg.content, emojiCount);
 
   return (
   <Fragment key={msg.id}>
@@ -114,38 +120,52 @@ const formatDate = (date: string) => {
               msg.sender === currentUser
                ? "flex-end"
               : "flex-start",
-            padding: "6px 12px",
+            padding: "6px 0px",
           }}
         >
           <div
-            style={{
-              maxWidth: "75%",
-              padding: emojiCount === 1 ? "0" : "10px 14px",
-              borderRadius:
-  emojiCount === 1
-    ? 0
-    : msg.sender === currentUser
-    ? "18px 18px 4px 18px"
-    : "18px 18px 18px 4px",
-              background:
-  emojiCount === 1
-    ? "transparent"
-    : msg.sender === currentUser
-    ? "#6d28d9"
-    : "#ffffff",
-               
-              color:
-              msg.sender === currentUser
-                  ? "#ffffff"
-                  : "#111111",
-              boxShadow:
-  emojiCount === 1
-    ? "none"
-    : "0 2px 8px rgba(0,0,0,.08)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
+    style={{
+  maxWidth: "70%",
+  width: "fit-content",
 
+  padding:
+    msg.message_type === "image" || msg.message_type === "video"
+      ? "2px"
+      : emojiCount === 1
+      ? "0"
+      : "12px 10px 4px 10px",
+
+  borderRadius:
+    emojiCount === 1
+      ? 0
+      : msg.sender === currentUser
+      ? "18px 18px 4px 18px"
+      : "18px 18px 18px 4px",
+
+  background:
+    msg.message_type === "image" || msg.message_type === "video"
+      ? msg.sender === currentUser
+        ? "#6d28d9"
+        : "#ffffff"
+      : emojiCount === 1
+      ? "transparent"
+      : msg.sender === currentUser
+      ? "#6d28d9"
+      : "#ffffff",
+
+  color:
+    msg.sender === currentUser
+      ? "#ffffff"
+      : "#111111",
+
+  boxShadow:
+    emojiCount === 1
+      ? "none"
+      : "0 2px 8px rgba(0,0,0,.08)",
+
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-word",
+}}
      onContextMenu={(e) => {
   e.preventDefault();
   setSelectedMessage(msg);
@@ -176,7 +196,7 @@ onTouchMove={(e) => {
 }}
 
 
-         >
+>
    {msg.reply_preview && (
      <div
        style={{
@@ -185,7 +205,7 @@ onTouchMove={(e) => {
            msg.sender === "member"
              ? "rgba(255,255,255,0.12)"
              : "#f3f4f6",
-         padding: "8px 10px",
+         padding: "12px 14px",
          borderRadius: "8px",
          marginBottom: "8px",
        }}
@@ -224,29 +244,63 @@ onTouchMove={(e) => {
 
            <div>
              <div
-               style={{
-                 fontWeight: 600,
-                 fontSize: "13px",
-               }}
-             >
-               {msg.reply_preview === "🎥 Video"
-                 ? "🎥 Video"
-                 : "🖼️ Photo"}
-             </div>
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontWeight: 600,
+    fontSize: "13px",
+    color:
+      msg.sender === "member"
+        ? "#ffffff"
+        : "#444",
+  }}
+>
+  {msg.reply_preview === "🎥 Video" ? (
+    <>
+      <Video
+        size={16}
+        strokeWidth={2.2}
+      />
+      <span>Video</span>
+    </>
+  ) : (
+    <>
+      <Camera
+        size={16}
+        strokeWidth={2.2}
+      />
+      <span>Photo</span>
+    </>
+  )}
+</div>
            </div>
          </div>
        ) : (
-         <div
-           style={{
-             fontSize: "12px",
-             lineHeight: 1.3,
-             whiteSpace: "nowrap",
-             overflow: "hidden",
-             textOverflow: "ellipsis",
-           }}
-         >
-           {msg.reply_preview}
-         </div>
+         <div>
+  <div
+    style={{
+      color: "#a78bfa",
+      fontWeight: 700,
+      fontSize: "12px",
+      marginBottom: 2,
+    }}
+  >
+    {msg.reply_sender === currentUser ? "You" : profileName}
+  </div>
+
+  <div
+    style={{
+      fontSize: "12px",
+      lineHeight: 1.3,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    }}
+  >
+    {msg.reply_preview}
+  </div>
+</div>
        )}
      </div>
    )}
@@ -254,68 +308,200 @@ onTouchMove={(e) => {
 
    {msg.message_type === "text" && (
   <div
-    style={
-  msg.is_deleted
-    ? {
-        fontStyle: "italic",
-        color:
-           msg.sender === currentUser
-    ? "rgba(255,255,255,0.75)"
-    : "#666",
-            
-      }
-    : {}
-}
+    style={{
+      ...(msg.is_deleted
+        ? {
+            fontStyle: "italic",
+            color:
+              msg.sender === currentUser
+                ? "rgba(255,255,255,0.75)"
+                : "#666",
+          }
+        : {}),
+      textAlign: "left",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+      overflowWrap: "break-word",
+      letterSpacing: "normal",
+      wordSpacing: "normal",
+    }}
   >
     {msg.is_deleted
   ? msg.sender === currentUser
     ? "🗑 You deleted this message"
     : "🗑 This message was deleted"
       : (
-  <span
+  <div
   style={{
-  fontSize:
-    emojiCount === 1
-      ? "60px"
-      : emojiCount === 2
-      ? "42px"
-      : emojiCount === 3
-      ? "36px"
-      : emojiCount === 4
-      ? "30px"
-      : "inherit",
-  lineHeight: 1,
-  fontFamily:
-    '"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji",sans-serif',
-  fontWeight: "normal",
-  letterSpacing: 0,
-  textRendering: "geometricPrecision",
-  WebkitFontSmoothing: "antialiased",
-  MozOsxFontSmoothing: "grayscale",
-}}
+    display: "inline",
+  }}
 >
-  {msg.content}
-</span>
+  <div
+  style={{
+    display: "inline-flex",
+    flexDirection: "column",
+    alignItems:  
+      msg.sender === currentUser
+        ? "flex-end"
+        : "flex-start",
+        
+  }}
+>
+  <span
+    style={{
+      fontSize:
+        emojiCount === 1
+          ? "60px"
+          : emojiCount === 2
+          ? "42px"
+          : emojiCount === 3
+          ? "36px"
+          : emojiCount === 4
+          ? "30px"
+          : "inherit",
+
+      lineHeight: 1.2,
+      display: "inline",
+    }}
+  >
+    {msg.content}
+  </span>
+
+  {emojiCount > 0 && (
+    <div
+      style={{
+        marginTop: 2,
+        padding: "3px 8px",
+        borderRadius: 12,
+
+        background:
+          msg.sender === currentUser
+            ? "#6d28d9"
+            : "#ffffff",
+
+        boxShadow: "0 1px 4px rgba(0,0,0,.12)",
+
+        display: "flex",
+        alignItems: "center",
+        gap: 3,
+
+        fontSize: 11,
+
+        color:
+          msg.sender === currentUser
+            ? "rgba(255,255,255,.82)"
+            : "#667781",
+      }}
+    >
+      <span>{formatTime(msg.created_at)}</span>
+
+      {msg.sender === currentUser && (
+        <span
+          style={{
+            color: msg.is_read ? "#53bdeb" : "#d1d5db",
+            fontWeight: 700,
+          }}
+        >
+          {msg.is_read ? "✓✓" : "✓"}
+        </span>
+      )}
+    </div>
+  )}
+</div>
+
+  {emojiCount === 0 && (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "flex-end",
+      alignItems: "flex-end",
+      gap: 3,
+
+      marginTop: 2,
+      marginBottom: -2,
+
+      fontSize: 11,
+      lineHeight: 1,
+
+      color:
+        msg.sender === currentUser
+          ? "rgba(255,255,255,.75)"
+          : "#667781",
+    }}
+  >
+    <span>{formatTime(msg.created_at)}</span>
+
+    {msg.sender === currentUser && (
+      <span
+        style={{
+          color: msg.is_read ? "#53bdeb" : "#d1d5db",
+          fontWeight: 700,
+        }}
+      >
+        {msg.is_read ? "✓✓" : "✓"}
+      </span>
+    )}
+  </div>
+)}
+</div>
 )}
   </div>
 )}
 
 {msg.message_type === "image" && (
-  <img
-    src={msg.file_url}
-    alt="Photo"
-    onClick={() => {
-      setViewerImage(msg.file_url);
-      setViewerName(msg.file_name || "Photo");
-      setShowImageViewer(true);
-    }}
+  <div
     style={{
-      maxWidth: "220px",
-      borderRadius: 12,
-      cursor: "pointer",
-      display: "block",
+      position: "relative",
+      display: "inline-block",
     }}
-  />
+  >
+    <img
+      src={msg.file_url}
+      alt="Photo"
+      onClick={() => {
+        setViewerImage(msg.file_url);
+        setViewerName(msg.file_name || "Photo");
+        setShowImageViewer(true);
+      }}
+      style={{
+        width: "100%",
+        maxWidth: "250px",
+        display: "block",
+        borderRadius: "16px",
+        objectFit: "cover",
+        cursor: "pointer",
+      }}
+    />
+
+    <div
+      style={{
+        position: "absolute",
+        right: 8,
+        bottom: 8,
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "2px 6px",
+        borderRadius: "12px",
+        background: "rgba(0,0,0,.45)",
+        color: "#fff",
+        fontSize: "11px",
+        fontWeight: 500,
+      }}
+    >
+      <span>{formatTime(msg.created_at)}</span>
+
+      {msg.sender === currentUser && (
+        <span
+          style={{
+            color: msg.is_read ? "#53bdeb" : "#ffffff",
+          }}
+        >
+          {msg.is_read ? "✓✓" : "✓"}
+        </span>
+      )}
+    </div>
+  </div>
 )}
 
 {msg.message_type === "video" && (
@@ -330,114 +516,90 @@ onTouchMove={(e) => {
       cursor: "pointer",
     }}
   >
-   <video
-  src={msg.file_url}
-  preload="metadata"
-  playsInline
-  muted
-  style={{
-    width: "100%",
-    maxWidth: "250px",
-    display: "block",
-    borderRadius: "16px",
-    objectFit: "cover",
-    pointerEvents: "none",
-  }}
-/>
-
-    <div
-  style={{
-    position: "absolute",
-    inset: 0,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    pointerEvents: "none",
-  }}
->
-  <div
-    style={{
-      width: "46px",
-      height: "46px",
-      borderRadius: "50%",
-      background: "#ffffff",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
-    }}
-  >
-    <div
+    <video
+      src={msg.file_url}
+      preload="metadata"
+      playsInline
+      muted
       style={{
-        width: 0,
-        height: 0,
-        borderTop: "8px solid transparent",
-        borderBottom: "8px solid transparent",
-        borderLeft: "12px solid #000",
-        marginLeft: "3px",
+        width: "100%",
+        maxWidth: "250px",
+        display: "block",
+        borderRadius: "16px",
+        objectFit: "cover",
+        cursor: "pointer",
       }}
     />
-  </div>
-</div>
-  </div>
-)}
 
-<div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    marginTop: emojiCount === 1 ? 10 : 6,
-  }}
->
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 3,
-
-      background:
-        emojiCount === 1
-          ? msg.sender === currentUser
-            ? "#6d28d9"
-            : "#ffffff"
-          : "transparent",
-
-      padding:
-        emojiCount === 1
-          ? "4px 8px"
-          : "0",
-
-      borderRadius:
-        emojiCount === 1
-          ? "12px"
-          : "0",
-
-      boxShadow:
-        emojiCount === 1
-          ? "0 2px 8px rgba(0,0,0,.08)"
-          : "none",
-
-      fontSize: 11,
-      lineHeight: 1,
-      opacity: 0.8,
-    }}
-  >
-  <span>
-    {formatTime(msg.created_at)}
-  </span>
-
-  {msg.sender === currentUser && (
-    <span
+    {/* Existing play button */}
+    <div
       style={{
-        color: msg.is_read ? "#53bdeb" : "#d1d5db",
-        fontWeight: 700,
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        pointerEvents: "none",
       }}
     >
-      {msg.is_read ? "✓✓" : "✓"}
-    </span>
-  )}
-</div>
-</div>
+      <div
+        style={{
+          width: "46px",
+          height: "46px",
+          borderRadius: "50%",
+          background: "#ffffff",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+        }}
+      >
+        <div
+          style={{
+            width: 0,
+            height: 0,
+            borderTop: "8px solid transparent",
+            borderBottom: "8px solid transparent",
+            borderLeft: "12px solid #000",
+            marginLeft: "3px",
+          }}
+        />
+      </div>
+    </div>
+
+    {/* Timestamp inside video */}
+    <div
+      style={{
+        position: "absolute",
+        right: "8px",
+        bottom: "8px",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px",
+        padding: "2px 6px",
+        borderRadius: "12px",
+        background: "rgba(0,0,0,0.45)",
+        color: "#ffffff",
+        fontSize: "11px",
+        fontWeight: 500,
+        pointerEvents: "none",
+      }}
+    >
+      <span>{formatTime(msg.created_at)}</span>
+
+      {msg.sender === currentUser && (
+        <span
+          style={{
+            color: msg.is_read ? "#53bdeb" : "#ffffff",
+            fontWeight: 700,
+          }}
+        >
+          {msg.is_read ? "✓✓" : "✓"}
+        </span>
+      )}
+    </div>
+  </div>
+)}
           </div>
         </div>
       </Fragment>

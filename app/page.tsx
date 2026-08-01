@@ -4,6 +4,13 @@ import "./home.css";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import { Play } from "lucide-react";
+import ImageIcon from "@mui/icons-material/Image";
+import VideoLibraryIcon from "@mui/icons-material/Videocam";
+import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
+
+
 
 export default function Home() {
   const [latestVideo, setLatestVideo] = useState("");
@@ -149,32 +156,29 @@ useEffect(() => {
 
 useEffect(() => {
   async function loadRecentPhotos() {
-    const supabase = createClient();
+  const supabase = createClient();
 
-    const { data } = await supabase.storage
-      .from("photos")
-      .list("", {
-        limit: 100,
-        sortBy: {
-          column: "created_at",
-          order: "desc",
-        },
-      });
+  const { data, error } = await supabase
+    .from("photos")
+    .select("image_url")
+    .order("id", { ascending: false })
+    .limit(2);
 
-    if (!data) return;
-
-    const urls = data
-      .slice(0, 2)
-      .map(
-        (file) =>
-          `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/photos/${file.name}`
-      );
-
-    setRecentPhotos(urls);
+  if (error) {
+    console.log(error);
+    return;
   }
+
+  console.log(data);
+
+  setRecentPhotos(
+    data?.map(photo => photo.image_url) || []
+  );
+}
 
   loadRecentPhotos();
 }, []);
+
 
 
 useEffect(() => {
@@ -464,17 +468,16 @@ onClick={() => {
 </div>
 
 
-{/* ADD PHOTO/VIDEO COUNTS HERE */}
+{/* PHOTO / VIDEO COUNTS */}
 
 <div
   className="stats-row"
   style={{
     display: "flex",
-    justifyContent: "flex-start",
     alignItems: "center",
-    gap: "24px",
-    marginTop: "15px",
-    marginBottom: "5px",
+    gap: "40px",
+    marginTop: "18px",
+    marginBottom: "10px",
     marginLeft: "186px",
   }}
 >
@@ -489,59 +492,57 @@ onClick={() => {
   >
     <div
       style={{
-        width: "32px",
-        height: "32px",
-        background: "#7c3aed",
-        borderRadius: "10px",
+        width: "46px",
+        height: "46px",
+        borderRadius: "14px",
+        background: "linear-gradient(135deg,#7c3aed,#9333ea)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        boxShadow: "0 8px 20px rgba(124,58,237,.25)",
       }}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="30"
-        height="30"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
+      <ImageIcon
+  sx={{
+    fontSize: 24,
+    color: "#fff",
+  }}
+/>
     </div>
 
     <div>
-      <h3
+      <div
         style={{
-          margin: 0,
-          fontSize: "18px",
-         fontWeight: "700",
-         lineHeight: "1",
+          fontSize: "20px",
+          fontWeight: 700,
+          color: "#111827",
+          lineHeight: 1,
         }}
       >
         {photoCount}
-      </h3>
+      </div>
 
-      <p
+      <div
         style={{
-          margin: 0,
-          fontSize: "13px",
-          color: "#7c3aed",
+          fontSize: "14px",
+          color: "#6b7280",
+          marginTop: "4px",
         }}
       >
         {t.photos}
-      </p>
+      </div>
     </div>
   </div>
 
+ {/* Divider */}
 
-  {/* Divider */}
-
+<div
+  style={{
+    width: "1px",
+    height: "42px",
+    background: "#e5e7eb",
+  }}
+/>
 
   {/* Videos */}
 
@@ -554,52 +555,45 @@ onClick={() => {
   >
     <div
       style={{
-        width: "32px",
-        height: "32px",
-        background: "#7c3aed",
-        borderRadius: "10px",
+        width: "46px",
+        height: "46px",
+        borderRadius: "14px",
+        background: "linear-gradient(135deg,#7c3aed,#9333ea)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        boxShadow: "0 8px 20px rgba(124,58,237,.25)",
       }}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
-      </svg>
+      <VideoLibraryIcon
+  sx={{
+    fontSize: 30,
+    color: "#fff",
+  }}
+/>
     </div>
 
-
     <div>
-      <h3
+      <div
         style={{
-          margin: 0,
-          fontSize: "18px",
-          fontWeight: "700",
-          lineHeight: "1",
+          fontSize: "20px",
+          fontWeight: 700,
+          color: "#111827",
+          lineHeight: 1,
         }}
       >
         {videoCount}
-      </h3>
+      </div>
 
-      <p
+      <div
         style={{
-          margin: 0,
-          fontSize: "13px",
-          color: "#7c3aed",
+          fontSize: "14px",
+          color: "#6b7280",
+          marginTop: "4px",
         }}
       >
         {t.videos}
-      </p>
+      </div>
     </div>
   </div>
 </div>
@@ -629,79 +623,142 @@ onClick={() => {
     alignItems: "flex-start",
   }}
 >
-  {/* Photos Card */}
+  {/* Premium Recent Photos Card */}
+
+<div
+  style={{
+  flex: 1,
+  background: "#ffffff",
+  border: "1px solid #eef2ff",
+  borderRadius: "24px",
+  padding: "20px 20px 10px",
+  boxShadow: "0 12px 35px rgba(15,23,42,0.08)",
+  display: "flex",
+  flexDirection: "column",
+}}
+>
+  <h3
+    style={{
+      margin: 0,
+      fontSize: "16px",
+      fontWeight: 600,
+      color: "#111827",
+      marginBottom: "18px",
+    }}
+  >
+    {t.recentPhotos}
+  </h3>
 
   <div
     style={{
-      flex: 1,
-      background: "#fff",
-      borderRadius: "16px",
-      padding: "15px",
-      boxShadow: "0 5px 15px rgba(0,0,0,0.08)",
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "6px",
     }}
   >
-    <h3
-      style={{
-        marginBottom: "12px",
-      }}
-    >
-      {t.recentPhotos}
-    </h3>
-
-    <div
-      style={{
-        display: "flex",
-        gap: "10px",
-      }}
-    >
-      {recentPhotos.slice(0, 2).map((photo, index) => (
-        <img
-          key={index}
-          src={photo}
-          alt=""
-          style={{
-            width: "50%",
-            height: "150px",
-            objectFit: "cover",
-            borderRadius: "10px",
-          }}
-        />
-      ))}
-    </div>
+    {recentPhotos.slice(0, 2).map((photo, index) => (
+      <img
+        key={index}
+        src={photo}
+        alt=""
+        style={{
+          width: "100%",
+          height: "210px",
+          borderRadius: "18px",
+          objectFit: "cover",
+          display: "block",
+        }}
+      />
+    ))}
   </div>
+</div>
 
   {/* Video Card */}
 
-  <div
+<div
+  style={{
+  flex: 1,
+  background: "#ffffff",
+  border: "1px solid #eef2ff",
+  borderRadius: "24px",
+  padding: "20px 20px 10px",
+  boxShadow: "0 12px 35px rgba(15,23,42,0.08)",
+  
+  display: "flex",
+  flexDirection: "column",
+}}
+>
+  <h2
     style={{
-      flex: 1,
-      background: "#fff",
-      borderRadius: "16px",
-      padding: "15px",
-      boxShadow: "0 5px 15px rgba(0,0,0,0.08)",
+      margin: "0 0 20px",
+      textAlign: "center",
+      fontSize: "16px",
+      fontWeight: 600,
+      color: "#111827",
     }}
   >
-    <h3
-      style={{
-        marginBottom: "12px",
-      }}
-    >
-      {t.latestVideo}
-    </h3>
+    {t.latestVideo}
+  </h2>
 
- {latestThumbnail && (
-  <img
-    src={latestThumbnail}
-    alt="Latest Video"
+  <div
     style={{
-      width: "100%",
-      height: "150px",
-      objectFit: "cover",
-      borderRadius: "10px",
+      position: "relative",
+      overflow: "hidden",
+      borderRadius: "18px",
     }}
-  />
-)}
+  >
+    {latestThumbnail && (
+      <img
+        src={latestThumbnail}
+        alt="Latest Video"
+        style={{
+          width: "100%",
+          height: "210px",
+          borderRadius: "18px",
+          objectFit: "cover",
+          display: "block",
+        }}
+      />
+    )}
+
+    <div
+  style={{
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    pointerEvents: "none",
+  }}
+>
+  <div
+    style={{
+      width: "50px",
+      height: "50px",
+      borderRadius: "50%",
+      background: "rgba(255,255,255,0.55)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: "1px solid rgba(255,255,255,0.8)",
+      boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    <Play
+      size={20}
+      fill="#ffffff"
+      color="#ffffff"
+      strokeWidth={2}
+    />
   </div>
+</div>
+
+  
+  </div>
+
+</div>
 </div>
 </div> {/* closes left-panel */}
 </div>
@@ -799,26 +856,14 @@ onClick={() => {
     display: "flex",
     justifyContent: "center",
     marginBottom: "4px",
-    color: "#7c3aed",
   }}
 >
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="28"
-    height="28"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M16 5h6" />
-    <path d="M19 2v6" />
-    <path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5" />
-    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-    <circle cx="9" cy="9" r="2" />
-  </svg>
+  <AddPhotoAlternateOutlinedIcon
+    sx={{
+      fontSize: 56,
+      color: "#7c3aed",
+    }}
+  />
 </div>
 
 
@@ -907,27 +952,37 @@ onClick={() => {
   }}
 >
   <>
-    {loading ? (
-      <>
-        <span
-          style={{
-            display: "inline-block",
-            width: "16px",
-            height: "16px",
-            border: "2px solid rgba(255,255,255,0.4)",
-            borderTop: "2px solid white",
-            borderRadius: "50%",
-            marginRight: "8px",
-            animation: "spin 1s linear infinite",
-            verticalAlign: "middle",
-          }}
-        />
-        {t.connecting}
-      </>
-    ) : (
-      t.join
-    )}
-  </>
+  {loading ? (
+    <>
+      <span
+        style={{
+          display: "inline-block",
+          width: "16px",
+          height: "16px",
+          border: "2px solid rgba(255,255,255,0.4)",
+          borderTop: "2px solid white",
+          borderRadius: "50%",
+          marginRight: "8px",
+          animation: "spin 1s linear infinite",
+          verticalAlign: "middle",
+        }}
+      />
+      {t.connecting}
+    </>
+  ) : (
+    <span
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+      }}
+    >
+      <PersonAddAlt1RoundedIcon sx={{ fontSize: 22 }} />
+      {t.join}
+    </span>
+  )}
+</>
 </button>
 
   <p
