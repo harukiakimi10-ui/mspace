@@ -605,6 +605,7 @@ async function uploadFile(file: File) {
     <Messages
   messages={messages}
   currentUser="admin"
+  profileName="Admin"
   formatTime={formatTime}
   formatDateLabel={formatDateLabel}
   isNewDay={isNewDay}
@@ -694,13 +695,12 @@ async function uploadFile(file: File) {
   }}
 >
   <ReplyPreview
-    replyMessage={replyMessage}
-    replyPreview={replyPreview}
-    onCancel={() => {
-      setReplyMessage(null);
-      setReplyPreview("");
-    }}
-  />
+  replyMessage={replyMessage}
+  replyPreview={replyPreview}
+  currentUser="admin"
+  profileName="Admin"
+  onCancel={() => setReplyMessage(null)}
+/>
 
   <div
     style={{
