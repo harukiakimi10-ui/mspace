@@ -835,12 +835,20 @@ onDeleteForEveryone={async () => {
 />
     <main
   style={{
-    height: "100dvh",
+    position: "fixed",
+    inset: 0,
+
     display: "flex",
     flexDirection: "column",
+
     background: "#f8f5ff",
-    position: "relative",
+
     overflow: "hidden",
+
+    height: "100dvh",
+    width: "100vw",
+
+    touchAction: "pan-y",
   }}
 >
       {/* Header */}
@@ -857,31 +865,46 @@ onDeleteForEveryone={async () => {
 
 <div
   style={{
-    flex: 1,
-    position: "relative",
-    overflow: "hidden",
-    marginTop: "88px",
-    marginBottom: "86px",
-  }}
+  flex: 1,
+  position: "relative",
+
+  minHeight: 0,
+
+  display: "flex",
+  flexDirection: "column",
+
+  overflow: "hidden",
+
+  marginTop: "88px",
+  marginBottom: "86px",
+}}
 >
   <div
-    ref={messagesRef}
-    onScroll={(e) => {
-      const el = e.currentTarget;
+  ref={messagesRef}
+  onClick={() => {
+    messageInputRef.current?.blur();
+  }}
+  onScroll={(e) => {
+    const el = e.currentTarget;
 
-      const distanceFromBottom =
-        el.scrollHeight -
-        el.scrollTop -
-        el.clientHeight;
+    const distanceFromBottom =
+      el.scrollHeight -
+      el.scrollTop -
+      el.clientHeight;
 
-      setShowScrollButton(distanceFromBottom > 80);
-      if (distanceFromBottom <= 80) {
-  setNewMessageCount(0);
-}
-    }}
+    setShowScrollButton(distanceFromBottom > 80);
+
+    if (distanceFromBottom <= 80) {
+      setNewMessageCount(0);
+    }
+  }}
     style={{
-  height: "100%",
+  flex: 1,
+  minHeight: 0,
+
   overflowY: "auto",
+  overflowX: "hidden",
+
   WebkitOverflowScrolling: "touch",
 
   padding: "20px 10px 20px",
