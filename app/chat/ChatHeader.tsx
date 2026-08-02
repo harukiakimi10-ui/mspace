@@ -18,16 +18,27 @@ export default function ChatHeader({
   onBack,
 }: ChatHeaderProps) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        padding: "15px",
-        background: "linear-gradient(90deg,#7c3aed,#9333ea)",
-        color: "#fff",
-        boxShadow: "0 2px 10px rgba(0,0,0,.15)",
-      }}
-    >
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 1000,
+
+      display: "flex",
+      alignItems: "center",
+
+      padding: "calc(env(safe-area-inset-top) + 12px) 15px 12px",
+
+      minHeight: "74px",
+      flexShrink: 0,
+
+      background: "linear-gradient(90deg,#7c3aed,#9333ea)",
+      color: "#fff",
+      boxShadow: "0 2px 12px rgba(0,0,0,.12)",
+    }}
+  >
       <button
         onClick={onBack}
         style={{
