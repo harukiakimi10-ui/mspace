@@ -29,9 +29,9 @@ export default function ChatHeader({
       display: "flex",
       alignItems: "center",
 
-      padding: "calc(env(safe-area-inset-top) + 12px) 15px 12px",
+      padding: "calc(env(safe-area-inset-top) + 2px) 12px 4px",
 
-      minHeight: "74px",
+      minHeight: "60px",
       flexShrink: 0,
 
       background: "linear-gradient(90deg,#7c3aed,#9333ea)",
@@ -63,8 +63,8 @@ export default function ChatHeader({
         }
         alt={profileName || "Donald Lee"}
         style={{
-          width: "46px",
-          height: "46px",
+          width: "40px",
+          height: "40px",
           borderRadius: "50%",
           objectFit: "cover",
           marginRight: "12px",
@@ -75,7 +75,7 @@ export default function ChatHeader({
         <div
           style={{
             fontWeight: "bold",
-            fontSize: "18px",
+            fontSize: "17px",
           }}
         >
           {profileName || "Donald Lee"}

@@ -875,7 +875,7 @@ onDeleteForEveryone={async () => {
 
   overflow: "hidden",
 
-  marginTop: "88px",
+  marginTop: "60px",
   marginBottom: "86px",
 }}
 >

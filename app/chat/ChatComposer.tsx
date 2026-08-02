@@ -99,7 +99,8 @@ export default function ChatComposer({
 
     borderTop: "1px solid rgba(0,0,0,.08)",
 
-    paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+    paddingTop: "0px",
+    paddingBottom: "max(2px, env(safe-area-inset-bottom))",
 
     boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
   }}

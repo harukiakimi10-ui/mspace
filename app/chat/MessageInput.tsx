@@ -39,7 +39,7 @@ export default function MessageInput({
       style={{
         display: "flex",
         gap: "8px",
-        padding: "8px 12px",
+        padding: "5px 10px",
         alignItems: "center",
       }}
     >
@@ -98,29 +98,21 @@ export default function MessageInput({
   value={message}
   onChange={onInput}
   onKeyDown={onKeyDown}
-  onBlur={(e) => {
-    // If the user tapped Send, keep the focus so the
-    // keyboard stays open.
-    requestAnimationFrame(() => {
-      if (document.activeElement !== e.target) {
-        messageInputRef.current?.focus();
-      }
-    });
-  }}
+  
   placeholder="Type a message..."
   rows={1}
         style={{
           flex: 1,
-          minHeight: "42px",
+          minHeight: "38px",
           maxHeight: "140px",
-          padding: "9px 16px",
-          borderRadius: "24px",
+          padding: "7px 14px",
+          borderRadius: "20px",
           border: "1px solid #ccc",
           outline: "none",
           resize: "none",
           overflowY: "auto",
           fontFamily: "inherit",
-          fontSize: "15px",
+          fontSize: "14px",
           lineHeight: 1.5,
         }}
       />
@@ -132,8 +124,8 @@ export default function MessageInput({
         style={{
   ...premiumButton,
 
-  width: "44px",
-  height: "44px",
+  width: "38px",
+  height: "38px",
 
   cursor: uploading ? "default" : "pointer",
 
@@ -143,7 +135,7 @@ export default function MessageInput({
 }}
       >
         <SendHorizontal
-          size={18}
+          size={17}
           strokeWidth={2.4}
           color="#fff"
         />
