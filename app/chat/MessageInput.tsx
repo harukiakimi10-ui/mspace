@@ -94,12 +94,21 @@ export default function MessageInput({
       </button>
 
       <textarea
-        ref={messageInputRef}
-        value={message}
-        onChange={onInput}
-        onKeyDown={onKeyDown}
-        placeholder="Type a message..."
-        rows={1}
+  ref={messageInputRef}
+  value={message}
+  onChange={onInput}
+  onKeyDown={onKeyDown}
+  onBlur={(e) => {
+    // If the user tapped Send, keep the focus so the
+    // keyboard stays open.
+    requestAnimationFrame(() => {
+      if (document.activeElement !== e.target) {
+        messageInputRef.current?.focus();
+      }
+    });
+  }}
+  placeholder="Type a message..."
+  rows={1}
         style={{
           flex: 1,
           minHeight: "42px",
@@ -117,7 +126,8 @@ export default function MessageInput({
       />
 
       <button
-        onClick={sendMessage}
+  onMouseDown={(e) => e.preventDefault()}
+  onClick={sendMessage}
         disabled={uploading}
         style={{
   ...premiumButton,

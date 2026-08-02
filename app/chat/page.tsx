@@ -524,14 +524,22 @@ reply_sender: replyMessage?.sender ?? null,
   if (!data) return;
 
   resetComposer();
-  await loadMessages(conversationId);
+await loadMessages(conversationId);
 
-  setTimeout(() => {
-    messagesRef.current?.scrollTo({
-      top: messagesRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, 50);
+requestAnimationFrame(() => {
+  messageInputRef.current?.focus();
+});
+
+setTimeout(() => {
+  const el = messagesRef.current;
+
+  if (!el) return;
+
+  el.scrollTo({
+    top: el.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
 }
 
 
@@ -826,14 +834,15 @@ onDeleteForEveryone={async () => {
   }}
 />
     <main
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        background: "#f8f5ff",
-        position: "relative",
-      }}
-    >
+  style={{
+    height: "100dvh",
+    display: "flex",
+    flexDirection: "column",
+    background: "#f8f5ff",
+    position: "relative",
+    overflow: "hidden",
+  }}
+>
       {/* Header */}
       <ChatHeader
   profileName={profileName}
@@ -851,6 +860,8 @@ onDeleteForEveryone={async () => {
     flex: 1,
     position: "relative",
     overflow: "hidden",
+    marginTop: "88px",
+    marginBottom: "86px",
   }}
 >
   <div
@@ -871,7 +882,11 @@ onDeleteForEveryone={async () => {
     style={{
   height: "100%",
   overflowY: "auto",
-  padding: "20px 10px 90px",
+  WebkitOverflowScrolling: "touch",
+
+  padding: "20px 10px 20px",
+
+  overscrollBehavior: "contain",
 }}
   >
     <div

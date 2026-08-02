@@ -34,6 +34,24 @@ export default function MessageMenu({
 
   if (!open || !selectedMessage) return null;
 
+  const menuWidth = 190;
+const menuHeight =
+  selectedMessage?.sender === currentUser
+    ? 232
+    : 176;
+
+const padding = 12;
+
+const safeX = Math.min(
+  Math.max(x, padding),
+  window.innerWidth - menuWidth - padding
+);
+
+const safeY = Math.min(
+  Math.max(y, padding),
+  window.innerHeight - menuHeight - padding
+);
+
   return (
     <div
       onClick={onClose}
@@ -48,10 +66,10 @@ export default function MessageMenu({
         onClick={(e) => e.stopPropagation()}
         style={{
   position: "absolute",
-  top: y,
-  left: x,
+  top: safeY,
+  left: safeX,
 
-  width: "190px",
+  width: 190,
 
   background:
     "linear-gradient(180deg,#ffffff,#faf5ff)",

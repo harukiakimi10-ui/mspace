@@ -87,11 +87,23 @@ export default function ChatComposer({
 }: ChatComposerProps) {
   return (
   <div
-    style={{
-      background: "#fff",
-      borderTop: "1px solid #ddd",
-    }}
-  >
+  style={{
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
+
+    zIndex: 999,
+
+    background: "#fff",
+
+    borderTop: "1px solid rgba(0,0,0,.08)",
+
+    paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+
+    boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
+  }}
+>
 
     <ReplyPreview
   replyMessage={replyMessage}
