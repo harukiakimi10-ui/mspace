@@ -887,6 +887,35 @@ async function uploadFile(file: File) {
   );
   setShowMessageMenu(false);
 }}
+
+onSave={async () => {
+  if (!selectedMessage?.file_url) return;
+
+  try {
+    const response = await fetch(selectedMessage.file_url);
+    const blob = await response.blob();
+
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+      selectedMessage.file_name ||
+      (selectedMessage.message_type === "video"
+        ? "MSpace-Video.mp4"
+        : "MSpace-Photo.jpg");
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    window.URL.revokeObjectURL(url);
+  } finally {
+    setShowMessageMenu(false);
+  }
+}}
   onDeleteForMe={async () => {
   if (!selectedMessage) return;
 
