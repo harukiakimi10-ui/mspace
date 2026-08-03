@@ -12,8 +12,6 @@ import ChatHeader from "./ChatHeader";
 import ChatComposer from "./ChatComposer";
 import ReplyPreview from "./ReplyPreview";
 import Messages from "./Messages";
-import Picker from "@emoji-mart/react";
-import data from "@emoji-mart/data";
 import { Paperclip, Smile, SendHorizontal } from "lucide-react";
 import { ChevronDown } from "lucide-react";
 
@@ -25,6 +23,7 @@ console.log("MEMBER PAGE LOADED");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [message, setMessage] = useState("");
+  const [pendingUploads, setPendingUploads] = useState<any[]>([]);
   const [newMessageCount, setNewMessageCount] = useState(0);
 
   const [profileName, setProfileName] = useState("");
@@ -36,13 +35,6 @@ console.log("MEMBER PAGE LOADED");
   const [admin, setAdmin] = useState<any>(null);  
   const [conversation, setConversation] = useState<any>(null);
 
- const quickEmojis = [
-  "😀","😁","😂","🤣","😊","😍","🥰","😘",
-  "❤️","💜","👍","👌","🙏","👏","🔥","🎉",
-  "😭","😎","🤔","😅","🥳","✨","💯","😇",
-  "🤩","😉","😋","😜","😢","😡","😴","🤗",
-  "➕"
-];
 
 
 
@@ -72,6 +64,29 @@ const [replyPreview, setReplyPreview] = useState("");
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
   console.log("ADMIN STATE:", admin);
+
+
+
+  useEffect(() => {
+  const disableContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+  };
+
+  document.addEventListener(
+    "contextmenu",
+    disableContextMenu,
+    true // capture phase
+  );
+
+  return () => {
+    document.removeEventListener(
+      "contextmenu",
+      disableContextMenu,
+      true
+    );
+  };
+}, []);
+
 
   useEffect(() => {
     console.log("Main useEffect ran");
@@ -412,6 +427,18 @@ async function loadMessages(id: string) {
   (msg) => msg.deleted_for !== "member"
 );
 
+// Remove pending uploads that already exist in Supabase
+setPendingUploads((prev) =>
+  prev.filter((pending) => {
+    return !filteredMessages.some(
+      (real) =>
+        real.sender === pending.sender &&
+        real.file_name === pending.file_name &&
+        real.message_type === pending.message_type
+    );
+  })
+);
+
 setMessages(filteredMessages);
 
   const el = messagesRef.current;
@@ -547,7 +574,11 @@ async function uploadFile(file: File) {
   if (!conversationId) return;
 
   setUploading(true);
-  let thumbnailUrl: string | null = null;
+
+  
+
+  let thumbnailUrl: string |null = null;
+
   try {
     const filePath = `${conversationId}/${Date.now()}-${file.name}`;
 
@@ -561,6 +592,7 @@ async function uploadFile(file: File) {
 
     if (uploadError) {
       alert(uploadError.message);
+
       return;
     }
 
@@ -568,51 +600,51 @@ async function uploadFile(file: File) {
       .from("photos")
       .getPublicUrl(filePath);
 
-if (file.type.startsWith("video/")) {
-  const video = document.createElement("video");
+    if (file.type.startsWith("video/")) {
+      const video = document.createElement("video");
 
-  video.src = URL.createObjectURL(file);
-  video.muted = true;
+      video.src = URL.createObjectURL(file);
+      video.muted = true;
 
-  await new Promise<void>((resolve) => {
-    video.onloadeddata = () => {
-      video.currentTime = 0.1;
-    };
+      await new Promise<void>((resolve) => {
+        video.onloadeddata = () => {
+          video.currentTime = 0.1;
+        };
 
-    video.onseeked = () => resolve();
-  });
+        video.onseeked = () => resolve();
+      });
 
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-  const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d");
 
-  if (ctx) {
-    ctx.drawImage(video, 0, 0);
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
 
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.8)
-    );
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.8)
+        );
 
-    if (blob) {
-      const thumbnailPath =
-        `${conversationId}/thumb-${Date.now()}.jpg`;
+        if (blob) {
+          const thumbnailPath =
+            `${conversationId}/thumb-${Date.now()}.jpg`;
 
-      await supabase.storage
-        .from("photos")
-        .upload(thumbnailPath, blob);
+          await supabase.storage
+            .from("photos")
+            .upload(thumbnailPath, blob);
 
-      const { data: thumb } = supabase.storage
-        .from("photos")
-        .getPublicUrl(thumbnailPath);
+          const { data: thumb } = supabase.storage
+            .from("photos")
+            .getPublicUrl(thumbnailPath);
 
-      thumbnailUrl = thumb.publicUrl;
+          thumbnailUrl = thumb.publicUrl;
+        }
+      }
+
+      URL.revokeObjectURL(video.src);
     }
-  }
-
-  URL.revokeObjectURL(video.src);
-}
 
     console.log("Public URL:", data.publicUrl);
 
@@ -622,13 +654,11 @@ if (file.type.startsWith("video/")) {
         conversation_id: conversationId,
         sender: "member",
         message_type: file.type.startsWith("image/")
-  ? "image"
-  : file.type.startsWith("video/")
-  ? "video"
-  : "file",
-
-content: "",
-
+          ? "image"
+          : file.type.startsWith("video/")
+          ? "video"
+          : "file",
+        content: "",
         file_url: data.publicUrl,
         reply_thumbnail_url: thumbnailUrl,
         file_name: file.name,
@@ -640,11 +670,12 @@ content: "",
     console.log("Insert error:", error);
 
     await loadMessages(conversationId);
+
+   
   } finally {
     setUploading(false);
   }
 }
-
 
 
 
@@ -774,6 +805,35 @@ return (
     setShowMessageMenu(false);
   }}
 
+  onSave={async () => {
+  if (!selectedMessage?.file_url) return;
+
+  try {
+    const response = await fetch(selectedMessage.file_url);
+    const blob = await response.blob();
+
+    const url = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+
+    link.download =
+      selectedMessage.file_name ||
+      (selectedMessage.message_type === "video"
+        ? "MSpace-Video.mp4"
+        : "MSpace-Photo.jpg");
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    window.URL.revokeObjectURL(url);
+  } finally {
+    setShowMessageMenu(false);
+  }
+}}
+
 onDeleteForMe={async () => {
   if (!selectedMessage) return;
 
@@ -818,19 +878,45 @@ onDeleteForEveryone={async () => {
   open={showPreview}
   previewFile={previewFile}
   previewUrl={previewUrl}
+
   onCancel={() => {
     setShowPreview(false);
     setPreviewFile(null);
     setPreviewUrl("");
   }}
+
   onSend={async () => {
     if (!previewFile) return;
 
-    await uploadFile(previewFile);
+    const tempId = "temp-" + Date.now();
+    const uploadId = crypto.randomUUID();
+
+    setPendingUploads((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        upload_id: uploadId,
+        sender: "member",
+        message_type: previewFile.type.startsWith("image/")
+          ? "image"
+          : "video",
+        file_url: previewUrl,
+        file_name: previewFile.name,
+        created_at: new Date().toISOString(),
+        uploading: true,
+        is_read: false,
+      },
+    ]);
 
     setShowPreview(false);
     setPreviewFile(null);
     setPreviewUrl("");
+
+    await uploadFile(previewFile);
+
+    setPendingUploads((prev) =>
+      prev.filter((m) => m.id !== tempId)
+    );
   }}
 />
     <main
@@ -884,6 +970,12 @@ onDeleteForEveryone={async () => {
   onClick={() => {
     messageInputRef.current?.blur();
   }}
+
+   onContextMenu={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }}
+
   onScroll={(e) => {
     const el = e.currentTarget;
 
@@ -927,7 +1019,7 @@ onDeleteForEveryone={async () => {
       Welcome to MSpace.
     </div>
 <Messages
-  messages={messages}
+  messages={[...messages, ...pendingUploads]}
   currentUser="member"
   profileName={profileName}
   formatTime={formatTime}
@@ -1054,16 +1146,6 @@ profileName={profileName}
     setReplyPreview("");
   }}
 
-  quickEmojis={quickEmojis}
-
-  showQuickEmoji={showEmojiPicker}
-  setShowQuickEmoji={setShowEmojiPicker}
-
-  showEmojiPicker={showEmojiPicker}
-  setShowEmojiPicker={setShowEmojiPicker}
-
-  showFullEmojiPicker={showFullEmojiPicker}
-  setShowFullEmojiPicker={setShowFullEmojiPicker}
 
   messageInputRef={messageInputRef}
 

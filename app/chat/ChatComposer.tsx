@@ -1,8 +1,6 @@
 "use client";
 
 import MessageInput from "./MessageInput";
-import QuickEmojiBar from "./QuickEmojiBar";
-import EmojiPanel from "./EmojiPanel";
 import ReplyPreview from "./ReplyPreview";
 
 type ChatComposerProps = {
@@ -10,41 +8,34 @@ type ChatComposerProps = {
   setMessage: (value: string) => void;
 
   currentUser: "member" | "admin";
-profileName: string;
+  profileName: string;
 
   replyMessage: any;
   replyPreview: string;
 
   onCancelReply: () => void;
 
-  quickEmojis: string[];
-
-  showQuickEmoji: boolean;
-  setShowQuickEmoji: (value: boolean) => void;
-  
-  showEmojiPicker: boolean;
-  setShowEmojiPicker: (value: boolean) => void;
-
-
-  showFullEmojiPicker: boolean;
-  setShowFullEmojiPicker: (value: boolean) => void;
-
   messageInputRef: React.RefObject<HTMLTextAreaElement | null>;
 
   sendMessage: () => void;
 
   onAttach: () => void;
- 
+
   uploading: boolean;
 
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 
-  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFileChange: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => void;
 
   onInput: (
-  e: React.ChangeEvent<HTMLTextAreaElement>
-) => void;
-onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => void;
+
+  onKeyDown: (
+    e: React.KeyboardEvent<HTMLTextAreaElement>
+  ) => void;
 };
 
 export default function ChatComposer({
@@ -59,18 +50,6 @@ export default function ChatComposer({
 
   onCancelReply,
 
-  quickEmojis,
-
-  showQuickEmoji,
-  setShowQuickEmoji,
-
-  showEmojiPicker,
-  setShowEmojiPicker,
-
-  showFullEmojiPicker,
-  setShowFullEmojiPicker,
-
-
   messageInputRef,
 
   sendMessage,
@@ -83,44 +62,44 @@ export default function ChatComposer({
 
   onInput,
   onKeyDown,
-
 }: ChatComposerProps) {
   return (
-  <div
-  style={{
-    position: "fixed",
-    left: 0,
-    right: 0,
-    bottom: 0,
+    <div
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
 
-    zIndex: 1000,
+        zIndex: 1000,
 
-    background: "#fff",
+        background: "#fff",
 
-    borderTop: "1px solid rgba(0,0,0,.08)",
+        borderTop: "1px solid rgba(0,0,0,.08)",
 
-    paddingTop: "0px",
-    paddingBottom: "max(2px, env(safe-area-inset-bottom))",
+        paddingTop: "0px",
+        paddingBottom:
+          "max(2px, env(safe-area-inset-bottom))",
 
-    boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
-  }}
->
+        boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
+      }}
+    >
+      <ReplyPreview
+        replyMessage={replyMessage}
+        replyPreview={replyPreview}
+        currentUser={currentUser}
+        profileName={profileName}
+        onCancel={onCancelReply}
+      />
 
-    <ReplyPreview
-  replyMessage={replyMessage}
-  replyPreview={replyPreview}
-  currentUser={currentUser}
-  profileName={profileName}
-  onCancel={onCancelReply}
-/>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        hidden
+        onChange={onFileChange}
+      />
 
-       <input
-  ref={fileInputRef}
-  type="file"
-  accept="image/*,video/*"
-  hidden
-  onChange={onFileChange}
-/>
       <MessageInput
         message={message}
         messageInputRef={messageInputRef}
@@ -129,34 +108,7 @@ export default function ChatComposer({
         uploading={uploading}
         onInput={onInput}
         onKeyDown={onKeyDown}
-        onToggleQuickEmoji={() => {
-  setShowEmojiPicker(!showEmojiPicker);
-  
-}}
-      />
-
-      {showEmojiPicker && (
-        <QuickEmojiBar
-          quickEmojis={quickEmojis}
-          onEmojiClick={(emoji) => {
-            if (emoji === "➕") {
-  setShowEmojiPicker(false);
-
-  setShowFullEmojiPicker(true);
-
-  return;
-}
-
-            setMessage(message + emoji);
-          }}
-        />
-      )}
-
-      <EmojiPanel
-        open={showFullEmojiPicker}
-        onEmojiSelect={(emoji: any) =>
-          setMessage(message + emoji.native)
-        }
+        onToggleQuickEmoji={() => {}}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { Paperclip, Smile, SendHorizontal } from "lucide-react";
+import { Paperclip, Sticker, SendHorizontal } from "lucide-react";
 import { premiumButton } from "./premiumButton";
 
 type MessageInputProps = {
@@ -86,11 +86,11 @@ export default function MessageInput({
           padding: 0,
         }}
       >
-        <Smile
-          size={22}
-          strokeWidth={2}
-          color="#444"
-        />
+        <Sticker
+  size={22}
+  strokeWidth={2.2}
+  color="#444"
+/>
       </button>
 
       <textarea

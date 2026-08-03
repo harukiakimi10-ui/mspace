@@ -1,6 +1,7 @@
 import {
   Reply,
- Copy,
+  Copy,
+  Download,
   Trash2,
   Trash,
 } from "lucide-react";
@@ -15,6 +16,7 @@ type MessageMenuProps = {
   onClose: () => void;
   onReply: () => void;
   onCopy: () => void;
+  onSave: () => void;
   onDeleteForMe: () => void;
   onDeleteForEveryone: () => void;
 };
@@ -28,6 +30,7 @@ export default function MessageMenu({
   onClose,
   onReply,
   onCopy,
+  onSave,
   onDeleteForMe,
   onDeleteForEveryone,
 }: MessageMenuProps) {
@@ -175,6 +178,24 @@ const safeY = Math.min(
   <Copy size={15} color="#555" />
 </div>
   Copy
+</div>
+
+<div
+  onClick={onSave}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    padding: "12px 18px",
+    cursor: "pointer",
+  }}
+>
+  <Download
+    size={18}
+    strokeWidth={2}
+  />
+
+  <span>Save</span>
 </div>
 
         <div

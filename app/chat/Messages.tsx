@@ -168,6 +168,8 @@ const formatDate = (date: string) => {
 }}
      onContextMenu={(e) => {
   e.preventDefault();
+  e.stopPropagation();
+
   setSelectedMessage(msg);
   setMenuX(e.clientX);
   setMenuY(e.clientY);
@@ -211,6 +213,21 @@ onTouchMove={(e) => {
        }}
      >
        {msg.reply_file_url ? (
+
+        <>
+
+       <div
+  style={{
+    color: "#a78bfa",
+    fontWeight: 700,
+    fontSize: "12px",
+    marginBottom: 6,
+  }}
+>
+  {msg.reply_sender === currentUser ? "You" : profileName}
+</div>
+
+
          <div
            style={{
              display: "flex",
@@ -276,6 +293,7 @@ onTouchMove={(e) => {
 </div>
            </div>
          </div>
+         </>
        ) : (
          <div>
   <div
@@ -464,13 +482,14 @@ onTouchMove={(e) => {
         setShowImageViewer(true);
       }}
       style={{
-        width: "100%",
-        maxWidth: "250px",
-        display: "block",
-        borderRadius: "16px",
-        objectFit: "cover",
-        cursor: "pointer",
-      }}
+  width: "250px",
+  height: "320px",
+  display: "block",
+  borderRadius: "16px",
+  objectFit: "cover",
+  cursor: "pointer",
+  background: "#000",
+}}
     />
 
     <div
@@ -517,18 +536,20 @@ onTouchMove={(e) => {
     }}
   >
     <video
-      src={msg.file_url}
-      preload="metadata"
-      playsInline
-      muted
+  src={msg.file_url}
+  poster={msg.reply_thumbnail_url || ""}
+  preload="metadata"
+  playsInline
+  muted
       style={{
-        width: "100%",
-        maxWidth: "250px",
-        display: "block",
-        borderRadius: "16px",
-        objectFit: "cover",
-        cursor: "pointer",
-      }}
+  width: "250px",
+  height: "320px",
+  display: "block",
+  borderRadius: "16px",
+  objectFit: "cover",
+  cursor: "pointer",
+  background: "#000",
+}}
     />
 
     {/* Existing play button */}
