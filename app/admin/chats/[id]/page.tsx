@@ -13,6 +13,10 @@ import VideoViewer from "@/app/chat/VideoViewer";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
+import { Trash2 } from "lucide-react";
+
+import DeleteConversationDialog from "@/app/admin/chats/components/DeleteConversationDialog";
+
 
 
 export default function ChatPage() {
@@ -24,6 +28,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [member, setMember] = useState<any>(null);
   const [conversation, setConversation] = useState<any>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const [reply, setReply] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true);
@@ -53,6 +59,7 @@ const [viewerVideo, setViewerVideo] = useState("");
 
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 const [newMessageCount, setNewMessageCount] = useState(0);
+const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,7 +223,10 @@ setTimeout(() => {
       .single();
  console.log("Conversation:", data);
 
-    if (!data) return;
+    if (!data) {
+  setLoadingProfile(false);
+  return;
+}
 
     const { data: memberData } = await supabase
   .from("members")
@@ -226,6 +236,8 @@ setTimeout(() => {
 
 setMember(memberData);
 setConversation(data);
+
+setLoadingProfile(false);
 
 console.log("Conversation:", data);
   }
@@ -331,6 +343,25 @@ setTimeout(() => {
 
   }
 
+async function deleteConversation() {
+  if (!conversation) return;
+
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .delete()
+    .eq("id", conversation.id)
+    .select();
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setShowDeleteDialog(false);
+
+router.push("/admin/chats");
+}
 
 function formatTime(date: string) {
   return new Date(date).toLocaleTimeString([], {
@@ -548,19 +579,21 @@ async function uploadFile(file: File) {
       </button>
 
       <img
-        src={member?.photo_url || "/avatar.png"}
-        style={{
-          width: 45,
-          height: 45,
-          borderRadius: "50%",
-          objectFit: "cover",
-        }}
-      />
-
+  src={member?.photo_url || "/avatar.png"}
+  onError={(e) => {
+    e.currentTarget.src = "/avatar.png";
+  }}
+  style={{
+    width: 45,
+    height: 45,
+    borderRadius: "50%",
+    objectFit: "cover",
+  }}
+/>
       <div>
   <div style={{ fontWeight: 600 }}>
-    {member?.name || "Member"}
-  </div>
+  {member?.name || "Member"}
+</div>
 
   <div style={{ fontSize: 13 }}>
   {conversation?.member_typing
@@ -571,6 +604,37 @@ async function uploadFile(file: File) {
         ? `Last seen ${formatLastSeen(member.last_seen)}`
         : "Offline"}
 </div>
+</div>
+
+<div style={{ marginLeft: "auto" }}>
+  <button
+    onClick={() => setShowDeleteDialog(true)}
+    title="Delete Chat"
+    aria-label="Delete Chat"
+    style={{
+      width: 32,
+      height: 32,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "transparent",
+      border: "none",
+      borderRadius: "50%",
+      cursor: "pointer",
+      color: "#e53935",
+      transition: "all .2s ease",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.background = "rgba(229,57,53,.12)";
+      e.currentTarget.style.transform = "scale(1.08)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.background = "transparent";
+      e.currentTarget.style.transform = "scale(1)";
+    }}
+  >
+    <Trash2 size={17} strokeWidth={2.3} />
+  </button>
 </div>
     </div>
 
@@ -953,6 +1017,12 @@ onSave={async () => {
 
   await loadMessages();
 }}
+/>
+
+<DeleteConversationDialog
+  open={showDeleteDialog}
+  onCancel={() => setShowDeleteDialog(false)}
+  onConfirm={deleteConversation}
 />
   </div>
 );

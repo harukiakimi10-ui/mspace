@@ -2,6 +2,8 @@
 
 import MessageInput from "./MessageInput";
 import ReplyPreview from "./ReplyPreview";
+import VoiceRecorder from "./VoiceRecorder";
+
 
 type ChatComposerProps = {
   message: string;
@@ -21,7 +23,39 @@ type ChatComposerProps = {
 
   onAttach: () => void;
 
+
   uploading: boolean;
+
+  recordingTime: number;
+
+  playing: boolean;
+
+  previewCurrentTime: number;
+
+  recording: boolean;
+
+  voiceState: "idle" | "recording" | "preview";
+
+  voiceLevel: number;
+
+  startRecording: () => void;
+
+  stopRecording: () => void;
+
+
+
+  onPlay: () => void;
+
+  onPause: () => void;
+
+  onDelete: () => void;
+
+  onSend: (duration: number) => void | Promise<void>;
+
+
+  // NEW
+  stickerOpen: boolean;
+  onToggleSticker: () => void;
 
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 
@@ -57,12 +91,36 @@ export default function ChatComposer({
   onAttach,
   uploading,
 
+  recordingTime,
+
+previewCurrentTime,
+
+recording,
+playing,
+voiceLevel,
+voiceState,
+  startRecording,
+  stopRecording,
+  onPlay,
+  onPause,
+  onDelete,
+  onSend,
+  // NEW
+  stickerOpen,
+  onToggleSticker,
+
   fileInputRef,
   onFileChange,
 
   onInput,
   onKeyDown,
 }: ChatComposerProps) {
+
+  console.log("recording =", recording);
+console.log("startRecording =", startRecording);
+console.log("stopRecording =", stopRecording);
+console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
+
   return (
     <div
       style={{
@@ -100,16 +158,50 @@ export default function ChatComposer({
         onChange={onFileChange}
       />
 
-      <MessageInput
-        message={message}
-        messageInputRef={messageInputRef}
-        sendMessage={sendMessage}
-        onAttach={onAttach}
-        uploading={uploading}
-        onInput={onInput}
-        onKeyDown={onKeyDown}
-        onToggleQuickEmoji={() => {}}
-      />
+    
+      {voiceState === "idle" ? (
+  <MessageInput
+    message={message}
+    messageInputRef={messageInputRef}
+    sendMessage={sendMessage}
+    onAttach={onAttach}
+    uploading={uploading}
+    recording={recording}
+    onMicClick={recording ? stopRecording : startRecording}
+    stickerOpen={stickerOpen}
+    onToggleQuickEmoji={onToggleSticker}
+    onInput={onInput}
+    onKeyDown={onKeyDown}
+  />
+) : (
+  <VoiceRecorder
+  voiceState={voiceState}
+
+  recordingTime={recordingTime}
+
+  playing={playing}
+
+  previewCurrentTime={previewCurrentTime}
+
+  voiceLevel={voiceLevel}
+
+  onStop={() => {
+    stopRecording();
+  }}
+
+  onPlay={onPlay}
+
+  onPause={onPause}
+
+  onDelete={onDelete}
+
+ onSend={async (duration) => {
+    await onSend(duration);
+    onCancelReply();
+  }}
+/>
+
+)}
     </div>
   );
 }

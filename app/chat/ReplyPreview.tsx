@@ -1,4 +1,5 @@
-import { Camera, Video, X } from "lucide-react";
+import { Camera, Video, Play, Mic, X } from "lucide-react";
+
 
 type ReplyPreviewProps = {
   replyMessage: any;
@@ -25,11 +26,16 @@ export default function ReplyPreview({
         borderLeft: "4px solid #7c3aed",
         background: "#f5f3ff",
         display: "flex",
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
         alignItems: "center",
       }}
     >
-      <div style={{ overflow: "hidden" }}>
+      <div
+  style={{
+    overflow: "hidden",
+    flex: 1,
+  }}
+>
         <div
   style={{
     color: "#7c3aed",
@@ -47,33 +53,116 @@ export default function ReplyPreview({
   style={{
     display: "flex",
     alignItems: "center",
-    gap: "6px",
-    fontSize: "13px",
-    color: "#555",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    maxWidth: "260px",
+    justifyContent: "space-between",
+    gap: 10,
+    width: "360px",
   }}
 >
-  {replyPreview === "🎥 Video" ? (
-    <>
-      <Video
-        size={16}
-        strokeWidth={2.2}
+  <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    flex: 1,
+    color: "#555",
+    fontSize: 13,
+  }}
+>
+    {replyMessage.message_type === "video" ? (
+  <>
+    <Video size={17} strokeWidth={2} />
+    <span>Video</span>
+  </>
+) : replyMessage.message_type === "sticker" ? (
+  <img
+    src={replyMessage.file_url}
+    alt=""
+    style={{
+      width: 48,
+      height: 48,
+      objectFit: "contain",
+      display: "block",
+    }}
+  />
+) : replyMessage.message_type === "image" ? (
+  <>
+    <Camera
+      size={17}
+      strokeWidth={2.3}
+      color="currentColor"
+    />
+    <span>Photo</span>
+  </>
+) : replyMessage.message_type === "voice" ? (
+  <>
+    <Mic size={17} strokeWidth={2.3} />
+    <span>
+      Voice message{" "}
+      {replyMessage.file_duration != null
+        ? `${Math.floor(replyMessage.file_duration / 60)}:${String(
+            Math.floor(replyMessage.file_duration % 60)
+          ).padStart(2, "0")}`
+        : ""}
+    </span>
+  </>
+) : (
+  <span>{replyPreview}</span>
+)}
+  </div>
+
+  {(replyMessage.message_type === "image" ||
+  replyMessage.message_type === "video") && (
+    <div
+      style={{
+        position: "relative",
+        width: 42,
+        height: 42,
+        borderRadius: 8,
+        overflow: "hidden",
+        flexShrink: 0,
+        marginLeft: 8,
+      }}
+    >
+      <img
+        src={
+          replyMessage.message_type === "video"
+            ? (
+                replyMessage.reply_thumbnail_url ??
+                replyMessage.thumbnail_url ??
+                replyMessage.file_url
+              )
+            : replyMessage.file_url
+        }
+        alt=""
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
       />
-      <span>Video</span>
-    </>
-  ) : replyPreview === "🖼️ Photo" ? (
-    <>
-      <Camera
-        size={16}
-        strokeWidth={2.2}
-      />
-      <span>Photo</span>
-    </>
-  ) : (
-    <span>{replyPreview}</span>
+
+      {replyMessage.message_type === "video" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,.22)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Play
+            size={13}
+            fill="#fff"
+            color="#fff"
+          />
+        </div>
+      )}
+    </div>
   )}
 </div>
       </div>

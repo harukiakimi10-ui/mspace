@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { ChevronLeft } from "lucide-react";
 
 type ChatHeaderProps = {
@@ -17,6 +19,21 @@ export default function ChatHeader({
   formatLastSeen,
   onBack,
 }: ChatHeaderProps) {
+
+  console.log("HEADER profileName:", profileName);
+console.log("HEADER profilePhoto:", profilePhoto);
+console.log("HEADER admin:", admin);
+
+
+
+useEffect(() => {
+  console.log("ChatHeader Mounted");
+
+  return () => {
+    console.log("ChatHeader Unmounted");
+  };
+}, []);
+
   return (
   <div
     style={{
@@ -56,20 +73,26 @@ export default function ChatHeader({
         <ChevronLeft size={34} strokeWidth={3.2} />
       </button>
 
-      <img
-        src={
-          profilePhoto ||
-          "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
-        }
-        alt={profileName || "Donald Lee"}
-        style={{
-          width: "40px",
-          height: "40px",
-          borderRadius: "50%",
-          objectFit: "cover",
-          marginRight: "12px",
-        }}
-      />
+      {profilePhoto && (
+  <img
+  src={
+    profilePhoto ||
+    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
+  }
+  onError={(e) => {
+    e.currentTarget.src =
+      "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg";
+  }}
+  alt={profileName || "Profile"}
+  style={{
+    width: 40,
+    height: 40,
+    borderRadius: "50%",
+    objectFit: "cover",
+    marginRight: 12,
+  }}
+/>
+)}
 
       <div>
         <div
@@ -78,22 +101,24 @@ export default function ChatHeader({
             fontSize: "17px",
           }}
         >
-          {profileName || "Donald Lee"}
+          {profileName}
         </div>
 
         <div
-          style={{
-            fontSize: "13px",
-          }}
-        >
-          {conversation?.admin_typing
-            ? "Typing..."
-            : admin?.is_online
-            ? "Online"
-            : admin?.last_seen
-            ? `Last seen ${formatLastSeen(admin.last_seen)}`
-            : "Offline"}
-        </div>
+  style={{
+    fontSize: "13px",
+  }}
+>
+  {conversation?.admin_typing
+    ? "Typing..."
+    : admin
+    ? admin.is_online
+      ? "Online"
+      : admin.last_seen
+      ? `Last seen ${formatLastSeen(admin.last_seen)}`
+      : ""
+    : ""}
+</div>
       </div>
     </div>
   );

@@ -199,20 +199,54 @@ async function loadVisits() {
 async function loadConversations() {
   const supabase = createClient();
 
-  const { data, error } = await supabase
+  // Load conversations
+  const { data: conversationsData } = await supabase
     .from("conversations")
-    .select(`
-      *,
-      members(name, photo_url)
-    `)
-    .order("created_at", { ascending: false });
+    .select("*")
+    .order("updated_at", { ascending: false });
 
-  console.log("Supabase conversations:", data);
-  console.log("Supabase error:", error);
+  if (!conversationsData) return;
 
-  if (data) {
-    setConversations(data);
+  // Load members
+  const { data: membersData } = await supabase
+    .from("members")
+    .select("member_id, name, photo_url");
+
+  const memberMap = new Map();
+
+  membersData?.forEach((member) => {
+    memberMap.set(member.member_id, member);
+  });
+
+  // Remove orphan conversations
+  const validConversations = conversationsData.filter((conversation) =>
+    memberMap.has(conversation.member_id)
+  );
+
+  // Automatically delete orphan conversations
+  const orphanConversations = conversationsData.filter(
+    (conversation) => !memberMap.has(conversation.member_id)
+  );
+
+  for (const orphan of orphanConversations) {
+    await supabase
+      .from("messages")
+      .delete()
+      .eq("conversation_id", orphan.id);
+
+    await supabase
+      .from("conversations")
+      .delete()
+      .eq("id", orphan.id);
   }
+
+  // Attach member info
+  const finalData = validConversations.map((conversation) => ({
+    ...conversation,
+    members: memberMap.get(conversation.member_id),
+  }));
+
+  setConversations(finalData);
 }
 
 async function openConversation(conversation: any) {
@@ -481,10 +515,7 @@ async function unbanDevice(member: any) {
 async function deleteMember(id: number) {
   const supabase = createClient();
 
-  const confirmed = confirm(
-    "Delete this member?"
-  );
-
+  const confirmed = confirm("Delete this member?");
   if (!confirmed) return;
 
   const { error } = await supabase
@@ -493,11 +524,17 @@ async function deleteMember(id: number) {
     .eq("id", id);
 
   if (error) {
-    alert("Delete failed");
+    alert(error.message);
     return;
   }
 
+  setSelectedConversation(null);
+  setChatMessages([]);
+
   loadMembers();
+  loadConversations();
+
+  alert("Member deleted successfully.");
 }
 
 async function saveSettings() {

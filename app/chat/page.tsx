@@ -14,30 +14,97 @@ import ReplyPreview from "./ReplyPreview";
 import Messages from "./Messages";
 import { Paperclip, Smile, SendHorizontal } from "lucide-react";
 import { ChevronDown } from "lucide-react";
+import AttachmentMenu from "./AttachmentMenu";
+import StickerPanel from "./StickerPanel";
+
+import {
+  getMessages,
+  sendTextMessage,
+  sendStickerMessage,
+} from "./services/messageService";
+
+import {
+  getConversation,
+  createConversation,
+  updateOnlineStatus as updateMemberOnlineStatus,
+  getProfileSettings,
+  getAdminStatus,
+} from "./services/conversationService";
+
+
+
+
 
 export default function ChatPage() {
-console.log("MEMBER PAGE LOADED");
+  
+console.log("MEMBER PAGE LOADED", Date.now());
   const router = useRouter();
   const supabase = createClient();
 
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+   useEffect(() => {
+  console.log("messages changed");
+}, [messages]);
+
   const [message, setMessage] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [voiceState, setVoiceState] = useState<
+  "idle" | "recording" | "preview"
+>("idle");
+const [recordingTime, setRecordingTime] = useState(0);
+const [recordedDuration, setRecordedDuration] = useState(0);
+const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
+
+
+const [mediaRecorder, setMediaRecorder] =
+  useState<MediaRecorder | null>(null);
+
+const [audioChunks, setAudioChunks] =
+  useState<Blob[]>([]);
+
+  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [pendingUploads, setPendingUploads] = useState<any[]>([]);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  
+
+
+   const memberId =
+  typeof window !== "undefined"
+    ? localStorage.getItem("mspace_member_id")
+    : null;
+
+const CHAT_CACHE_KEY = `mspace-chat-header-${memberId ?? "default"}`;
+const MESSAGE_CACHE_KEY = `mspace-chat-messages-${memberId ?? "default"}`;
+
+
+  const [cachedHeader, setCachedHeader] = useState<any>(null);
 
   const [profileName, setProfileName] = useState("");
-  const [profilePhoto, setProfilePhoto] = useState("");
+
+const [profilePhoto, setProfilePhoto] = useState("");
+
+const [admin, setAdmin] = useState<any>(null);
+  
+
 
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showStickerPanel, setShowStickerPanel] =
+  useState(false);
   const [isChatActive, setIsChatActive] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [admin, setAdmin] = useState<any>(null);  
+  
+
+
   const [conversation, setConversation] = useState<any>(null);
+    useEffect(() => {
+  console.log("conversation changed");
+}, [conversation]);
 
 
-
-
+const [startupComplete, setStartupComplete] = useState(false);
 const [uploading, setUploading] = useState(false);
 
 const messagesRef = useRef<HTMLDivElement>(null);
@@ -45,10 +112,27 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 const hasAutoScrolled = useRef(false);
 const loadingConversationRef = useRef(false);
+const showScrollButtonRef = useRef(false);
 const messageInputRef = useRef<HTMLTextAreaElement>(null);
+const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+const audioChunksRef = useRef<Blob[]>([]);
+const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+const timerRef = useRef<NodeJS.Timeout | null>(null);
+const recordedAudioRef = useRef<Blob | null>(null);
+const hasBootstrappedRef = useRef(false);
+const analyserRef = useRef<AnalyserNode | null>(null);
+const audioContextRef = useRef<AudioContext | null>(null);
+const animationFrameRef = useRef<number | null>(null);
+
+
+
+const [voiceLevel, setVoiceLevel] = useState(0);
+
+
+
+const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
 const [previewFile, setPreviewFile] = useState<File | null>(null);
-const [previewUrl, setPreviewUrl] = useState("");
 const [showPreview, setShowPreview] = useState(false);
 const [showImageViewer, setShowImageViewer] = useState(false);
 const [viewerImage, setViewerImage] = useState("");
@@ -63,8 +147,30 @@ const [replyMessage, setReplyMessage] = useState<any>(null);
 const [replyPreview, setReplyPreview] = useState("");
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
-  console.log("ADMIN STATE:", admin);
+ console.count("ChatPage Render");
+console.log("ADMIN STATE:", admin);
 
+
+
+
+
+
+async function bootstrapChat() {
+  await Promise.all([
+    loadConversation(),
+    loadProfile(),
+    loadAdminStatus(),
+  ]);
+
+  setStartupComplete(true);
+}
+
+
+
+
+useEffect(() => {
+  showScrollButtonRef.current = showScrollButton;
+}, [showScrollButton]);
 
 
   useEffect(() => {
@@ -89,13 +195,39 @@ const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
 
 
   useEffect(() => {
-    console.log("Main useEffect ran");
+    console.log("Main useEffect ran");const cached = localStorage.getItem(CHAT_CACHE_KEY);
+ bootstrapChat().catch((err) => {
+  console.error("Bootstrap failed:", err);
+});
 
-    loadConversation();
-    loadProfile();
-    loadAdminStatus();
+console.log("HEADER CACHE:", cached);
+
+if (cached) {
+  const header = JSON.parse(cached);
+
+  console.log("HEADER OBJECT:", header);
+
+  setProfileName(header.profileName || "");
+  setProfilePhoto(header.profilePhoto || null);
+
+  if (header.admin) {
+    setAdmin(header.admin);
+  }
+}
+
+const cachedMessages = localStorage.getItem(MESSAGE_CACHE_KEY);
+
+if (cachedMessages) {
+  try {
+    setMessages(JSON.parse(cachedMessages));
+  } catch (err) {
+    console.error("Message cache parse error:", err);
+  }
+}
 
     const handleVisibility = async () => {
+      if (!startupComplete) return;
+
   const active =
     document.visibilityState === "visible" &&
     document.hasFocus();
@@ -117,7 +249,7 @@ const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
 };
       
 
-    window.addEventListener("focus", handleVisibility);
+   
     document.addEventListener(
       "visibilitychange",
       handleVisibility
@@ -133,6 +265,7 @@ window.addEventListener("beforeunload", handleUnload);
 
 window.addEventListener("focus", handleVisibility);
 window.addEventListener("blur", handleVisibility);
+
 
 return () => {
   updateOnlineStatus(false);
@@ -157,7 +290,7 @@ return () => {
     handleUnload
   );
 };
-}, [conversationId]);
+}, []);
 
 useEffect(() => {
   if (!conversationId) return;
@@ -219,9 +352,9 @@ useEffect(() => {
           
           await loadMessages(conversationId);
 
-          if (showScrollButton) {
-          setNewMessageCount((count) => count + 1);
-        }
+          if (showScrollButtonRef.current) {
+  setNewMessageCount((count) => count + 1);
+}
 
           if (
             document.visibilityState === "visible" &&
@@ -250,7 +383,7 @@ useEffect(() => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, showScrollButton]);
+  }, [conversationId]);
 
 useEffect(() => {
   if (hasAutoScrolled.current) return;
@@ -266,47 +399,62 @@ useEffect(() => {
   });
 }, [messages]);
 
+useEffect(() => {
+  console.log("conversationId changed:", conversationId);
+}, [conversationId]);
+
+useEffect(() => {
+  console.log("profileName changed:", profileName);
+}, [profileName]);
+
+useEffect(() => {
+  console.log("profilePhoto changed:", profilePhoto);
+}, [profilePhoto]);
+
+useEffect(() => {
+  console.log("admin changed:", admin);
+}, [admin]);
+
+useEffect(() => {
+  console.log("conversation changed:", conversation);
+}, [conversation]);
+
+useEffect(() => {
+  console.log("messages changed:", messages.length);
+}, [messages]);
+
+useEffect(() => {
+  console.log("startupComplete changed:", startupComplete);
+}, [startupComplete]);
+
+useEffect(() => {
+  console.log("isChatActive changed:", isChatActive);
+}, [isChatActive]);
+
+
 async function loadConversation() {
 if (loadingConversationRef.current) return;
 loadingConversationRef.current = true;
 
 console.log(">>> loadConversation START");
   const memberId = localStorage.getItem("mspace_member_id");
+  console.log("MEMBER ID:", memberId);
 
   if (!memberId) {
   loadingConversationRef.current = false;
   return;
 }
 
-  const { data, error } = await supabase
-  .from("conversations")
-  .select("*")
-  .eq("member_id", memberId)
-  .order("created_at", { ascending: true })
-  .limit(1);
+  let conversation = await getConversation(memberId);
 
-console.log("Query returned:", data);
-
-let conversation = data?.[0];
-
-console.log("Conversation query data:", data);
-console.log("Conversation query error:", error);
 
   if (!conversation) {
 
   console.log(">>> INSERTING conversation");
 
-  const { data: newConversation } = await supabase
-    .from("conversations")
-    .insert({
-      member_id: memberId,
-    })
-    .select()
-    .single();
+  conversation = await createConversation(memberId);
 
-  conversation = newConversation;
-
-  console.log(">>> CREATED:", newConversation.id);
+console.log(">>> CREATED:", conversation.id);
 }
 
   if (!conversation) {
@@ -331,30 +479,92 @@ loadingConversationRef.current = false;
 }
 
 async function loadProfile() {
-  const { data } = await supabase
-    .from("settings")
-    .select("*")
-    .eq("id", 1)
-    .single();
+  
+  const data = await getProfileSettings();
 
-  if (!data) return;
+if (!data) return;
 
   setProfileName(data.profile_name);
-  setProfilePhoto(data.profile_photo);
+  setProfilePhoto(data.profile_photo || null);
+  const existing = localStorage.getItem(CHAT_CACHE_KEY);
+
+let header: any = {};
+
+if (existing) {
+  try {
+    header = JSON.parse(existing);
+  } catch {
+    header = {};
+  }
+}
+
+header.profileName = data.profile_name;
+header.profilePhoto = data.profile_photo;
+
+localStorage.setItem(
+  CHAT_CACHE_KEY,
+  JSON.stringify(header)
+);
 }
 
 async function loadAdminStatus() {
-  const { data, error } = await supabase
-    .from("admins")
-    .select("is_online, last_seen")
-    .single();
+  // Load the last known admin status immediately
+  const cached = localStorage.getItem(CHAT_CACHE_KEY);
 
-  console.log("ADMIN STATUS:", data);
-  console.log("ADMIN ERROR:", error);
+  if (cached) {
+    try {
+      const header = JSON.parse(cached);
 
-  if (!data) return;
+      if (header.admin) {
+        setAdmin(header.admin);
+      }
+    } catch (err) {
+      console.error("Cache parse error:", err);
+    }
+  }
 
+  // Fetch the latest status from Supabase
+  let data;
+
+try {
+  data = await getAdminStatus();
+} 
+
+  catch (error: any) {
+  console.error("ADMIN ERROR:", error);
+  console.error("MESSAGE:", error?.message);
+  console.error("DETAILS:", error?.details);
+  console.error("HINT:", error?.hint);
+  console.error("CODE:", error?.code);
+  return;
+}
+
+console.log("ADMIN STATUS:", data);
+
+if (!data) return;
+
+  // Update React state
   setAdmin(data);
+
+  // Save the updated status back to the cache
+  const existing = localStorage.getItem(CHAT_CACHE_KEY);
+
+  let header: any = {};
+
+  if (existing) {
+    try {
+      header = JSON.parse(existing);
+    } catch {
+      header = {};
+    }
+  }
+
+  header.admin = data;
+
+  localStorage.setItem(
+    CHAT_CACHE_KEY,
+    JSON.stringify(header)
+  );
 }
 
 async function updateOnlineStatus(online: boolean) {
@@ -362,17 +572,11 @@ async function updateOnlineStatus(online: boolean) {
 
   if (!memberId) return;
 
-  const { error } = await supabase
-    .from("members")
-    .update({
-      is_online: online,
-      last_seen: new Date().toISOString(),
-    })
-    .eq("member_id", memberId);
-
-  if (error) {
-    console.error("Online status error:", error);
-  }
+  try {
+  await updateMemberOnlineStatus(memberId, online);
+} catch (error) {
+  console.error("Online status error:", error);
+}
 }
 
 function handleMessageInput(
@@ -417,11 +621,7 @@ function handleMessageInput(
 
 
 async function loadMessages(id: string) {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-.eq("conversation_id", id)
-.order("created_at", { ascending: true });
+  const data = await getMessages(id);
 
   const filteredMessages = (data || []).filter(
   (msg) => msg.deleted_for !== "member"
@@ -439,7 +639,15 @@ setPendingUploads((prev) =>
   })
 );
 
+console.log("Before setMessages:", messages.length);
+console.log("Incoming messages:", filteredMessages.length);
+
 setMessages(filteredMessages);
+
+localStorage.setItem(
+  MESSAGE_CACHE_KEY,
+  JSON.stringify(filteredMessages)
+);
 
   const el = messagesRef.current;
 
@@ -509,47 +717,25 @@ function handleFileChange(
 }
 
 async function sendMessage() {
+  console.log("Conversation ID:", conversationId);
   if (!conversationId) return;
 
   if (!message.trim()) return;
 
-  const { data } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: conversationId,
-      sender: "member",
-      message_type: "text",
-      content: message,
-      is_read: false,
+  let data;
 
-      reply_to_id: replyMessage?.id ?? null,
+try {
+  data = await sendTextMessage({
+    conversationId,
+    content: message,
+    replyMessage,
+  });
+} catch (error) {
+  console.error("Send message error:", error);
+  return;
+}
 
-reply_preview:
-  replyMessage?.message_type === "text"
-    ? replyMessage.content
-    : replyMessage?.message_type === "image"
-      ? "📷 Photo"
-      : replyMessage?.message_type === "video"
-        ? "🎥 Video"
-        : null,
-
-reply_file_url:
-  replyMessage?.message_type === "image" ||
-  replyMessage?.message_type === "video"
-    ? replyMessage.file_url
-    : null,
-reply_thumbnail_url:
-  replyMessage?.message_type === "video"
-    ? replyMessage.reply_thumbnail_url
-    : null,
-reply_sender: replyMessage?.sender ?? null,
-
-    })
-    .select()
-    .single();
-
-  if (!data) return;
-
+if (!data) return;
   resetComposer();
 await loadMessages(conversationId);
 
@@ -569,6 +755,213 @@ setTimeout(() => {
 }, 50);
 }
 
+const startRecording = async () => {
+
+  try {
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+  audio: true,
+});
+
+// Live microphone analyser for waveform
+const audioContext = new AudioContext();
+const analyser = audioContext.createAnalyser();
+
+analyser.fftSize = 256;
+
+const source = audioContext.createMediaStreamSource(stream);
+source.connect(analyser);
+
+audioContextRef.current = audioContext;
+analyserRef.current = analyser;
+
+const dataArray = new Uint8Array(analyser.fftSize);
+
+const updateVoiceLevel = () => {
+  analyser.getByteTimeDomainData(dataArray);
+
+  let sum = 0;
+
+  for (let i = 0; i < dataArray.length; i++) {
+    const value = (dataArray[i] - 128) / 128;
+    sum += value * value;
+  }
+
+  const rms = Math.sqrt(sum / dataArray.length);
+
+  setVoiceLevel(Math.min(1, rms * 4));
+
+  animationFrameRef.current =
+    requestAnimationFrame(updateVoiceLevel);
+};
+
+updateVoiceLevel();
+
+const recorder = new MediaRecorder(stream);
+
+    console.log("MediaRecorder =", recorder);
+
+    audioChunksRef.current = [];
+
+    recorder.ondataavailable = (event) => {
+  if (event.data.size > 0) {
+    audioChunksRef.current.push(event.data);
+  }
+};
+
+    recorder.onstart = () => {
+
+  setRecording(true);
+  setVoiceState("recording");
+
+  setAudioChunks([]);
+
+  setRecordingTime(0);
+
+timerRef.current = setInterval(() => {
+  setRecordingTime((t) => t + 1);
+}, 1000);
+
+};
+
+
+    recorder.start();
+
+    mediaRecorderRef.current = recorder;
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const stopRecording = (sendDirectly = false) => {
+  return new Promise<void>((resolve) => {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) {
+      resolve();
+      return;
+    }
+
+    recorder.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: "audio/webm",
+      });
+
+      console.log("Recorded audio:", audioBlob);
+
+      setRecordedAudio(audioBlob);
+
+      recordedAudioRef.current = audioBlob;
+
+      const url = URL.createObjectURL(audioBlob);
+
+      if (previewAudioRef.current) {
+        previewAudioRef.current.src = url;
+      } else {
+        previewAudioRef.current = new Audio(url);
+      }
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setRecording(false);
+      setRecordedDuration(recordingTime);
+      if (!sendDirectly) {
+      setVoiceState("preview");
+      }
+
+      recorder.stream
+        .getTracks()
+        .forEach((track) => track.stop());
+
+      resolve();   // <-- This is the important line
+    };
+
+    recorder.stop();
+  });
+};
+
+const playRecording = () => {
+  if (!previewAudioRef.current) return;
+
+  previewAudioRef.current.play();
+  setPlaying(true);
+
+  const audio = previewAudioRef.current;
+
+  const interval = setInterval(() => {
+    setPreviewCurrentTime(audio.currentTime);
+    
+  }, 200);
+
+  audio.onended = () => {
+    clearInterval(interval);
+    setPlaying(false);
+
+    audio.currentTime = 0;
+
+    setPreviewCurrentTime(0);
+  };
+};
+
+const pauseRecording = () => {
+  if (!previewAudioRef.current) return;
+
+  previewAudioRef.current.pause();
+  setPlaying(false);
+};
+
+const deleteRecording = () => {
+  if (previewAudioRef.current) {
+    previewAudioRef.current.pause();
+    previewAudioRef.current.currentTime = 0;
+  }
+
+  setPlaying(false);
+
+  setRecordedAudio(null);
+
+  setRecordingTime(0);
+
+  setRecordedDuration(0);
+
+  setVoiceState("idle");
+};
+
+async function sendSticker(sticker: string) {
+  if (!conversationId) return;
+
+  let data;
+
+try {
+  data = await sendStickerMessage(
+  conversationId,
+  sticker,
+  replyMessage
+);
+} catch (error) {
+  console.error("Sticker error:", error);
+  return;
+}
+
+if (!data) return;
+
+setShowStickerPanel(false);
+
+// Clear the reply composer after sending
+setReplyMessage(null);
+setReplyPreview("");
+
+await loadMessages(conversationId);
+  setTimeout(() => {
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, 50);
+}
 
 async function uploadFile(file: File) {
   if (!conversationId) return;
@@ -678,6 +1071,133 @@ async function uploadFile(file: File) {
 }
 
 
+async function sendVoiceMessage(duration: number) {
+  console.log("Sending voice duration:", duration);
+  if (!conversationId) return;
+
+const audioBlob = recordedAudioRef.current;
+
+if (!audioBlob) return;
+
+setUploading(true);
+
+try {
+  const file = new File(
+  [audioBlob],
+  `voice-${Date.now()}.webm`,
+  {
+    type: "audio/webm",
+  }
+);
+
+const filePath =
+  `${conversationId}/${file.name}`;
+
+  const { error: uploadError } = await supabase.storage
+  .from("photos")
+  .upload(filePath, file);
+
+if (uploadError) {
+  alert(uploadError.message);
+  return;
+}
+
+const { data } = supabase.storage
+  .from("photos")
+  .getPublicUrl(filePath);
+
+  const { error } = await supabase
+  .from("messages")
+  .insert({
+    conversation_id: conversationId,
+    sender: "member",
+    message_type: "voice",
+    content: "",
+    file_url: data.publicUrl,
+    file_name: file.name,
+    file_size: file.size,
+    mime_type: file.type,
+file_duration: duration,
+is_read: false,
+    
+    reply_to_id: replyMessage?.id ?? null,
+
+    reply_file_duration:
+  replyMessage?.message_type === "voice"
+    ? replyMessage.file_duration
+    : null,
+
+reply_preview:
+  replyMessage?.message_type === "text"
+    ? replyMessage.content
+    : replyMessage?.message_type === "image"
+    ? "📷 Photo"
+    : replyMessage?.message_type === "video"
+    ? "🎥 Video"
+    : replyMessage?.message_type === "voice"
+    ? "🎤 Voice"
+    : replyMessage?.message_type === "sticker"
+    ? "🏷️ Sticker"
+    : null,
+
+reply_file_url:
+  replyMessage?.message_type === "image" ||
+  replyMessage?.message_type === "video" ||
+  replyMessage?.message_type === "voice" ||
+  replyMessage?.message_type === "sticker"
+    ? replyMessage.file_url
+    : null,
+
+reply_thumbnail_url:
+  replyMessage?.message_type === "video"
+    ? (
+        replyMessage.reply_thumbnail_url ??
+        replyMessage.thumbnail_url ??
+        replyMessage.file_url
+      )
+    : null,
+
+reply_message_type: replyMessage?.message_type ?? null,
+
+reply_sender: replyMessage?.sender ?? null,
+
+  });
+
+if (error) {
+  alert(error.message);
+  return;
+}
+
+await loadMessages(conversationId);
+
+deleteRecording();
+
+recordedAudioRef.current = null;
+
+requestAnimationFrame(() => {
+  messageInputRef.current?.focus();
+});
+
+setTimeout(() => {
+  const el = messagesRef.current;
+
+  if (!el) return;
+
+  el.scrollTo({
+    top: el.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
+
+} finally {
+  setUploading(false);
+}
+
+
+
+}
+
+
 
 
 function formatTime(date: string) {
@@ -762,6 +1282,9 @@ function getEmojiCount(text: string) {
 }
 
 
+console.log("RENDER profileName:", profileName);
+console.log("RENDER profilePhoto:", profilePhoto);
+
 return (
   <>
 
@@ -786,6 +1309,7 @@ return (
   currentUser="member"
   onClose={() => setShowMessageMenu(false)}
   onReply={() => {
+    console.log("REPLY SELECTED MESSAGE:", selectedMessage);
     setReplyMessage(selectedMessage);
 
     if (selectedMessage?.message_type === "text") {
@@ -794,8 +1318,26 @@ return (
       setReplyPreview("📷 Photo");
     } else if (selectedMessage?.message_type === "video") {
       setReplyPreview("🎥 Video");
-    }
+    } else if (selectedMessage?.message_type === "voice") {
+  const duration = selectedMessage.file_duration ?? 0;
 
+  setReplyPreview(
+    `🎤 Voice message ${Math.floor(duration / 60)}:${String(
+      Math.floor(duration % 60)
+    ).padStart(2, "0")}`
+  );
+} else if (selectedMessage?.message_type === "voice") {
+  const duration = selectedMessage.file_duration ?? 0;
+
+  setReplyPreview(
+    `🎤 Voice message ${Math.floor(duration / 60)}:${String(
+      Math.floor(duration % 60)
+    ).padStart(2, "0")}`
+  );
+} else if (selectedMessage?.message_type === "sticker") {
+  setReplyPreview("🏷️ Sticker");
+}
+    
     setShowMessageMenu(false);
   }}
   onCopy={() => {
@@ -874,6 +1416,43 @@ onDeleteForEveryone={async () => {
 }}
 />
 
+<AttachmentMenu
+  open={showAttachmentMenu}
+  onClose={() => setShowAttachmentMenu(false)}
+
+  onCamera={() => {
+    setShowAttachmentMenu(false);
+
+    alert("Camera coming next.");
+  }}
+
+  onPhoto={() => {
+    setShowAttachmentMenu(false);
+
+    fileInputRef.current?.click();
+  }}
+
+  onVideo={() => {
+    setShowAttachmentMenu(false);
+
+    fileInputRef.current?.click();
+  }}
+
+  onLocation={() => {
+    setShowAttachmentMenu(false);
+
+    alert("Location sharing coming next.");
+  }}
+/>
+
+<StickerPanel
+  open={showStickerPanel}
+  onClose={() => setShowStickerPanel(false)}
+  onStickerSelect={(sticker) => {
+  sendSticker(sticker);
+}}
+/>
+
 <MediaPreview
   open={showPreview}
   previewFile={previewFile}
@@ -938,7 +1517,7 @@ onDeleteForEveryone={async () => {
   }}
 >
       {/* Header */}
-      <ChatHeader
+<ChatHeader
   profileName={profileName}
   profilePhoto={profilePhoto}
   admin={admin}
@@ -1137,7 +1716,7 @@ onDeleteForEveryone={async () => {
   setMessage={setMessage}
 
   currentUser="member"
-profileName={profileName}
+  profileName={profileName}
 
   replyMessage={replyMessage}
   replyPreview={replyPreview}
@@ -1146,13 +1725,53 @@ profileName={profileName}
     setReplyPreview("");
   }}
 
-
   messageInputRef={messageInputRef}
 
   sendMessage={sendMessage}
 
-  onAttach={() => fileInputRef.current?.click()}
+  stickerOpen={showStickerPanel}
+
+  onToggleSticker={() => {
+    if (showStickerPanel) {
+      setShowStickerPanel(false);
+
+      setTimeout(() => {
+        messageInputRef.current?.focus();
+      }, 150);
+    } else {
+      messageInputRef.current?.blur();
+      setShowStickerPanel(true);
+    }
+  }}
+
+  onAttach={() => {
+    setShowAttachmentMenu(true);
+  }}
+
   uploading={uploading}
+
+  recording={recording}
+  voiceState={voiceState}
+  voiceLevel={voiceLevel}
+  recordingTime={recordingTime}
+  playing={playing}
+  previewCurrentTime={previewCurrentTime}
+  startRecording={startRecording}
+  stopRecording={stopRecording}
+  onPlay={playRecording}
+  onPause={pauseRecording}
+  onDelete={deleteRecording}
+  onSend={async (duration) => {
+  console.log("CHAT PAGE onSend duration =", duration);
+
+  if (recording) {
+    await stopRecording(true);
+  }
+
+  console.log("Calling sendVoiceMessage with =", duration);
+
+  await sendVoiceMessage(duration);
+}}
 
   fileInputRef={fileInputRef}
   onFileChange={handleFileChange}

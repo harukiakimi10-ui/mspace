@@ -109,11 +109,62 @@ ownerSpace: "Donald Lee的",
 }[language];
 
   useEffect(() => {
-  const memberId = localStorage.getItem("mspace_member_id");
+  async function restoreMember() {
+    console.log("=== RESTORE START ===");
 
-  if (memberId) {
+    const memberId = localStorage.getItem("mspace_member_id");
+    console.log("Member ID:", memberId);
+
+    if (memberId) {
+      console.log("Already logged in");
+      router.push("/members");
+      return;
+    }
+
+    const deviceId = localStorage.getItem("mspace_device_id");
+    console.log("Device ID:", deviceId);
+
+    if (!deviceId) {
+      console.log("No device ID");
+      return;
+    }
+
+    const supabase = createClient();
+
+    const { data: members, error } = await supabase
+  .from("members")
+  .select("*")
+  .eq("device_id", deviceId)
+  .order("created_at", { ascending: false });
+
+const member = members?.[0];
+
+    console.log("Supabase error:", error);
+    console.log("Member found:", member);
+
+    if (!member) {
+      console.log("No member matched this device");
+      return;
+    }
+
+    if (member.banned) {
+      console.log("Member is banned");
+      return;
+    }
+
+    console.log("Restoring login...");
+
+    localStorage.setItem(
+      "mspace_member_id",
+      member.member_id
+    );
+
+    console.log("Redirecting...");
+
     router.push("/members");
   }
+
+  restoreMember();
 }, []);
 
 useEffect(() => {
@@ -275,6 +326,8 @@ if (existingMember?.banned) {
   setLoading(false);
   return;
 }
+
+
     const memberId = crypto.randomUUID();
 
 
@@ -322,6 +375,25 @@ if (error) {
     alert(`${t.error}: ${error.message}`);
 
   setLoading(false);
+  return;
+}
+
+// Same browser/device already has an account
+const { data: deviceMember } = await supabase
+  .from("members")
+  .select("member_id")
+  .eq("device_id", deviceId)
+  .maybeSingle();
+
+if (deviceMember) {
+  localStorage.setItem(
+    "mspace_member_id",
+    deviceMember.member_id
+  );
+
+  setLoading(false);
+
+  router.push("/members");
   return;
 }
 

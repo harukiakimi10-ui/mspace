@@ -1,6 +1,12 @@
 "use client";
 
-import { Paperclip, Sticker, SendHorizontal } from "lucide-react";
+import {
+  Plus,
+  Images,
+  Keyboard,
+  SendHorizontal,
+  Mic,
+} from "lucide-react";
 import { premiumButton } from "./premiumButton";
 
 type MessageInputProps = {
@@ -12,6 +18,12 @@ type MessageInputProps = {
   onAttach: () => void;
 
   uploading: boolean;
+
+  recording: boolean;
+
+  onMicClick: () => void;
+
+  stickerOpen: boolean;
 
   onToggleQuickEmoji: () => void;
 
@@ -30,6 +42,10 @@ export default function MessageInput({
   sendMessage,
   onAttach,
   uploading,
+  recording,
+  onMicClick,
+
+  stickerOpen,
   onToggleQuickEmoji,
   onInput,
   onKeyDown,
@@ -37,11 +53,11 @@ export default function MessageInput({
   return (
     <div
       style={{
-        display: "flex",
-        gap: "8px",
-        padding: "5px 10px",
-        alignItems: "center",
-      }}
+  display: "flex",
+  gap: "8px",
+  padding: "5px 18px 5px 10px",
+  alignItems: "center",
+}}
     >
       <button
   onClick={onAttach}
@@ -49,10 +65,11 @@ export default function MessageInput({
   style={{
     ...premiumButton,
 
-    width: "38px",
-    height: "38px",
+    width: "40px",
+    height: "40px",
 
-    background: "transparent",
+    background: "#f3f4f6",
+    borderRadius: "50%",
 
     boxShadow: "none",
 
@@ -64,11 +81,11 @@ export default function MessageInput({
   {uploading ? (
     "..."
   ) : (
-    <Paperclip
-      size={22}
-      strokeWidth={2}
-      color="#444"
-    />
+    <Plus
+  size={26}
+  strokeWidth={2.4}
+  color="#444"
+/>
   )}
 </button>
 
@@ -86,11 +103,19 @@ export default function MessageInput({
           padding: 0,
         }}
       >
-        <Sticker
-  size={22}
-  strokeWidth={2.2}
-  color="#444"
-/>
+        {stickerOpen ? (
+  <Keyboard
+    size={24}
+    strokeWidth={2.2}
+    color="#444"
+  />
+) : (
+  <Images
+    size={24}
+    strokeWidth={2.2}
+    color="#444"
+  />
+)}
       </button>
 
       <textarea
@@ -119,27 +144,38 @@ export default function MessageInput({
 
       <button
   onMouseDown={(e) => e.preventDefault()}
-  onClick={sendMessage}
-        disabled={uploading}
-        style={{
-  ...premiumButton,
-
-  width: "38px",
-  height: "38px",
-
-  cursor: uploading ? "default" : "pointer",
-
-  opacity: uploading ? 0.6 : 1,
-
-  flexShrink: 0,
+  onClick={() => {
+  if (message.trim()) {
+    sendMessage();
+  } else {
+    onMicClick();
+  }
 }}
-      >
-        <SendHorizontal
-          size={17}
-          strokeWidth={2.4}
-          color="#fff"
-        />
-      </button>
+  disabled={uploading}
+  style={{
+    ...premiumButton,
+    width: "38px",
+    height: "38px",
+    cursor: uploading ? "default" : "pointer",
+    opacity: uploading ? 0.6 : 1,
+    flexShrink: 0,
+  }}
+>
+
+  {message.trim() ? (
+    <SendHorizontal
+      size={17}
+      strokeWidth={2.4}
+      color="#fff"
+    />
+  ) : (
+    <Mic
+      size={18}
+      strokeWidth={2.4}
+      color="#fff"
+    />
+  )}
+</button>
     </div>
   );
 }

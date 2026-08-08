@@ -1,7 +1,13 @@
 "use client";
-
 import { Fragment } from "react";
-import { Camera, Video } from "lucide-react";
+import {
+  Video,
+  Camera,
+  Play,
+  Pause,
+  Mic
+} from "lucide-react";
+import VoiceMessage from "./VoiceMessage";
 
 type MessagesProps = {
   messages: any[];
@@ -78,9 +84,20 @@ const formatDate = (date: string) => {
   return (
     <>
       {messages.map((msg, index) => {
+        const isReplyVideo =
+  msg.reply_preview?.toLowerCase().includes("video");
+
+const isReplySticker =
+  msg.reply_preview?.toLowerCase().includes("sticker");
+
+const isReplyVoice =
+  msg.reply_preview?.toLowerCase().includes("voice");
   const previous = index > 0 ? messages[index - 1] : null;
 
   const emojiCount = getEmojiCount(msg.content || "");
+  const isStickerReply =
+  msg.message_type === "sticker" && !!msg.reply_preview;
+
 
   console.log(msg.content, emojiCount);
 
@@ -127,31 +144,44 @@ const formatDate = (date: string) => {
     style={{
   maxWidth: "70%",
   width: "fit-content",
+  
 
   padding:
-    msg.message_type === "image" || msg.message_type === "video"
-      ? "2px"
-      : emojiCount === 1
-      ? "0"
-      : "12px 10px 4px 10px",
+  (
+    msg.message_type === "image" ||
+    msg.message_type === "video" ||
+    msg.message_type === "sticker"
+  ) && !msg.reply_preview
+    ? "0"
+    : emojiCount === 1 && !msg.reply_preview
+    ? "0"
+    : "12px 10px 4px 10px",
 
   borderRadius:
-    emojiCount === 1
-      ? 0
-      : msg.sender === currentUser
-      ? "18px 18px 4px 18px"
-      : "18px 18px 18px 4px",
+  (
+    msg.message_type === "image" ||
+    msg.message_type === "video" ||
+    msg.message_type === "sticker"
+  ) && !msg.reply_preview
+    ? 0
+    : emojiCount === 1 && !msg.reply_preview
+    ? 0
+    : msg.sender === currentUser
+    ? "18px 18px 4px 18px"
+    : "18px 18px 18px 4px",
 
   background:
-    msg.message_type === "image" || msg.message_type === "video"
-      ? msg.sender === currentUser
-        ? "#6d28d9"
-        : "#ffffff"
-      : emojiCount === 1
-      ? "transparent"
-      : msg.sender === currentUser
-      ? "#6d28d9"
-      : "#ffffff",
+  (
+    msg.message_type === "image" ||
+    msg.message_type === "video" ||
+    msg.message_type === "sticker"
+  ) && !msg.reply_preview
+    ? "transparent"
+    : emojiCount === 1 && !msg.reply_preview
+    ? "transparent"
+    : msg.sender === currentUser
+    ? "#6d28d9"
+    : "#ffffff",
 
   color:
     msg.sender === currentUser
@@ -159,9 +189,15 @@ const formatDate = (date: string) => {
       : "#111111",
 
   boxShadow:
-    emojiCount === 1
-      ? "none"
-      : "0 2px 8px rgba(0,0,0,.08)",
+  (
+    msg.message_type === "image" ||
+    msg.message_type === "video" ||
+    msg.message_type === "sticker"
+  ) && !msg.reply_preview
+    ? "none"
+    : emojiCount === 1 && !msg.reply_preview
+    ? "none"
+    : "0 2px 8px rgba(0,0,0,.08)",
 
   whiteSpace: "pre-wrap",
   wordBreak: "break-word",
@@ -212,7 +248,7 @@ onTouchMove={(e) => {
          marginBottom: "8px",
        }}
      >
-       {msg.reply_file_url ? (
+       {msg.reply_file_url && !isReplyVoice? (
 
         <>
 
@@ -235,30 +271,66 @@ onTouchMove={(e) => {
              gap: "10px",
            }}
          >
-           <div
-             style={{
-               position: "relative",
-               width: "48px",
-               height: "48px",
-               flexShrink: 0,
-             }}
-           >
-             <img
-               src={
-                 msg.reply_preview === "🎥 Video"
-                   ? msg.reply_thumbnail_url
-                   : msg.reply_file_url
-               }
-               alt="Reply"
-               style={{
-                 width: "48px",
-                 height: "48px",
-                 borderRadius: "8px",
-                 objectFit: "cover",
-               }}
-             />
-           </div>
-
+           {isReplyVideo ? (
+  <div
+    style={{
+      position: "relative",
+      width: "48px",
+      height: "48px",
+      flexShrink: 0,
+    }}
+  >
+    <img
+      src={msg.reply_thumbnail_url}
+      alt="Reply"
+      style={{
+        width: "48px",
+        height: "48px",
+        borderRadius: "8px",
+        objectFit: "cover",
+      }}
+    />
+  </div>
+) : isReplySticker ? (
+  <div
+    style={{
+      width: "48px",
+      height: "48px",
+      flexShrink: 0,
+    }}
+  >
+    <img
+      src={msg.reply_file_url}
+      alt="Sticker"
+      style={{
+        width: "48px",
+        height: "48px",
+        objectFit: "contain",
+        display: "block",
+      }}
+    />
+  </div>
+) : (
+  <div
+    style={{
+      position: "relative",
+      width: "48px",
+      height: "48px",
+      flexShrink: 0,
+    }}
+  >
+    <img
+      src={msg.reply_file_url}
+      alt="Reply"
+      style={{
+        width: "48px",
+        height: "48px",
+        borderRadius: "8px",
+        objectFit: "cover",
+      }}
+    />
+  </div>
+)}
            <div>
              <div
   style={{
@@ -274,22 +346,22 @@ onTouchMove={(e) => {
   }}
 >
   {msg.reply_preview === "🎥 Video" ? (
-    <>
-      <Video
-        size={16}
-        strokeWidth={2.2}
-      />
-      <span>Video</span>
-    </>
-  ) : (
-    <>
-      <Camera
-        size={16}
-        strokeWidth={2.2}
-      />
-      <span>Photo</span>
-    </>
-  )}
+  <>
+    <Video
+      size={16}
+      strokeWidth={2.2}
+    />
+    <span>Video</span>
+  </>
+) : isReplySticker ? null : (
+  <>
+    <Camera
+      size={16}
+      strokeWidth={2.2}
+    />
+    <span>Photo</span>
+  </>
+)}
 </div>
            </div>
          </div>
@@ -316,7 +388,47 @@ onTouchMove={(e) => {
       textOverflow: "ellipsis",
     }}
   >
-    {msg.reply_preview}
+    {msg.reply_preview === "🎤 Voice" ||
+msg.reply_preview === "🎤 Voice message" ? (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    }}
+  >
+    <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  }}
+>
+  <Mic
+    size={15}
+    strokeWidth={2.2}
+  />
+
+  <span>Voice message</span>
+</div>
+
+    <span
+      style={{
+        fontSize: "11px",
+        opacity: 0.75,
+        fontWeight: 500,
+      }}
+    >
+      {msg.reply_file_duration != null
+  ? `${Math.floor(msg.reply_file_duration / 60)}:${String(
+      Math.floor(msg.reply_file_duration % 60)
+    ).padStart(2, "0")}`
+  : ""}
+    </span>
+  </div>
+) : (
+  msg.reply_preview
+)}
   </div>
 </div>
        )}
@@ -463,6 +575,88 @@ onTouchMove={(e) => {
 )}
 </div>
 )}
+  </div>
+)}
+
+{msg.message_type === "sticker" && (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: isStickerReply
+  ? "center"
+  : msg.sender === currentUser
+  ? "flex-end"
+  : "flex-start",
+      background: "transparent",
+      width: isStickerReply ? "100%" : "auto",
+    }}
+  >
+    {/* STICKER */}
+    <img
+      src={msg.file_url}
+      alt="Sticker"
+      draggable={false}
+      style={{
+        width: "auto",
+        height: "160px",
+        display: "block",
+        background: "transparent",
+        border: "none",
+        boxShadow: "none",
+      }}
+    />
+
+    {/* TIMESTAMP */}
+    <div
+      style={{
+        marginTop: 2,
+        padding: "3px 8px",
+        borderRadius: 12,
+
+        background:
+          msg.sender === currentUser
+            ? "#6d28d9"
+            : "#ffffff",
+
+        boxShadow: "0 1px 4px rgba(0,0,0,.12)",
+
+        display: "flex",
+        alignItems: "center",
+
+        justifyContent:
+          isStickerReply
+            ? "flex-end"
+            : msg.sender === currentUser
+            ? "flex-end"
+            : "flex-start",
+
+        gap: 3,
+
+        fontSize: 11,
+
+        color:
+          msg.sender === currentUser
+            ? "rgba(255,255,255,.82)"
+            : "#667781",
+
+        width: isStickerReply ? "100%" : "auto",
+        boxSizing: "border-box",
+      }}
+    >
+      <span>{formatTime(msg.created_at)}</span>
+
+      {msg.sender === currentUser && (
+        <span
+          style={{
+            color: msg.is_read ? "#53bdeb" : "#d1d5db",
+            fontWeight: 700,
+          }}
+        >
+          {msg.is_read ? "✓✓" : "✓"}
+        </span>
+      )}
+    </div>
   </div>
 )}
 
@@ -621,6 +815,16 @@ onTouchMove={(e) => {
     </div>
   </div>
 )}
+
+
+      {msg.message_type === "voice" && (
+  <VoiceMessage
+    msg={msg}
+    currentUser={currentUser}
+    formatTime={formatTime}
+  />
+)}
+
           </div>
         </div>
       </Fragment>

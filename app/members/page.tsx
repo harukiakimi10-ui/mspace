@@ -477,7 +477,7 @@ async function loadUnreadCount() {
         whiteSpace: "nowrap",
       }}
     >
-      {profileName || "Donald Lee"}
+      {profileName}
     </h2>
 
     <p
