@@ -50,10 +50,15 @@ const safeX = Math.min(
   window.innerWidth - menuWidth - padding
 );
 
-const safeY = Math.min(
-  Math.max(y, padding),
-  window.innerHeight - menuHeight - padding
-);
+let safeY = y;
+
+const bottomSpace = window.innerHeight - y;
+
+if (bottomSpace < menuHeight + padding) {
+  safeY = y - menuHeight - padding;
+}
+
+safeY = Math.max(safeY, padding);
 
   return (
     <div
@@ -61,6 +66,9 @@ const safeY = Math.min(
       style={{
         position: "fixed",
         inset: 0,
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
         background: "rgba(0,0,0,0.15)",
         zIndex: 9999,
       }}
@@ -71,6 +79,9 @@ const safeY = Math.min(
   position: "absolute",
   top: safeY,
   left: safeX,
+  userSelect: "none",
+  WebkitUserSelect: "none",
+  WebkitTouchCallout: "none",
 
   width: 190,
 

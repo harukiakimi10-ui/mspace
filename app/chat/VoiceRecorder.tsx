@@ -357,10 +357,11 @@ return (
 
       {/* Send */}
       <button
+  type="button"
   onClick={() => {
-  console.log("VoiceRecorder recordingTime =", recordingTime);
-  onSend(recordingTime);
-}}
+    console.log("VoiceRecorder recordingTime =", recordingTime);
+    onSend(recordingTime);
+  }}
   style={{
     width: 42,
     height: 42,

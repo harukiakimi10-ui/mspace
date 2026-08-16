@@ -3,10 +3,13 @@
 import Header from "./components/Header";
 import Stats from "./components/Stats";
 import ConversationList from "./components/ConversationList";
+import NotificationButton from "@/app/NotificationButton";
 import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 
 export default function AdminChatsPage() {
+
+  
 
 
 const [conversations, setConversations] = useState<any[]>([]);
@@ -19,6 +22,36 @@ const totalMembers = conversations.length;
 const unreadCount = conversations.filter(
   (c) => c.has_unread
 ).length;
+
+
+async function testPushNotification() {
+  try {
+    const response = await fetch("/api/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "MSpace Test",
+        body: "Push notifications are working! 🔔",
+      }),
+    });
+
+    const data = await response.json();
+
+    console.log("MSpace push test:", data);
+
+    if (!response.ok) {
+      alert(data?.error || "Push notification test failed.");
+      return;
+    }
+
+    alert("Push notification sent. Check the subscribed admin devices.");
+  } catch (error) {
+    console.error("MSpace push test error:", error);
+    alert("Could not send push notification.");
+  }
+}
 
 const supabase = createClient();
 
@@ -195,22 +228,33 @@ console.log("Inserted admin message:", data);
 
   return (
   <div
-    style={{
-      height: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      overflow: "hidden",
-      background: "#fff",
-    }}
-  >
+  style={{
+    position: "fixed",
+    inset: 0,
+    width: "100%",
+    height: "100dvh",
+    minHeight: 0,
+
+    display: "flex",
+    flexDirection: "column",
+
+    overflow: "hidden",
+
+    background: "#fff",
+
+    overscrollBehavior: "none",
+  }}
+>
     {/* Fixed Header + Counters */}
     <div
-      style={{
-        flexShrink: 0,
-        background: "#fff",
-        zIndex: 100,
-      }}
-    >
+  style={{
+    flexShrink: 0,
+    position: "relative",
+    zIndex: 1000,
+    background: "#fff",
+    overflow: "hidden",
+  }}
+>
       <Header />
 
       <div style={{ padding: "8px 20px 0" }}>
@@ -219,6 +263,26 @@ console.log("Inserted admin message:", data);
           totalMembers={totalMembers}
           unreadCount={unreadCount}
         />
+
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    padding: "10px 20px",
+  }}
+>
+
+</div>
+
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    padding: "8px 0 4px",
+  }}
+>
+  <NotificationButton />
+</div>
       </div>
 
       <div
@@ -229,13 +293,21 @@ console.log("Inserted admin message:", data);
       />
     </div>
 
-    {/* Scrollable Conversation List */}
-    <div
-      style={{
-        flex: 1,
-        overflowY: "auto",
-      }}
-    >
+    {/* ONLY THIS AREA SCROLLS */}
+<div
+  style={{
+    flex: 1,
+    minHeight: 0,
+    height: 0,
+
+    overflowY: "auto",
+    overflowX: "hidden",
+
+    WebkitOverflowScrolling: "touch",
+
+    overscrollBehaviorY: "contain",
+  }}
+>
       <ConversationList
         conversations={conversations}
       />

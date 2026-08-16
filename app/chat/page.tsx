@@ -16,11 +16,18 @@ import { Paperclip, Smile, SendHorizontal } from "lucide-react";
 import { ChevronDown } from "lucide-react";
 import AttachmentMenu from "./AttachmentMenu";
 import StickerPanel from "./StickerPanel";
+import { createId } from "@/lib/createId";
+import { compressVideo } from "./videoCompressor";
+import LocationPreview from "./LocationPreview";
+
+import * as tus from "tus-js-client";
+
 
 import {
   getMessages,
   sendTextMessage,
   sendStickerMessage,
+  sendLocationMessage,
 } from "./services/messageService";
 
 import {
@@ -66,6 +73,8 @@ const [audioChunks, setAudioChunks] =
 
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [pendingUploads, setPendingUploads] = useState<any[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const activeUploadsRef = useRef<Record<string, tus.Upload>>({});
   const [newMessageCount, setNewMessageCount] = useState(0);
   
 
@@ -96,6 +105,13 @@ const [admin, setAdmin] = useState<any>(null);
   const [isChatActive, setIsChatActive] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   
+  const [showLocationPreview, setShowLocationPreview] =
+  useState(false);
+
+const [locationPreview, setLocationPreview] = useState<{
+  latitude: number;
+  longitude: number;
+} | null>(null);
 
 
   const [conversation, setConversation] = useState<any>(null);
@@ -109,12 +125,14 @@ const [uploading, setUploading] = useState(false);
 
 const messagesRef = useRef<HTMLDivElement>(null);
 const fileInputRef = useRef<HTMLInputElement>(null);
+const cameraInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 const hasAutoScrolled = useRef(false);
 const loadingConversationRef = useRef(false);
 const showScrollButtonRef = useRef(false);
 const messageInputRef = useRef<HTMLTextAreaElement>(null);
 const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 const audioChunksRef = useRef<Blob[]>([]);
 const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,6 +141,7 @@ const hasBootstrappedRef = useRef(false);
 const analyserRef = useRef<AnalyserNode | null>(null);
 const audioContextRef = useRef<AudioContext | null>(null);
 const animationFrameRef = useRef<number | null>(null);
+const sendingVoiceRef = useRef(false);
 
 
 
@@ -757,6 +776,8 @@ setTimeout(() => {
 
 const startRecording = async () => {
 
+  sendingVoiceRef.current = false;
+
   try {
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -800,6 +821,7 @@ updateVoiceLevel();
 const recorder = new MediaRecorder(stream);
 
     console.log("MediaRecorder =", recorder);
+    console.log("Recorder MIME type:", recorder.mimeType);
 
     audioChunksRef.current = [];
 
@@ -844,10 +866,11 @@ const stopRecording = (sendDirectly = false) => {
 
     recorder.onstop = () => {
       const audioBlob = new Blob(audioChunksRef.current, {
-        type: "audio/webm",
-      });
+  type: recorder.mimeType,
+});
 
       console.log("Recorded audio:", audioBlob);
+      console.log("Final audio type:", audioBlob.type);
 
       setRecordedAudio(audioBlob);
 
@@ -884,36 +907,59 @@ const stopRecording = (sendDirectly = false) => {
 };
 
 const playRecording = () => {
-  if (!previewAudioRef.current) return;
-
-  previewAudioRef.current.play();
-  setPlaying(true);
-
   const audio = previewAudioRef.current;
 
-  const interval = setInterval(() => {
+  if (!audio) return;
+
+  // Clear any old playback timer
+  if (playbackIntervalRef.current) {
+    clearInterval(playbackIntervalRef.current);
+    playbackIntervalRef.current = null;
+  }
+
+  audio.play();
+
+  setPlaying(true);
+
+  playbackIntervalRef.current = setInterval(() => {
     setPreviewCurrentTime(audio.currentTime);
-    
-  }, 200);
+  }, 100);
 
   audio.onended = () => {
-    clearInterval(interval);
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current);
+      playbackIntervalRef.current = null;
+    }
+
     setPlaying(false);
 
     audio.currentTime = 0;
-
     setPreviewCurrentTime(0);
   };
 };
 
 const pauseRecording = () => {
-  if (!previewAudioRef.current) return;
+  const audio = previewAudioRef.current;
 
-  previewAudioRef.current.pause();
+  if (!audio) return;
+
+  audio.pause();
+
+  if (playbackIntervalRef.current) {
+    clearInterval(playbackIntervalRef.current);
+    playbackIntervalRef.current = null;
+  }
+
+  setPreviewCurrentTime(audio.currentTime);
   setPlaying(false);
 };
 
 const deleteRecording = () => {
+  if (playbackIntervalRef.current) {
+  clearInterval(playbackIntervalRef.current);
+  playbackIntervalRef.current = null;
+}
+
   if (previewAudioRef.current) {
     previewAudioRef.current.pause();
     previewAudioRef.current.currentTime = 0;
@@ -963,108 +1009,370 @@ await loadMessages(conversationId);
   }, 50);
 }
 
-async function uploadFile(file: File) {
+
+const cancelUpload = (uploadId: string) => {
+  console.log("Cancelling upload:", uploadId);
+
+  // Get the actual TUS upload
+  const upload = activeUploadsRef.current[uploadId];
+
+  // Stop the real upload first
+  if (upload) {
+    upload.abort();
+    delete activeUploadsRef.current[uploadId];
+  }
+
+  // Remove the temporary message
+  setPendingUploads((prev) =>
+    prev.filter(
+      (msg) =>
+        msg.upload_id !== uploadId &&
+        msg.id !== uploadId
+    )
+  );
+
+  // Remove its progress
+  setUploadProgress((prev) => {
+    const next = { ...prev };
+    delete next[uploadId];
+    return next;
+  });
+};
+
+async function uploadFile(file: File, uploadId?: string) {
   if (!conversationId) return;
 
   setUploading(true);
 
-  
+  if (uploadId) {
+  setUploadProgress((prev) => ({
+    ...prev,
+    [uploadId]: 0,
+  }));
+}
 
-  let thumbnailUrl: string |null = null;
+  let uploadFile = file;
+  let thumbnailUrl: string | null = null;
 
   try {
-    const filePath = `${conversationId}/${Date.now()}-${file.name}`;
+    /*
+     * VIDEO COMPRESSION
+     *
+     * Videos 10 MB or smaller are uploaded normally.
+     * Videos above 10 MB are compressed before upload.
+     */
+    if (file.type.startsWith("video/")) {
+      console.log(
+        "Original video:",
+        (file.size / 1024 / 1024).toFixed(2),
+        "MB"
+      );
+
+      if (file.size > 15 * 1024 * 1024) {
+        console.log("Video is above 15 MB. Compressing...");
+
+        uploadFile = await compressVideo(file);
+
+        console.log(
+          "Compressed video:",
+          (uploadFile.size / 1024 / 1024).toFixed(2),
+          "MB"
+        );
+
+        if (uploadFile.size > 10 * 1024 * 1024) {
+          throw new Error(
+            "The video could not be compressed below 10 MB."
+          );
+        }
+      } else {
+        console.log("Video is 15 MB or smaller. Uploading original.");
+      }
+    }
+
+    /*
+     * Upload the FINAL file.
+     *
+     * For videos above 10 MB this is the compressed MP4.
+     * For videos 10 MB or smaller this is the original file.
+     */
+    const filePath = `${conversationId}/${Date.now()}-${uploadFile.name}`;
 
     console.log("Uploading:", filePath);
 
-    const { error: uploadError } = await supabase.storage
-      .from("photos")
-      .upload(filePath, file);
+    /*
+ * RESUMABLE UPLOAD WITH REAL PROGRESS
+ */
+const { data: sessionData } = await supabase.auth.getSession();
 
-    console.log("Storage error:", uploadError);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-    if (uploadError) {
-      alert(uploadError.message);
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-      return;
-    }
+const accessToken =
+  sessionData.session?.access_token || supabaseKey;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error("Supabase configuration is missing.");
+}
+
+if (!supabaseUrl || !accessToken) {
+  throw new Error("Supabase configuration is missing.");
+}
+
+await new Promise<void>((resolve, reject) => {
+  const upload = new tus.Upload(uploadFile, {
+    endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+
+    retryDelays: [0, 3000, 5000, 10000, 20000],
+
+    headers: {
+  authorization: `Bearer ${accessToken}`,
+  apikey: supabaseKey,
+  "x-upsert": "false",
+},
+
+    metadata: {
+      bucketName: "photos",
+      objectName: filePath,
+      contentType: uploadFile.type || "application/octet-stream",
+      cacheControl: "3600",
+    },
+
+    onError(error) {
+      console.error("TUS upload error:", error);
+      reject(error);
+    },
+
+    onProgress(bytesUploaded, bytesTotal) {
+      const percentage = Math.round(
+        (bytesUploaded / bytesTotal) * 100
+      );
+
+      console.log("Upload progress:", percentage + "%");
+
+      if (uploadId) {
+        setPendingUploads((prev) =>
+          prev.map((m) =>
+            m.upload_id === uploadId
+              ? {
+                  ...m,
+                  progress: percentage,
+                }
+              : m
+          )
+        );
+      }
+    },
+
+    onSuccess() {
+      console.log("TUS upload completed.");
+      resolve();
+    },
+  });
+
+  if (uploadId) {
+  activeUploadsRef.current[uploadId] = upload;
+}
+
+  upload.start();
+});
 
     const { data } = supabase.storage
       .from("photos")
       .getPublicUrl(filePath);
 
-    if (file.type.startsWith("video/")) {
+    /*
+     * CREATE VIDEO THUMBNAIL
+     *
+     * IMPORTANT:
+     * We create the thumbnail from uploadFile,
+     * so the thumbnail corresponds to the actual
+     * video stored in Supabase.
+     */
+    if (uploadFile.type.startsWith("video/")) {
       const video = document.createElement("video");
 
-      video.src = URL.createObjectURL(file);
-      video.muted = true;
+      const videoUrl = URL.createObjectURL(uploadFile);
 
-      await new Promise<void>((resolve) => {
-        video.onloadeddata = () => {
-          video.currentTime = 0.1;
+      video.src = videoUrl;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+
+      await new Promise<void>((resolve, reject) => {
+        let finished = false;
+
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          resolve();
         };
 
-        video.onseeked = () => resolve();
+        video.onloadedmetadata = () => {
+          video.currentTime = Math.min(
+            0.1,
+            Math.max(0, video.duration - 0.1)
+          );
+        };
+
+        video.onseeked = finish;
+        video.onerror = () => {
+          if (finished) return;
+          finished = true;
+          reject(new Error("Could not create video thumbnail."));
+        };
+
+        setTimeout(finish, 5000);
       });
 
       const canvas = document.createElement("canvas");
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
       const ctx = canvas.getContext("2d");
 
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
+      if (ctx && canvas.width && canvas.height) {
+        ctx.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
 
         const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", 0.8)
+          canvas.toBlob(
+            resolve,
+            "image/jpeg",
+            0.8
+          )
         );
 
         if (blob) {
           const thumbnailPath =
             `${conversationId}/thumb-${Date.now()}.jpg`;
 
-          await supabase.storage
-            .from("photos")
-            .upload(thumbnailPath, blob);
+          const { error: thumbnailError } =
+            await supabase.storage
+              .from("photos")
+              .upload(thumbnailPath, blob);
 
-          const { data: thumb } = supabase.storage
-            .from("photos")
-            .getPublicUrl(thumbnailPath);
+          if (!thumbnailError) {
+            const { data: thumb } =
+              supabase.storage
+                .from("photos")
+                .getPublicUrl(thumbnailPath);
 
-          thumbnailUrl = thumb.publicUrl;
+            thumbnailUrl = thumb.publicUrl;
+          }
         }
       }
 
-      URL.revokeObjectURL(video.src);
+      URL.revokeObjectURL(videoUrl);
     }
 
     console.log("Public URL:", data.publicUrl);
 
+    /*
+     * SAVE MESSAGE
+     */
     const { error } = await supabase
       .from("messages")
       .insert({
         conversation_id: conversationId,
         sender: "member",
-        message_type: file.type.startsWith("image/")
+
+        message_type: uploadFile.type.startsWith("image/")
           ? "image"
-          : file.type.startsWith("video/")
+          : uploadFile.type.startsWith("video/")
           ? "video"
           : "file",
+
         content: "",
+
         file_url: data.publicUrl,
+
         reply_thumbnail_url: thumbnailUrl,
-        file_name: file.name,
-        file_size: file.size,
-        mime_type: file.type,
+
+        file_name: uploadFile.name,
+
+        file_size: uploadFile.size,
+
+        mime_type: uploadFile.type,
+
         is_read: false,
       });
 
     console.log("Insert error:", error);
 
-    await loadMessages(conversationId);
+if (error) {
+  throw new Error(error.message);
+}
 
-   
+/*
+ * SEND PUSH NOTIFICATION TO ADMIN
+ *
+ * The media message was successfully saved.
+ * Notify the MSpace admin only.
+ */
+try {
+  const pushResponse = await fetch(
+    "/api/push/send",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "MSpace",
+        body:
+          uploadFile.type.startsWith("image/")
+            ? "📷 Photo"
+            : uploadFile.type.startsWith("video/")
+            ? "🎥 Video"
+            : "📎 File",
+      }),
+    }
+  );
+
+  const pushResult =
+    await pushResponse.json();
+
+  console.log(
+    "Member → Admin media push result:",
+    pushResult
+  );
+
+  if (!pushResponse.ok) {
+    console.error(
+      "Member → Admin media push failed:",
+      pushResult
+    );
+  }
+} catch (pushError) {
+  /*
+   * Push failure must NOT break the
+   * successfully uploaded message.
+   */
+  console.error(
+    "Member → Admin media push error:",
+    pushError
+  );
+}
+
+await loadMessages(conversationId);
+
+  } catch (error) {
+    console.error("Upload failed:", error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "The file could not be uploaded."
+    );
+
   } finally {
     setUploading(false);
   }
@@ -1072,21 +1380,47 @@ async function uploadFile(file: File) {
 
 
 async function sendVoiceMessage(duration: number) {
+
+  if (sendingVoiceRef.current) return;
+
+  sendingVoiceRef.current = true;
+
   console.log("Sending voice duration:", duration);
-  if (!conversationId) return;
 
-const audioBlob = recordedAudioRef.current;
+console.log("MEMBER ID:", localStorage.getItem("mspace_member_id"));
+console.log("DEVICE ID:", localStorage.getItem("mspace_device_id"));
+console.log("CONVERSATION ID:", conversationId);
 
-if (!audioBlob) return;
 
-setUploading(true);
+  if (!conversationId) {
+  alert("CONVERSATION ID IS EMPTY");
+  return;
+}
+
+  const audioBlob = recordedAudioRef.current;
+
+if (!audioBlob) {
+  alert("AUDIO BLOB IS EMPTY");
+  return;
+}
+
+  setUploading(true);
+
 
 try {
-  const file = new File(
+  const mimeType = audioBlob.type || "audio/mp4";
+
+const extension = mimeType.includes("mp4")
+  ? "mp4"
+  : mimeType.includes("webm")
+  ? "webm"
+  : "audio";
+
+const file = new File(
   [audioBlob],
-  `voice-${Date.now()}.webm`,
+  `voice-${Date.now()}.${extension}`,
   {
-    type: "audio/webm",
+    type: mimeType,
   }
 );
 
@@ -1138,6 +1472,8 @@ reply_preview:
     ? "🎤 Voice"
     : replyMessage?.message_type === "sticker"
     ? "🏷️ Sticker"
+    : replyMessage?.message_type === "location"
+    ? "📍 Location"
     : null,
 
 reply_file_url:
@@ -1146,6 +1482,8 @@ reply_file_url:
   replyMessage?.message_type === "voice" ||
   replyMessage?.message_type === "sticker"
     ? replyMessage.file_url
+    : replyMessage?.message_type === "location"
+    ? replyMessage.content
     : null,
 
 reply_thumbnail_url:
@@ -1167,6 +1505,53 @@ if (error) {
   alert(error.message);
   return;
 }
+
+/*
+ * Send push notification to the admin.
+ * Do NOT wait for the push request before continuing.
+ */
+void fetch("/api/push/send", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    title: "MSpace",
+    body: "New voice message",
+    conversationId,
+
+    // Same admin recipient used by text/sticker notifications.
+    targetMemberId:
+      "11111111-1111-1111-1111-111111111111",
+  }),
+})
+  .then(async (pushResponse) => {
+    const pushResult = await pushResponse.text();
+
+    console.log(
+      "VOICE PUSH RESPONSE STATUS:",
+      pushResponse.status
+    );
+
+    console.log(
+      "VOICE PUSH RESPONSE BODY:",
+      pushResult
+    );
+
+    if (!pushResponse.ok) {
+      console.error(
+        "Voice push request failed:",
+        pushResponse.status,
+        pushResult
+      );
+    }
+  })
+  .catch((pushError) => {
+    console.error(
+      "Voice push notification error:",
+      pushError
+    );
+  });
 
 await loadMessages(conversationId);
 
@@ -1309,37 +1694,37 @@ return (
   currentUser="member"
   onClose={() => setShowMessageMenu(false)}
   onReply={() => {
-    console.log("REPLY SELECTED MESSAGE:", selectedMessage);
-    setReplyMessage(selectedMessage);
+  console.log("REPLY SELECTED MESSAGE:", selectedMessage);
 
-    if (selectedMessage?.message_type === "text") {
-      setReplyPreview(selectedMessage.content);
-    } else if (selectedMessage?.message_type === "image") {
-      setReplyPreview("📷 Photo");
-    } else if (selectedMessage?.message_type === "video") {
-      setReplyPreview("🎥 Video");
-    } else if (selectedMessage?.message_type === "voice") {
-  const duration = selectedMessage.file_duration ?? 0;
+  setReplyMessage(selectedMessage);
 
-  setReplyPreview(
-    `🎤 Voice message ${Math.floor(duration / 60)}:${String(
-      Math.floor(duration % 60)
-    ).padStart(2, "0")}`
-  );
-} else if (selectedMessage?.message_type === "voice") {
-  const duration = selectedMessage.file_duration ?? 0;
+  if (selectedMessage?.message_type === "text") {
+    setReplyPreview(selectedMessage.content);
 
-  setReplyPreview(
-    `🎤 Voice message ${Math.floor(duration / 60)}:${String(
-      Math.floor(duration % 60)
-    ).padStart(2, "0")}`
-  );
-} else if (selectedMessage?.message_type === "sticker") {
-  setReplyPreview("🏷️ Sticker");
-}
-    
-    setShowMessageMenu(false);
-  }}
+  } else if (selectedMessage?.message_type === "image") {
+    setReplyPreview("📷 Photo");
+
+  } else if (selectedMessage?.message_type === "video") {
+    setReplyPreview("🎥 Video");
+
+  } else if (selectedMessage?.message_type === "voice") {
+    const duration = selectedMessage.file_duration ?? 0;
+
+    setReplyPreview(
+      `🎤 Voice message ${Math.floor(duration / 60)}:${String(
+        Math.floor(duration % 60)
+      ).padStart(2, "0")}`
+    );
+
+  } else if (selectedMessage?.message_type === "location") {
+    setReplyPreview("Location");
+
+  } else if (selectedMessage?.message_type === "sticker") {
+    setReplyPreview("🏷️ Sticker");
+  }
+
+  setShowMessageMenu(false);
+}}
   onCopy={() => {
     navigator.clipboard.writeText(
       selectedMessage?.content || ""
@@ -1421,10 +1806,12 @@ onDeleteForEveryone={async () => {
   onClose={() => setShowAttachmentMenu(false)}
 
   onCamera={() => {
-    setShowAttachmentMenu(false);
+  setShowAttachmentMenu(false);
 
-    alert("Camera coming next.");
-  }}
+  document
+    .getElementById("mspace-camera-input")
+    ?.click();
+}}
 
   onPhoto={() => {
     setShowAttachmentMenu(false);
@@ -1439,18 +1826,94 @@ onDeleteForEveryone={async () => {
   }}
 
   onLocation={() => {
-    setShowAttachmentMenu(false);
+  setShowAttachmentMenu(false);
 
-    alert("Location sharing coming next.");
-  }}
+  if (!navigator.geolocation) {
+    alert("Location is not supported on this device.");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+
+      setLocationPreview({
+        latitude,
+        longitude,
+      });
+
+      setShowLocationPreview(true);
+    },
+    (error) => {
+      console.error(
+        "Location permission error:",
+        error
+      );
+
+      if (error.code === 1) {
+        alert(
+          "Please allow location access to share your location."
+        );
+      } else {
+        alert("Unable to get your location.");
+      }
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    }
+  );
+}}
 />
+
+{showLocationPreview && locationPreview && (
+  <LocationPreview
+    latitude={locationPreview.latitude}
+    longitude={locationPreview.longitude}
+    onCancel={() => {
+      setShowLocationPreview(false);
+      setLocationPreview(null);
+    }}
+    onSend={async (latitude, longitude) => {
+  try {
+    await sendLocationMessage(
+      conversationId!,
+      latitude,
+      longitude
+    );
+
+    setShowLocationPreview(false);
+    setLocationPreview(null);
+  } catch (error) {
+    console.error(
+      "Location send error:",
+      error
+    );
+
+    alert("Unable to send your location.");
+  }
+}}
+  />
+)}
 
 <StickerPanel
   open={showStickerPanel}
   onClose={() => setShowStickerPanel(false)}
   onStickerSelect={(sticker) => {
-  sendSticker(sticker);
+    sendSticker(sticker);
+  }}
+  onEmojiSelect={(emoji: any) => {
+  const emojiValue =
+    typeof emoji === "string"
+      ? emoji
+      : emoji?.native;
+
+  if (emojiValue) {
+    setMessage((prev) => prev + emojiValue);
+  }
 }}
+
 />
 
 <MediaPreview
@@ -1465,38 +1928,64 @@ onDeleteForEveryone={async () => {
   }}
 
   onSend={async () => {
-    if (!previewFile) return;
+  if (!previewFile) return;
 
-    const tempId = "temp-" + Date.now();
-    const uploadId = crypto.randomUUID();
+  // Keep references to the file and preview URL
+  // before clearing the preview state.
+  const fileToUpload = previewFile;
+  const localPreviewUrl = previewUrl;
 
-    setPendingUploads((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        upload_id: uploadId,
-        sender: "member",
-        message_type: previewFile.type.startsWith("image/")
-          ? "image"
-          : "video",
-        file_url: previewUrl,
-        file_name: previewFile.name,
-        created_at: new Date().toISOString(),
-        uploading: true,
-        is_read: false,
-      },
-    ]);
+  const tempId = "temp-" + Date.now();
+  const uploadId = createId();
 
-    setShowPreview(false);
-    setPreviewFile(null);
-    setPreviewUrl("");
+  // Show the video immediately in the chat while uploading.
+  setPendingUploads((prev) => [
+    ...prev,
+    {
+      id: tempId,
+      upload_id: uploadId,
+      sender: "member",
+      message_type: fileToUpload.type.startsWith("image/")
+        ? "image"
+        : "video",
+      file_url: localPreviewUrl,
+      file_name: fileToUpload.name,
+      created_at: new Date().toISOString(),
+      uploading: true,
+      progress: 0,
+      is_read: false,
+    },
+  ]);
 
-    await uploadFile(previewFile);
+  // IMPORTANT:
+  // Close and completely clear the full-screen preview
+  // immediately when Send is pressed.
+  setShowPreview(false);
+  setPreviewFile(null);
+  setPreviewUrl("");
 
+  try {
+    // Upload using the captured file, NOT previewFile state.
+    await uploadFile(fileToUpload, uploadId);
+
+    // Upload succeeded.
     setPendingUploads((prev) =>
       prev.filter((m) => m.id !== tempId)
     );
-  }}
+    
+ setUploadProgress((prev) => {
+  const next = { ...prev };
+  delete next[uploadId];
+  return next;
+});
+
+  } catch (error) {
+    console.error("Media upload failed:", error);
+
+    // Keep the temporary message visible if upload fails.
+    // It can show the uploading/failed state.
+  }
+}}
 />
     <main
   style={{
@@ -1541,14 +2030,18 @@ onDeleteForEveryone={async () => {
   overflow: "hidden",
 
   marginTop: "60px",
-  marginBottom: "86px",
+  marginBottom: "0px",
 }}
 >
   <div
   ref={messagesRef}
   onClick={() => {
-    messageInputRef.current?.blur();
-  }}
+  messageInputRef.current?.blur();
+
+  if (showStickerPanel) {
+    setShowStickerPanel(false);
+  }
+}}
 
    onContextMenu={(e) => {
     e.preventDefault();
@@ -1578,7 +2071,9 @@ onDeleteForEveryone={async () => {
 
   WebkitOverflowScrolling: "touch",
 
-  padding: "20px 10px 20px",
+  padding: showStickerPanel
+  ? "20px 10px calc(38vh + 80px)"
+  : "20px 10px 80px",
 
   overscrollBehavior: "contain",
 }}
@@ -1604,6 +2099,7 @@ onDeleteForEveryone={async () => {
   formatTime={formatTime}
   formatDateLabel={formatDateLabel}
   isNewDay={isNewDay}
+  onCancelUpload={cancelUpload}
   setViewerImage={setViewerImage}
   setViewerName={setViewerName}
   setShowImageViewer={setShowImageViewer}
@@ -1621,7 +2117,7 @@ onDeleteForEveryone={async () => {
   style={{
     position: "absolute",
     right: 20,
-    bottom: 20,
+    bottom: 95,
     zIndex: 100,
   }}
 >
@@ -1744,9 +2240,12 @@ onDeleteForEveryone={async () => {
     }
   }}
 
+  onCloseStickerPanel={() => setShowStickerPanel(false)}
+
   onAttach={() => {
-    setShowAttachmentMenu(true);
-  }}
+  setShowStickerPanel(false);
+  setShowAttachmentMenu(true);
+}}
 
   uploading={uploading}
 
@@ -1762,22 +2261,45 @@ onDeleteForEveryone={async () => {
   onPause={pauseRecording}
   onDelete={deleteRecording}
   onSend={async (duration) => {
+
+
   console.log("CHAT PAGE onSend duration =", duration);
 
-  if (recording) {
-    await stopRecording(true);
+  try {
+
+    if (recording) {
+      await stopRecording(true);
+    }
+
+    console.log("Calling sendVoiceMessage with =", duration);
+
+    await sendVoiceMessage(duration);
+
+  } catch (error) {
+
+    console.error("Voice message send error:", error);
+
+  
   }
-
-  console.log("Calling sendVoiceMessage with =", duration);
-
-  await sendVoiceMessage(duration);
 }}
 
   fileInputRef={fileInputRef}
   onFileChange={handleFileChange}
 
   onInput={handleMessageInput}
-  onKeyDown={() => {}}
+  onKeyDown={(e) => {
+  if (
+    e.key === "Enter" &&
+    !e.shiftKey &&
+    window.innerWidth > 768
+  ) {
+    e.preventDefault();
+
+    if (message.trim()) {
+      sendMessage();
+    }
+  }
+}}
 />
    </main>
 </>

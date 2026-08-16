@@ -69,8 +69,8 @@ export default function AttachmentMenu({
   willChange: "transform",
 
   background: "#fff",
-          borderTopLeftRadius: 30,
-          borderTopRightRadius: 30,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
 
           padding: "18px",
 
@@ -80,19 +80,6 @@ export default function AttachmentMenu({
           zIndex: 1999,
         }}
       >
-        {/* Drag Handle */}
-        <div
-          style={{
-            width: 48,
-            height: 5,
-
-            borderRadius: 999,
-
-            background: "#ddd",
-
-            margin: "0 auto 18px",
-          }}
-        />
 
         {/* Header */}
         <div

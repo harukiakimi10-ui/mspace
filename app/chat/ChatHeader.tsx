@@ -57,21 +57,36 @@ useEffect(() => {
     }}
   >
       <button
-        onClick={onBack}
-        style={{
-  background: "transparent",
-  border: "none",
-  color: "#fff",
-  cursor: "pointer",
-  marginRight: "10px",
-  padding: "8px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-}}
-      >
-        <ChevronLeft size={34} strokeWidth={3.2} />
-      </button>
+  onClick={onBack}
+  style={{
+    width: 40,
+    height: 40,
+    borderRadius: "50%",
+
+    border: "1px solid rgba(255,255,255,0.22)",
+    background: "rgba(255,255,255,0.12)",
+    color: "#fff",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    padding: 0,
+    marginRight: "10px",
+
+    cursor: "pointer",
+
+    boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+
+    WebkitTapHighlightColor: "transparent",
+  }}
+>
+  <ChevronLeft
+    size={24}
+    strokeWidth={2.3}
+  />
+</button>
+
 
       {profilePhoto && (
   <img
@@ -79,6 +94,12 @@ useEffect(() => {
     profilePhoto ||
     "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
   }
+
+  draggable={false}
+  onContextMenu={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }}
   onError={(e) => {
     e.currentTarget.src =
       "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg";
@@ -90,19 +111,25 @@ useEffect(() => {
     borderRadius: "50%",
     objectFit: "cover",
     marginRight: 12,
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
   }}
 />
 )}
 
       <div>
         <div
-          style={{
-            fontWeight: "bold",
-            fontSize: "17px",
-          }}
-        >
-          {profileName}
-        </div>
+  style={{
+    fontWeight: "bold",
+    fontSize: "17px",
+
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  }}
+>
+  {profileName}
+</div>
 
         <div
   style={{

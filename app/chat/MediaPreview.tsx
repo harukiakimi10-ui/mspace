@@ -67,6 +67,7 @@ export default function MediaPreview({
 }}
       >
         <button
+  type="button"
   onClick={onCancel}
   aria-label="Cancel"
   style={{
@@ -87,6 +88,7 @@ export default function MediaPreview({
 </button>
 
         <button
+  type="button"
   onClick={onSend}
   aria-label="Send"
   style={{

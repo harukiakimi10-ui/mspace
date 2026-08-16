@@ -11,16 +11,17 @@ export default function Header() {
   return (
   <div
     style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "10px 12px",
-      borderBottom: "1px solid #e5e7eb",
-      background: "#fff",
-      position: "sticky",
-      top: 0,
-      zIndex: 1000,
-    }}
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "10px 12px",
+  borderBottom: "1px solid #e5e7eb",
+  background: "#fff",
+  position: "sticky",
+  top: 0,
+  zIndex: 1000,
+  flexShrink: 0,
+}}
   >
     <div
   style={{

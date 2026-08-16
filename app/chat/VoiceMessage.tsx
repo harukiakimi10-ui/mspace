@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Play,Pause, Mic } from "lucide-react";
 
 type VoiceMessageProps = {
@@ -34,6 +34,17 @@ export default function VoiceMessage({
   msg.file_duration ?? 0
 );
 
+
+const [isAndroid, setIsAndroid] = useState(false);
+
+useEffect(() => {
+  const ua = navigator.userAgent;
+
+  const android = /Android/i.test(ua);
+  const wechat = /MicroMessenger/i.test(ua);
+
+  setIsAndroid(android && !wechat);
+}, []);
   return (
   
   <div
@@ -48,8 +59,8 @@ export default function VoiceMessage({
       ? "18px 18px 4px 18px"
       : "18px 18px 18px 4px",
 
-  minWidth: 240,
-  maxWidth: 300,
+  minWidth: isAndroid ? 220 : 240,
+  maxWidth: isAndroid ? 280 : 300,
 
   display: "flex",
   alignItems: "flex-start",
@@ -201,6 +212,7 @@ export default function VoiceMessage({
     <div
   style={{
     flex: 1,
+    minWidth: 0,
     display: "flex",
     flexDirection: "column",
     gap: 2,
@@ -208,12 +220,15 @@ export default function VoiceMessage({
 >
   {/* Waveform */}
   <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 3,
-    }}
-  >
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: isAndroid ? 2 : 3,
+    minWidth: 0,
+    width: "100%",
+    overflow: "hidden",
+  }}
+>
     {Array.from({ length: 30 }).map((_, i) => (
       <div
         key={i}

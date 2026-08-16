@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import Script from "next/script";
+import ServiceWorkerRegister from "./ServiceWorkerRegister";
 
 
 const geistSans = Geist({
@@ -20,9 +21,9 @@ export const metadata: Metadata = {
   description: "MSpace Social Platform",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon-192.png",
-    apple: "/icon-192.png",
-  },
+  icon: "/mspace-icon.png",
+  apple: "/mspace-icon.png",
+},
 };
 
 export const viewport = {
@@ -31,6 +32,7 @@ export const viewport = {
   maximumScale: 1,
   minimumScale: 1,
   userScalable: false,
+  themeColor: "#6d28d9",
 };
 
 export default function RootLayout({
@@ -40,13 +42,13 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-     <body className="min-h-full flex flex-col">
-
+  lang="en"
+  suppressHydrationWarning
+  className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+>
+  <body className="min-h-full flex flex-col">
  
-
+  <ServiceWorkerRegister />
   {children}
 
 </body>

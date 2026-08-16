@@ -1,4 +1,4 @@
-import { Camera, Video, Play, Mic, X } from "lucide-react";
+import { Camera, Video, MapPin, Play, Mic, X } from "lucide-react";
 
 
 type ReplyPreviewProps = {
@@ -99,14 +99,24 @@ export default function ReplyPreview({
 ) : replyMessage.message_type === "voice" ? (
   <>
     <Mic size={17} strokeWidth={2.3} />
-    <span>
-      Voice message{" "}
-      {replyMessage.file_duration != null
-        ? `${Math.floor(replyMessage.file_duration / 60)}:${String(
-            Math.floor(replyMessage.file_duration % 60)
-          ).padStart(2, "0")}`
-        : ""}
-    </span>
+    <span>Voice message</span>
+    {replyMessage.file_duration != null && (
+      <span style={{ marginLeft: "6px" }}>
+        {Math.floor(replyMessage.file_duration / 60)}:
+        {String(
+          Math.floor(replyMessage.file_duration % 60)
+        ).padStart(2, "0")}
+      </span>
+    )}
+  </>
+) : replyMessage.message_type === "location" ? (
+  <>
+    <MapPin
+  size={17}
+  strokeWidth={2.5}
+  color="currentColor"
+/>
+    <span>Location</span>
   </>
 ) : (
   <span>{replyPreview}</span>

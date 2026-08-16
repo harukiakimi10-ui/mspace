@@ -9,7 +9,7 @@ import ImageIcon from "@mui/icons-material/Image";
 import VideoLibraryIcon from "@mui/icons-material/Videocam";
 import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
-
+import { createId } from "@/lib/createId";
 
 
 export default function Home() {
@@ -280,7 +280,7 @@ async function joinMSpace() {
   localStorage.getItem("mspace_device_id");
 
 if (!deviceId) {
-  deviceId = crypto.randomUUID();
+  deviceId = createId();
 
   localStorage.setItem(
     "mspace_device_id",
@@ -327,9 +327,39 @@ if (existingMember?.banned) {
   return;
 }
 
+// Check whether this device already has an MSpace account
+const { data: deviceMember } = await supabase
+  .from("members")
+  .select("member_id, name, banned")
+  .eq("device_id", deviceId)
+  .maybeSingle();
 
-    const memberId = crypto.randomUUID();
+if (deviceMember) {
+  if (deviceMember.banned) {
+    alert(t.bannedAccount);
+    setLoading(false);
+    return;
+  }
 
+  console.log(
+    "Existing account found for this device:",
+    deviceMember
+  );
+
+  localStorage.setItem(
+    "mspace_member_id",
+    deviceMember.member_id
+  );
+
+  setLoading(false);
+
+  router.push("/members");
+  return;
+}
+
+// No account exists for this device — create one
+
+   const memberId = createId();
 
    let photoUrl = "";
 
@@ -378,24 +408,6 @@ if (error) {
   return;
 }
 
-// Same browser/device already has an account
-const { data: deviceMember } = await supabase
-  .from("members")
-  .select("member_id")
-  .eq("device_id", deviceId)
-  .maybeSingle();
-
-if (deviceMember) {
-  localStorage.setItem(
-    "mspace_member_id",
-    deviceMember.member_id
-  );
-
-  setLoading(false);
-
-  router.push("/members");
-  return;
-}
 
 localStorage.setItem(
   "mspace_member_id",
@@ -432,6 +444,7 @@ return (
   }}
 >
  <img
+ suppressHydrationWarning
   src="/MSpace-logo.jpg.jpeg"
   alt={t.appName}
   style={{
@@ -486,17 +499,18 @@ onClick={() => {
  <div className="profile-row">
 
   <img
-    src="https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%2012.15.29%20PM.jpeg"
-    alt="Donald Lee"
-    style={{
-      width: "160px",
-      height: "160px",
-      borderRadius: "50%",
-      objectFit: "cover",
-      border: "6px solid white",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-    }}
-  />
+  suppressHydrationWarning
+  src="https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%2012.15.29%20PM.jpeg"
+  alt="Donald Lee"
+  style={{
+    width: "160px",
+    height: "160px",
+    borderRadius: "50%",
+    objectFit: "cover",
+    border: "6px solid white",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
+  }}
+/>
 
   <div className="profile-info">
 

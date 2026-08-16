@@ -1,13 +1,19 @@
 "use client";
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
+import LocationMessage from "./LocationMessage";
 import {
   Video,
   Camera,
   Play,
   Pause,
-  Mic
+  Mic,
+  MapPin
 } from "lucide-react";
 import VoiceMessage from "./VoiceMessage";
+
+import LocationThumbnail from "./LocationThumbnail";
+
+
 
 type MessagesProps = {
   messages: any[];
@@ -31,6 +37,8 @@ type MessagesProps = {
   setMenuX: (x: number) => void;
   setMenuY: (y: number) => void;
   setShowMessageMenu: (open: boolean) => void;
+
+  onCancelUpload: (uploadId: string) => void;
 };
 
 function getEmojiCount(text: string) {
@@ -68,7 +76,12 @@ export default function Messages({
   setMenuX,
   setMenuY,
   setShowMessageMenu,
+  onCancelUpload,
 }: MessagesProps) {
+
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(
+  new Set()
+);
 
 const formatDate = (date: string) => {
   const d = new Date(date);
@@ -92,14 +105,48 @@ const isReplySticker =
 
 const isReplyVoice =
   msg.reply_preview?.toLowerCase().includes("voice");
+
+const isReplyLocation =
+  msg.reply_message_type === "location";
+
   const previous = index > 0 ? messages[index - 1] : null;
 
   const emojiCount = getEmojiCount(msg.content || "");
+
+ const isLongMessage =
+  msg.message_type === "text" &&
+  (msg.content || "").length > 500;
+
+const isExpanded = expandedMessages.has(msg.id);
+
   const isStickerReply =
   msg.message_type === "sticker" && !!msg.reply_preview;
 
+  const getLocationCoordinates = () => {
+  try {
+    const url = new URL(msg.reply_file_url);
+    const q = url.searchParams.get("q");
 
-  console.log(msg.content, emojiCount);
+    if (!q) return null;
+
+    const [lat, lng] = q.split(",").map(Number);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    return {
+      latitude: lat,
+      longitude: lng,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const locationCoordinates = isReplyLocation
+  ? getLocationCoordinates()
+  : null;
 
   return (
   <Fragment key={msg.id}>
@@ -142,15 +189,20 @@ const isReplyVoice =
         >
           <div
     style={{
-  maxWidth: "70%",
-  width: "fit-content",
+  maxWidth:
+  msg.message_type === "location"
+    ? "390px"
+    : "70%",
+
+width: "fit-content",
   
 
   padding:
   (
     msg.message_type === "image" ||
     msg.message_type === "video" ||
-    msg.message_type === "sticker"
+    msg.message_type === "sticker" ||
+    msg.message_type === "location"
   ) && !msg.reply_preview
     ? "0"
     : emojiCount === 1 && !msg.reply_preview
@@ -161,7 +213,8 @@ const isReplyVoice =
   (
     msg.message_type === "image" ||
     msg.message_type === "video" ||
-    msg.message_type === "sticker"
+    msg.message_type === "sticker" ||
+    msg.message_type === "location"
   ) && !msg.reply_preview
     ? 0
     : emojiCount === 1 && !msg.reply_preview
@@ -174,7 +227,8 @@ const isReplyVoice =
   (
     msg.message_type === "image" ||
     msg.message_type === "video" ||
-    msg.message_type === "sticker"
+    msg.message_type === "sticker" ||
+    msg.message_type === "location"
   ) && !msg.reply_preview
     ? "transparent"
     : emojiCount === 1 && !msg.reply_preview
@@ -192,7 +246,8 @@ const isReplyVoice =
   (
     msg.message_type === "image" ||
     msg.message_type === "video" ||
-    msg.message_type === "sticker"
+    msg.message_type === "sticker" ||
+    msg.message_type === "location"
   ) && !msg.reply_preview
     ? "none"
     : emojiCount === 1 && !msg.reply_preview
@@ -213,6 +268,7 @@ const isReplyVoice =
 }}
 
 onTouchStart={(e) => {
+
   const touch = e.touches[0];
 
   const timer = setTimeout(() => {
@@ -240,9 +296,9 @@ onTouchMove={(e) => {
        style={{
          borderLeft: "4px solid #a78bfa",
          background:
-           msg.sender === "member"
-             ? "rgba(255,255,255,0.12)"
-             : "#f3f4f6",
+  msg.sender === currentUser
+    ? "rgba(255,255,255,0.12)"
+    : "#f3f4f6",
          padding: "12px 14px",
          borderRadius: "8px",
          marginBottom: "8px",
@@ -271,7 +327,44 @@ onTouchMove={(e) => {
              gap: "10px",
            }}
          >
-           {isReplyVideo ? (
+         {isReplyLocation ? (
+  <div
+    style={{
+      position: "relative",
+      width: "48px",
+      height: "48px",
+      flexShrink: 0,
+      borderRadius: "8px",
+      overflow: "hidden",
+      background: "#e9e3f7",
+    }}
+  >
+    {locationCoordinates ? (
+  <LocationThumbnail
+    latitude={locationCoordinates.latitude}
+    longitude={locationCoordinates.longitude}
+  />
+) : (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#f0eaff",
+        }}
+      >
+        <MapPin
+          size={24}
+          strokeWidth={2.4}
+          color="#6d28d9"
+        />
+      </div>
+    )}
+  </div>
+
+) : isReplyVideo ? (
   <div
     style={{
       position: "relative",
@@ -340,12 +433,21 @@ onTouchMove={(e) => {
     fontWeight: 600,
     fontSize: "13px",
     color:
-      msg.sender === "member"
-        ? "#ffffff"
-        : "#444",
+  msg.sender === currentUser
+    ? "#ffffff"
+    : "#444",
   }}
 >
-  {msg.reply_preview === "🎥 Video" ? (
+  {isReplyLocation ? (
+  <>
+    <MapPin
+      size={16}
+      strokeWidth={2.2}
+      
+    />
+    <span>Location</span>
+  </>
+) : msg.reply_preview === "🎥 Video" ? (
   <>
     <Video
       size={16}
@@ -477,6 +579,7 @@ msg.reply_preview === "🎤 Voice message" ? (
         
   }}
 >
+  {msg.message_type !== "location" && (
   <span
     style={{
       fontSize:
@@ -494,8 +597,49 @@ msg.reply_preview === "🎤 Voice message" ? (
       display: "inline",
     }}
   >
-    {msg.content}
+    {isLongMessage && !isExpanded
+      ? `${msg.content.slice(0, 500)}…`
+      : msg.content}
   </span>
+)}
+
+  {isLongMessage && (
+  <button
+    type="button"
+    onClick={() => {
+      setExpandedMessages((prev) => {
+        const next = new Set(prev);
+
+        if (next.has(msg.id)) {
+          next.delete(msg.id);
+        } else {
+          next.add(msg.id);
+        }
+
+        return next;
+      });
+    }}
+    style={{
+      marginTop: 6,
+      padding: "3px 0",
+      border: "none",
+      background: "transparent",
+      color:
+        msg.sender === currentUser
+          ? "#ddd6fe"
+          : "#6d28d9",
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer",
+      alignSelf:
+        msg.sender === currentUser
+          ? "flex-end"
+          : "flex-start",
+    }}
+  >
+    {isExpanded ? "Show less" : "Load more"}
+  </button>
+)}
 
   {emojiCount > 0 && (
     <div
@@ -594,18 +738,26 @@ msg.reply_preview === "🎤 Voice message" ? (
   >
     {/* STICKER */}
     <img
-      src={msg.file_url}
-      alt="Sticker"
-      draggable={false}
-      style={{
-        width: "auto",
-        height: "160px",
-        display: "block",
-        background: "transparent",
-        border: "none",
-        boxShadow: "none",
-      }}
-    />
+  src={msg.file_url}
+  alt="Sticker"
+  draggable={false}
+  onContextMenu={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }}
+  style={{
+    width: "auto",
+    height: "160px",
+    display: "block",
+    background: "transparent",
+    border: "none",
+    boxShadow: "none",
+
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  }}
+/>
 
     {/* TIMESTAMP */}
     <div
@@ -675,6 +827,10 @@ msg.reply_preview === "🎤 Voice message" ? (
         setViewerName(msg.file_name || "Photo");
         setShowImageViewer(true);
       }}
+  onContextMenu={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+}}
       style={{
   width: "250px",
   height: "320px",
@@ -683,8 +839,82 @@ msg.reply_preview === "🎤 Voice message" ? (
   objectFit: "cover",
   cursor: "pointer",
   background: "#000",
+
+  WebkitTouchCallout: "none",
+  WebkitUserSelect: "none",
+  userSelect: "none",
 }}
     />
+
+{msg.uploading && (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Cancel upload"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (msg.upload_id) {
+              onCancelUpload(msg.upload_id);
+            }
+          }}
+          style={{
+            position: "relative",
+            width: "58px",
+            height: "58px",
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            cursor: "pointer",
+            pointerEvents: "auto",
+          }}
+        >
+          {/* Progress ring */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "50%",
+              background: `conic-gradient(
+                #ffffff ${(msg.progress ?? 0) * 3.6}deg,
+                rgba(255,255,255,0.25) 0deg
+              )`,
+              WebkitMask:
+                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+              mask:
+                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+            }}
+          />
+
+          {/* X */}
+          <span
+            style={{
+              position: "relative",
+              color: "#ffffff",
+              fontSize: "25px",
+              fontWeight: 300,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </span>
+        </button>
+      </div>
+    )}
 
     <div
       style={{
@@ -726,27 +956,71 @@ msg.reply_preview === "🎤 Voice message" ? (
     style={{
       position: "relative",
       display: "inline-block",
+      width: "250px",
+      height: "320px",
       cursor: "pointer",
+      overflow: "hidden",
+      borderRadius: "16px",
+      background: "#000",
     }}
   >
-    <video
-  src={msg.file_url}
-  poster={msg.reply_thumbnail_url || ""}
-  preload="metadata"
-  playsInline
-  muted
-      style={{
-  width: "250px",
-  height: "320px",
-  display: "block",
-  borderRadius: "16px",
-  objectFit: "cover",
-  cursor: "pointer",
-  background: "#000",
-}}
-    />
+    {msg.uploading ? (
+      <video
+        src={msg.file_url}
+        preload="auto"
+        playsInline
+        muted
+        autoPlay
+        loop
+        onLoadedData={(e) => {
+          const video = e.currentTarget;
 
-    {/* Existing play button */}
+          video.pause();
+
+          try {
+            video.currentTime = 0.1;
+          } catch {}
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        style={{
+          width: "250px",
+          height: "320px",
+          display: "block",
+          objectFit: "cover",
+          background: "#000",
+          borderRadius: "16px",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+        }}
+      />
+    ) : (
+      <img
+        src={msg.reply_thumbnail_url}
+        alt="Video"
+        draggable={false}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        style={{
+          width: "250px",
+          height: "320px",
+          display: "block",
+          objectFit: "cover",
+          background: "#000",
+          borderRadius: "16px",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+        }}
+      />
+    )}
+
+    {/* Center control */}
     <div
       style={{
         position: "absolute",
@@ -757,32 +1031,89 @@ msg.reply_preview === "🎤 Voice message" ? (
         pointerEvents: "none",
       }}
     >
-      <div
-        style={{
-          width: "46px",
-          height: "46px",
-          borderRadius: "50%",
-          background: "#ffffff",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
-        }}
-      >
+      {msg.uploading ? (
+        <button
+          type="button"
+          aria-label="Cancel upload"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            onCancelUpload(msg.upload_id ?? msg.id);
+          }}
+          style={{
+            position: "relative",
+            zIndex: 10,
+            width: "58px",
+            height: "58px",
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            cursor: "pointer",
+            pointerEvents: "auto",
+          }}
+        >
+          {/* Progress ring */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "50%",
+              background: `conic-gradient(
+                #ffffff ${(msg.progress ?? 0) * 3.6}deg,
+                rgba(255,255,255,0.25) 0deg
+              )`,
+              WebkitMask:
+                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+              mask:
+                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+            }}
+          />
+
+          <span
+            style={{
+              position: "relative",
+              color: "#ffffff",
+              fontSize: "25px",
+              fontWeight: 300,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </span>
+        </button>
+      ) : (
         <div
           style={{
-            width: 0,
-            height: 0,
-            borderTop: "8px solid transparent",
-            borderBottom: "8px solid transparent",
-            borderLeft: "12px solid #000",
-            marginLeft: "3px",
+            width: "46px",
+            height: "46px",
+            borderRadius: "50%",
+            background: "#ffffff",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
           }}
-        />
-      </div>
+        >
+          <div
+            style={{
+              width: 0,
+              height: 0,
+              borderTop: "8px solid transparent",
+              borderBottom: "8px solid transparent",
+              borderLeft: "12px solid #000",
+              marginLeft: "3px",
+            }}
+          />
+        </div>
+      )}
     </div>
 
-    {/* Timestamp inside video */}
+    {/* Timestamp */}
     <div
       style={{
         position: "absolute",
@@ -798,6 +1129,7 @@ msg.reply_preview === "🎤 Voice message" ? (
         fontSize: "11px",
         fontWeight: 500,
         pointerEvents: "none",
+        zIndex: 5,
       }}
     >
       <span>{formatTime(msg.created_at)}</span>
@@ -824,6 +1156,15 @@ msg.reply_preview === "🎤 Voice message" ? (
     formatTime={formatTime}
   />
 )}
+
+{msg.message_type === "location" && (
+  <LocationMessage
+    msg={msg}
+    currentUser={currentUser}
+    formatTime={formatTime}
+  />
+)}
+
 
           </div>
         </div>

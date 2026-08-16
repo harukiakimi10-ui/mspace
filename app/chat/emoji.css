@@ -1,0 +1,13 @@
+em-emoji-picker {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+
+  flex: 1 1 100% !important;
+  align-self: stretch !important;
+
+  box-sizing: border-box !important;
+
+  --em-emoji-picker-width: 100% !important;
+}

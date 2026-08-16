@@ -2,40 +2,43 @@
 
 import { stickerPacks } from "./StickerData";
 import { useState } from "react";
+import { Smile, Sticker } from "lucide-react";
+import EmojiPanel from "./EmojiPanel";
+import Picker from "@emoji-mart/react";
+import data from "@emoji-mart/data";
 
 type StickerPanelProps = {
   open: boolean;
   onClose: () => void;
   onStickerSelect: (sticker: string) => void;
+  onEmojiSelect: (emoji: string) => void;
 };
 
 export default function StickerPanel({
   open,
   onClose,
   onStickerSelect,
+  onEmojiSelect,
 }: StickerPanelProps) {
   const [selectedPack, setSelectedPack] = useState("expressions");
-
+  const [panelTab, setPanelTab] = useState<"emoji" | "sticker">("emoji"); 
+   
   if (!open) return null;
 
-  const currentPack =
-    stickerPacks.find(
-      (pack) => pack.id === selectedPack
-    ) ?? stickerPacks[0];
 
   return (
     <>
       {/* Background */}
       <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,.12)",
-          zIndex: 1998,
-        }}
-      />
-
+  onClick={onClose}
+  style={{
+    position: "fixed",
+    inset: 0,
+    background: "transparent",
+    zIndex: 1998,
+    pointerEvents: "none",
+  }}
+/>
       {/* Panel */}
       <div
         style={{
@@ -46,82 +49,105 @@ export default function StickerPanel({
 
           background: "#fff",
 
-          borderTopLeftRadius: 30,
-          borderTopRightRadius: 30,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
 
-          padding: 18,
+          padding: "8px 0 0 0",
 
           zIndex: 1999,
 
-          height: "45vh",
+          height: "38vh",
 
           display: "flex",
           flexDirection: "column",
         }}
       >
-        {/* Drag Handle */}
-        <div
-          style={{
-            width: 48,
-            height: 5,
-            borderRadius: 999,
-            background: "#ddd",
-            margin: "0 auto 18px",
-          }}
-        />
 
-        {/* Header */}
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: 700,
-            color: "#6d28d9",
-            fontSize: 17,
-            marginBottom: 10,
-          }}
-        >
-          Stickers
-        </div>
+        {/* Emoji / Sticker tabs */}
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 40,
+    marginBottom: 10,
+  }}
+>
+  <button
+    type="button"
+    onClick={() => setPanelTab("emoji")}
+    style={{
+      border: "none",
+      background: "transparent",
+      padding: "6px 12px",
+      cursor: "pointer",
+      color: panelTab === "emoji" ? "#6d28d9" : "#777",
+      borderBottom:
+        panelTab === "emoji"
+          ? "3px solid #6d28d9"
+          : "3px solid transparent",
+    }}
+  >
+    <Smile
+      size={26}
+      strokeWidth={2.2}
+    />
+  </button>
 
-        {/* Pack Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            overflowX: "auto",
-            marginBottom: 8,
-          }}
-        >
-          {stickerPacks.map((pack) => (
-            <button
-              key={pack.id}
-              onClick={() =>
-                setSelectedPack(pack.id)
-              }
-              style={{
-                border: "none",
-                background:
-                  selectedPack === pack.id
-                    ? "#ede9fe"
-                    : "transparent",
+  <button
+    type="button"
+    onClick={() => setPanelTab("sticker")}
+    style={{
+      border: "none",
+      background: "transparent",
+      padding: "6px 12px",
+      cursor: "pointer",
+      color: panelTab === "sticker" ? "#6d28d9" : "#777",
+      borderBottom:
+        panelTab === "sticker"
+          ? "3px solid #6d28d9"
+          : "3px solid transparent",
+    }}
+  >
+    <Sticker
+      size={26}
+      strokeWidth={2.2}
+    />
+  </button>
+</div>
 
-                borderRadius: 999,
+  {panelTab === "emoji" && (
+  <div
+  style={{
+    flex: "1 1 auto",
+    width: "calc(100% + 18px)",
+    minWidth: 0,
+    marginRight: "-18px",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "stretch",
+  }}
+>
+    <Picker
+      data={data}
+      theme="light"
+      onEmojiSelect={onEmojiSelect}
+      searchPosition="none"
+      previewPosition="none"
+      skinTonePosition="none"
+      perLine={9}
+      dynamicWidth={false}
+      width="100%"
+style={{
+  width: "100%",
+  maxWidth: "100%",
+  flex: "1 1 auto",
+}}
+    />
+  </div>
+)}
 
-                padding: "6px 10px",
-
-                cursor: "pointer",
-
-                whiteSpace: "nowrap",
-
-                fontWeight: 600,
-              }}
-            >
-              {pack.title}
-            </button>
-          ))}
-        </div>
-
-        {/* Sticker Grid */}
+    {panelTab === "sticker" && (
 <div
   style={{
     flex: 1,
@@ -134,8 +160,10 @@ export default function StickerPanel({
     paddingTop: 10,
   }}
 >
-  {currentPack.stickers.map((file) => {
-    const src = `${currentPack.folder}/${file}`;
+  {stickerPacks
+  .find((pack) => pack.id === "chinese")
+  ?.stickers.map((file) => {
+    const src = `/stickers/chinese/${file}`;
 
     return (
       <button
@@ -167,7 +195,7 @@ export default function StickerPanel({
     );
   })}
 
-{currentPack.stickers.length === 0 && (
+{stickerPacks.find((pack) => pack.id === "chinese")?.stickers.length === 0 && (
   <div
     style={{
       gridColumn: "1 / -1",
@@ -180,7 +208,10 @@ export default function StickerPanel({
   </div>
 )}
 </div>
-      </div>
+)}
+  </div>
+
+  
     </>
   );
 }

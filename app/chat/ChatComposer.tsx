@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import MessageInput from "./MessageInput";
 import ReplyPreview from "./ReplyPreview";
 import VoiceRecorder from "./VoiceRecorder";
@@ -57,6 +58,8 @@ type ChatComposerProps = {
   stickerOpen: boolean;
   onToggleSticker: () => void;
 
+  onCloseStickerPanel: () => void;
+
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 
   onFileChange: (
@@ -108,6 +111,7 @@ voiceState,
   // NEW
   stickerOpen,
   onToggleSticker,
+  onCloseStickerPanel,
 
   fileInputRef,
   onFileChange,
@@ -116,6 +120,7 @@ voiceState,
   onKeyDown,
 }: ChatComposerProps) {
 
+const cameraInputRef = useRef<HTMLInputElement | null>(null);
   console.log("recording =", recording);
 console.log("startRecording =", startRecording);
 console.log("stopRecording =", stopRecording);
@@ -124,20 +129,20 @@ console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
   return (
     <div
       style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
+  position: "fixed",
+  left: 0,
+  right: 0,
+  bottom: stickerOpen ? "38vh" : 0,
 
-        zIndex: 1000,
+  zIndex: 1500,
 
         background: "#fff",
 
         borderTop: "1px solid rgba(0,0,0,.08)",
 
-        paddingTop: "0px",
+        paddingTop: "8px",
         paddingBottom:
-          "max(2px, env(safe-area-inset-bottom))",
+          "max(8px, env(safe-area-inset-bottom))",
 
         boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
       }}
@@ -158,6 +163,15 @@ console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
         onChange={onFileChange}
       />
 
+      <input
+  id="mspace-camera-input"
+  ref={cameraInputRef}
+  type="file"
+  accept="image/*"
+  capture="environment"
+  hidden
+  onChange={onFileChange}
+/>
     
       {voiceState === "idle" ? (
   <MessageInput
@@ -170,6 +184,7 @@ console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
     onMicClick={recording ? stopRecording : startRecording}
     stickerOpen={stickerOpen}
     onToggleQuickEmoji={onToggleSticker}
+    onFocusInput={onCloseStickerPanel}
     onInput={onInput}
     onKeyDown={onKeyDown}
   />
@@ -196,9 +211,13 @@ console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
   onDelete={onDelete}
 
  onSend={async (duration) => {
+  try {
     await onSend(duration);
     onCancelReply();
-  }}
+  } catch (error) {
+    console.error("Voice send error:", error);
+  }
+}}
 />
 
 )}

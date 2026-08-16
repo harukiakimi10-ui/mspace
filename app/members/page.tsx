@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { MessagesSquare } from "lucide-react";
+import NotificationButton from "../NotificationButton";
+
 import {
   MessageCircleMore,
   ChevronLeft,
@@ -336,16 +338,25 @@ async function openChat() {
 if (loading) {
   return (
     <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        fontSize: "18px",
-      }}
-    >
-      Loading...
-    </div>
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100vh",
+    width: "100%",
+    background: "#6d28d9",
+  }}
+>
+  <img
+    src="/mspace-icon.png"
+    alt="MSpace"
+    style={{
+      width: "110px",
+      height: "110px",
+      objectFit: "contain",
+    }}
+  />
+</div>
   );
 }
 
@@ -379,6 +390,8 @@ async function loadUnreadCount() {
   setUnreadCount(count ?? 0);
 }
 
+
+
   return (
   
    
@@ -392,6 +405,8 @@ async function loadUnreadCount() {
   }}
 >
  {/* HEADER */}
+
+ <NotificationButton />
 
    <div
   style={{

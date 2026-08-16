@@ -1,5 +1,11 @@
 import { useRouter } from "next/navigation";
 
+import {
+  Camera,
+  Video,
+  MapPin,
+} from "lucide-react";
+
 type Conversation = {
   id: string;
   updated_at: string;
@@ -108,13 +114,58 @@ const router = useRouter();
         maxWidth: "85%",
       }}
     >
-      {chat.lastMessage
-        ? chat.lastMessage.message_type === "image"
-          ? "📷 Photo"
-          : chat.lastMessage.message_type === "video"
-          ? "🎥 Video"
-          : chat.lastMessage.content
-        : ""}
+      {chat.lastMessage ? (
+  chat.lastMessage.message_type === "image" ? (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      <Camera
+        size={15}
+        strokeWidth={2.4}
+        color="#6d28d9"
+      />
+      <span>Photo</span>
+    </span>
+  ) : chat.lastMessage.message_type === "video" ? (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      <Video
+        size={15}
+        strokeWidth={2.4}
+        color="#6d28d9"
+      />
+      <span>Video</span>
+    </span>
+  ) : chat.lastMessage.message_type === "location" ? (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      <MapPin
+        size={15}
+        strokeWidth={2.4}
+        color="#6d28d9"
+      />
+      <span>Location</span>
+    </span>
+  ) : (
+    chat.lastMessage.content
+  )
+) : (
+  ""
+)}
     </span>
 
     {(chat.unreadCount ?? 0) > 0 && (

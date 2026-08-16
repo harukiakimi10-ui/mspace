@@ -2,7 +2,7 @@
 
 import {
   Plus,
-  Images,
+  Smile,
   Keyboard,
   SendHorizontal,
   Mic,
@@ -27,6 +27,8 @@ type MessageInputProps = {
 
   onToggleQuickEmoji: () => void;
 
+  onFocusInput: () => void;
+
   onInput: (
     e: React.ChangeEvent<HTMLTextAreaElement>
   ) => void;
@@ -47,21 +49,21 @@ export default function MessageInput({
 
   stickerOpen,
   onToggleQuickEmoji,
+  onFocusInput,
   onInput,
   onKeyDown,
 }: MessageInputProps) {
   return (
-    <div
-      style={{
-  display: "flex",
-  gap: "8px",
-  padding: "5px 18px 5px 10px",
-  alignItems: "center",
-}}
-    >
+  <div
+    style={{
+      display: "flex",
+      gap: "8px",
+      padding: "0 18px 14px 10px",
+      alignItems: "center",
+    }}
+  >
       <button
   onClick={onAttach}
-  disabled={uploading}
   style={{
     ...premiumButton,
 
@@ -78,15 +80,11 @@ export default function MessageInput({
     padding: 0,
   }}
 >
-  {uploading ? (
-    "..."
-  ) : (
-    <Plus
+  <Plus
   size={26}
   strokeWidth={2.4}
   color="#444"
 />
-  )}
 </button>
 
       <button
@@ -110,11 +108,11 @@ export default function MessageInput({
     color="#444"
   />
 ) : (
-  <Images
-    size={24}
-    strokeWidth={2.2}
-    color="#444"
-  />
+  <Smile
+  size={26}
+  strokeWidth={2.2}
+  color="#444"
+/>
 )}
       </button>
 
@@ -122,7 +120,20 @@ export default function MessageInput({
   ref={messageInputRef}
   value={message}
   onChange={onInput}
-  onKeyDown={onKeyDown}
+  onKeyDown={(e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+
+    if (message.trim()) {
+      sendMessage();
+    }
+
+    return;
+  }
+
+  onKeyDown(e);
+}}
+  onPointerDown={onFocusInput}
   
   placeholder="Type a message..."
   rows={1}
@@ -143,21 +154,23 @@ export default function MessageInput({
       />
 
       <button
-  onMouseDown={(e) => e.preventDefault()}
-  onClick={() => {
-  if (message.trim()) {
-    sendMessage();
-  } else {
-    onMicClick();
-  }
-}}
-  disabled={uploading}
+  type="button"
+  onMouseDown={(e) => {
+    e.preventDefault();
+  }}
+  onClick={async () => {
+    if (message.trim()) {
+      await sendMessage();
+    } else {
+      onMicClick();
+    }
+  }}
   style={{
     ...premiumButton,
     width: "38px",
     height: "38px",
-    cursor: uploading ? "default" : "pointer",
-    opacity: uploading ? 0.6 : 1,
+    cursor: "pointer",
+    opacity: 1,
     flexShrink: 0,
   }}
 >
