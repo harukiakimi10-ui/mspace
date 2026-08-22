@@ -80,35 +80,194 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: savedSubscription, error } = await supabase
-  .from("push_subscriptions")
-  .upsert(
-    {
-      member_id: validMemberId,
-      endpoint: subscription.endpoint,
-      subscription: subscription,
-      updated_at: new Date().toISOString(),
-    },
-    {
-      onConflict: "endpoint",
+    // --------------------------------------------------
+// Save push subscription
+//
+// Members: ONE subscription per member.
+// Admin: multiple subscriptions are allowed.
+// --------------------------------------------------
+
+const ADMIN_ID =
+  "11111111-1111-1111-1111-111111111111";
+
+let savedSubscription;
+
+// ADMIN
+// --------------------------------------------------
+if (validMemberId === ADMIN_ID) {
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .upsert(
+      {
+        member_id: validMemberId,
+        endpoint: subscription.endpoint,
+        subscription: subscription,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "endpoint",
+      }
+    )
+    .select("id, member_id, endpoint")
+    .single();
+
+  if (error) {
+    console.error(
+      "Supabase admin push subscription error:",
+      error
+    );
+
+    return Response.json(
+      {
+        error: "Failed to save admin push subscription",
+      },
+      { status: 500 }
+    );
+  }
+
+  savedSubscription = data;
+}
+
+// MEMBER
+// --------------------------------------------------
+else {
+  // Find whether this exact browser push endpoint
+  // already exists anywhere in MSpace.
+  const {
+    data: existingEndpoint,
+    error: endpointError,
+  } = await supabase
+    .from("push_subscriptions")
+    .select("id, member_id, endpoint, subscription")
+    .eq("endpoint", subscription.endpoint)
+    .maybeSingle();
+
+  if (endpointError) {
+    console.error(
+      "Existing push endpoint lookup error:",
+      endpointError
+    );
+
+    return Response.json(
+      {
+        error:
+          "Failed to check existing push subscription",
+      },
+      { status: 500 }
+    );
+  }
+
+  // ------------------------------------------------
+  // This browser endpoint already exists
+  // ------------------------------------------------
+  if (existingEndpoint) {
+    // Same member already owns this browser subscription.
+    // Just update the subscription information.
+    if (existingEndpoint.member_id === validMemberId) {
+      const { data, error } = await supabase
+        .from("push_subscriptions")
+        .update({
+          subscription: subscription,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingEndpoint.id)
+        .select("id, member_id, endpoint")
+        .single();
+
+      if (error) {
+        console.error(
+          "Supabase push subscription update error:",
+          error
+        );
+
+        return Response.json(
+          {
+            error:
+              "Failed to update push subscription",
+          },
+          { status: 500 }
+        );
+      }
+
+      savedSubscription = data;
     }
-  )
-  .select("id, member_id, endpoint")
-  .single();
+
+    // ------------------------------------------------
+    // Endpoint belongs to another member.
+    // Reassign this browser subscription to the
+    // member currently using this browser.
+    // ------------------------------------------------
+    else {
+      console.log(
+        "Reassigning push endpoint from member:",
+        existingEndpoint.member_id,
+        "to member:",
+        validMemberId
+      );
+
+      const { data, error } = await supabase
+        .from("push_subscriptions")
+        .update({
+          member_id: validMemberId,
+          subscription: subscription,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existingEndpoint.id)
+        .select("id, member_id, endpoint")
+        .single();
+
+      if (error) {
+        console.error(
+          "Supabase push subscription reassignment error:",
+          error
+        );
+
+        return Response.json(
+          {
+            error:
+              "Failed to reassign push subscription",
+          },
+          { status: 500 }
+        );
+      }
+
+      savedSubscription = data;
+    }
+  }
+
+  // ------------------------------------------------
+  // This is a completely new browser subscription.
+  // ------------------------------------------------
+  else {
+    const { data, error } = await supabase
+      .from("push_subscriptions")
+      .insert({
+        member_id: validMemberId,
+        endpoint: subscription.endpoint,
+        subscription: subscription,
+        updated_at: new Date().toISOString(),
+      })
+      .select("id, member_id, endpoint")
+      .single();
 
     if (error) {
       console.error(
-        "Supabase push subscription error:",
+        "Supabase push subscription insert error:",
         error
       );
 
       return Response.json(
         {
-          error: "Failed to save push subscription",
+          error:
+            "Failed to create push subscription",
         },
         { status: 500 }
       );
     }
+
+    savedSubscription = data;
+  }
+}
 
     console.log(
       "MSpace push subscription saved for member:",
@@ -141,19 +300,21 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
     const memberId = searchParams.get("memberId");
+const endpoint = searchParams.get("endpoint");
 
-    if (!memberId) {
-      return Response.json(
-        { saved: false },
-        { status: 400 }
-      );
-    }
+if (!memberId || !endpoint) {
+  return Response.json(
+    { saved: false },
+    { status: 400 }
+  );
+}
 
     const { data, error } = await supabase
-      .from("push_subscriptions")
-      .select("id, member_id, endpoint")
-      .eq("member_id", memberId)
-      .limit(1);
+  .from("push_subscriptions")
+  .select("id, member_id, endpoint")
+  .eq("member_id", memberId)
+  .eq("endpoint", endpoint)
+  .maybeSingle();
 
     if (error) {
       console.error(
@@ -167,14 +328,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const saved = !!data && data.length > 0;
+    const saved = !!data;
 
     console.log(
       "Push subscription check:",
       {
         memberId,
         saved,
-        count: data?.length ?? 0,
+        count: data ? 1 : 0,
       }
     );
 

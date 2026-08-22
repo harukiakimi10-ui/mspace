@@ -30,11 +30,18 @@ export default function Home() {
 const [deferredPrompt, setDeferredPrompt] =
   useState<any>(null);
   const router = useRouter();
-  const language =
-  typeof navigator !== "undefined" &&
-  navigator.language.startsWith("zh")
-    ? "zh"
-    : "en";
+
+const [language, setLanguage] =
+  useState<"en" | "zh">("en");
+
+useEffect(() => {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.language.startsWith("zh")
+  ) {
+    setLanguage("zh");
+  }
+}, []);
 
 const t = {
 en: {
@@ -67,7 +74,7 @@ bannedAccount: "Your MSpace account has been banned.",
 error: "Error",
 copyright: "All Rights Reserved",
 appName: "MSpace",
-ownerSpace: "Donald Lee's",
+ownerSpace: "Huang Dingxiang's",
 
 
 },
@@ -102,7 +109,7 @@ bannedAccount: "您的星域账户已被封禁。",
 error: "错误",
 copyright: "版权所有",
 appName: "星域",
-ownerSpace: "Donald Lee的",
+ownerSpace: "黄定襄的",
 
 
 },
@@ -1131,7 +1138,7 @@ onClick={() => {
     fontSize: "13px",
   }}
 >
- ©️ 2026 Donald Lee. {t.copyright}
+ ©️ 2026 {language === "zh" ? "黄定襄" : "Huang Dingxiang"}. {t.copyright}
 </p>
 </footer>
 {showInstallButton && (

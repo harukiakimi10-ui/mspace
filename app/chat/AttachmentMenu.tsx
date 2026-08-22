@@ -8,6 +8,30 @@ import {
   X,
 } from "lucide-react";
 
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    attach: "Attach",
+    camera: "Camera",
+    photos: "Photos",
+    video: "Video",
+    location: "Location",
+  },
+
+  zh: {
+    attach: "附件",
+    camera: "相机",
+    photos: "照片",
+    video: "视频",
+    location: "位置",
+  },
+}[language];
+
 
 type AttachmentMenuProps = {
   open: boolean;
@@ -39,17 +63,18 @@ export default function AttachmentMenu({
     
       {/* Background */}
       <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
+  style={{
+    position: "fixed",
+    inset: 0,
 
-          background: "rgba(0,0,0,.12)",
-          transition: "opacity .25s ease",
+    background: "rgba(0,0,0,.12)",
+    transition: "opacity .25s ease",
 
-          zIndex: 1998,
-        }}
-      />
+    zIndex: 1998,
+
+    pointerEvents: "none",
+  }}
+/>
 
       {/* Bottom Sheet */}
       <div
@@ -99,7 +124,7 @@ export default function AttachmentMenu({
       color: "#6d28d9",
     }}
   >
-    Attach
+    {t.attach}
   </div>
 
   <button
@@ -129,25 +154,25 @@ export default function AttachmentMenu({
     >
   <MenuItem
     icon={<Camera size={28} color="#6d28d9" />}
-    label="Camera"
+    label={t.camera}
     onClick={onCamera}
   />
 
   <MenuItem
   icon={<Image size={28} color="#6d28d9" />}
-  label="Photos"
+  label={t.photos}
   onClick={onPhoto}
 />
 
   <MenuItem
     icon={<Video size={28} color="#6d28d9" />}
-    label="Video"
+    label={t.video}
     onClick={onVideo}
   />
 
   <MenuItem
     icon={<MapPin size={28} color="#6d28d9" />}
-    label="Location"
+    label={t.location}
     onClick={onLocation}
   />
 </div>

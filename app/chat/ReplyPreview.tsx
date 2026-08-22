@@ -1,5 +1,31 @@
 import { Camera, Video, MapPin, Play, Mic, X } from "lucide-react";
 
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    replyingTo: "Replying to",
+    you: "You",
+    video: "Video",
+    photo: "Photo",
+    voiceMessage: "Voice message",
+    location: "Location",
+  },
+
+  zh: {
+    replyingTo: "回复",
+    you: "你",
+    video: "视频",
+    photo: "照片",
+    voiceMessage: "语音消息",
+    location: "位置",
+  },
+}[language];
+
 
 type ReplyPreviewProps = {
   replyMessage: any;
@@ -43,9 +69,9 @@ export default function ReplyPreview({
     fontSize: "13px",
   }}
 >
-  Replying to{" "}
+  {t.replyingTo}{" "}
 {replyMessage.sender === currentUser
-  ? "You"
+  ? t.you
   : profileName}
 </div>
 
@@ -74,7 +100,7 @@ export default function ReplyPreview({
     {replyMessage.message_type === "video" ? (
   <>
     <Video size={17} strokeWidth={2} />
-    <span>Video</span>
+    <span>{t.video}</span>
   </>
 ) : replyMessage.message_type === "sticker" ? (
   <img
@@ -94,12 +120,12 @@ export default function ReplyPreview({
       strokeWidth={2.3}
       color="currentColor"
     />
-    <span>Photo</span>
+    <span>{t.photo}</span>
   </>
 ) : replyMessage.message_type === "voice" ? (
   <>
     <Mic size={17} strokeWidth={2.3} />
-    <span>Voice message</span>
+    <span>{t.voiceMessage}</span>
     {replyMessage.file_duration != null && (
       <span style={{ marginLeft: "6px" }}>
         {Math.floor(replyMessage.file_duration / 60)}:
@@ -116,7 +142,7 @@ export default function ReplyPreview({
   strokeWidth={2.5}
   color="currentColor"
 />
-    <span>Location</span>
+    <span>{t.location}</span>
   </>
 ) : (
   <span>{replyPreview}</span>

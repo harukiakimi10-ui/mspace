@@ -10,6 +10,22 @@ import {
 
 import { useEffect, useRef, useState } from "react";
 
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    delete: "Delete",
+  },
+
+  zh: {
+    delete: "删除",
+  },
+}[language];
+
 type VoiceRecorderProps = {
   voiceState: "recording" | "preview";
 
@@ -187,7 +203,7 @@ export default function VoiceRecorder({
     }}
   >
     <Trash2 size={20} />
-    Delete
+    {t.delete}
   </button>
 
   <button

@@ -7,6 +7,9 @@ import VoiceRecorder from "./VoiceRecorder";
 
 
 type ChatComposerProps = {
+  placeholder: string;
+  showComposer?: boolean;
+
   message: string;
   setMessage: (value: string) => void;
 
@@ -76,6 +79,10 @@ type ChatComposerProps = {
 };
 
 export default function ChatComposer({
+  placeholder,
+
+  showComposer,
+
   message,
   setMessage,
 
@@ -86,7 +93,6 @@ export default function ChatComposer({
   replyPreview,
 
   onCancelReply,
-
   messageInputRef,
 
   sendMessage,
@@ -126,6 +132,10 @@ console.log("startRecording =", startRecording);
 console.log("stopRecording =", stopRecording);
 console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
 
+if (!showComposer) {
+  return null;
+}
+
   return (
     <div
       style={{
@@ -134,11 +144,9 @@ console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
   right: 0,
   bottom: stickerOpen ? "38vh" : 0,
 
-  zIndex: 1500,
-
-        background: "#fff",
-
+  zIndex: 5000,
         borderTop: "1px solid rgba(0,0,0,.08)",
+        background: "#f8f7ff",
 
         paddingTop: "8px",
         paddingBottom:
@@ -175,6 +183,7 @@ console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
     
       {voiceState === "idle" ? (
   <MessageInput
+    placeholder={placeholder}
     message={message}
     messageInputRef={messageInputRef}
     sendMessage={sendMessage}

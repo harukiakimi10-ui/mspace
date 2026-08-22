@@ -3,7 +3,9 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { flushSync } from "react-dom";
+
 import ImageViewer from "./ImageViewer";
 import VideoViewer from "./VideoViewer";
 import MessageMenu from "./MessageMenu";
@@ -45,6 +47,81 @@ import {
 export default function ChatPage() {
   
 console.log("MEMBER PAGE LOADED", Date.now());
+
+
+const [language, setLanguage] = useState<"en" | "zh">("en");
+
+useEffect(() => {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.language.startsWith("zh")
+  ) {
+    setLanguage("zh");
+  }
+}, []);
+
+const t = {
+    en: {
+    hello: "Hello",
+    today: "Today",
+    yesterday: "Yesterday",
+    todayAt: "today at",
+
+    welcome: "Welcome to MSpace.",
+
+    photo: "Photo",
+    video: "Video",
+    voice: "Voice message",
+    sticker: "Sticker",
+    location: "Location",
+
+    locationNotSupported:
+      "Location is not supported on this device.",
+
+    allowLocation:
+      "Please allow location access to share your location.",
+
+    unableLocation:
+      "Unable to get your location.",
+
+    unableSendLocation:
+      "Unable to send your location.",
+
+    uploadFailed:
+      "The file could not be uploaded.",
+  },
+
+    zh: {
+    hello: "你好",
+    today: "今天",
+    yesterday: "昨天",
+    todayAt: "今天",
+
+    welcome: "欢迎来到星域。",
+
+    photo: "照片",
+    video: "视频",
+    voice: "语音消息",
+    sticker: "贴纸",
+    location: "位置",
+
+    locationNotSupported:
+      "此设备不支持位置功能。",
+
+    allowLocation:
+      "请允许访问您的位置以分享位置。",
+
+    unableLocation:
+      "无法获取您的位置。",
+
+    unableSendLocation:
+      "无法发送您的位置。",
+
+    uploadFailed:
+      "文件无法上传。",
+  },
+}[language];
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -124,6 +201,13 @@ const [startupComplete, setStartupComplete] = useState(false);
 const [uploading, setUploading] = useState(false);
 
 const messagesRef = useRef<HTMLDivElement>(null);
+const longPressTimerRef =
+  useRef<ReturnType<typeof setTimeout> | null>(null);
+
+const longPressTriggeredRef =
+  useRef(false);
+
+
 const fileInputRef = useRef<HTMLInputElement>(null);
 const cameraInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,6 +222,10 @@ const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 const timerRef = useRef<NodeJS.Timeout | null>(null);
 const recordedAudioRef = useRef<Blob | null>(null);
 const hasBootstrappedRef = useRef(false);
+
+const presenceMountedRef = useRef(false);
+const presenceRequestRef = useRef(0);
+
 const analyserRef = useRef<AnalyserNode | null>(null);
 const audioContextRef = useRef<AudioContext | null>(null);
 const animationFrameRef = useRef<number | null>(null);
@@ -160,6 +248,148 @@ const [showVideoViewer, setShowVideoViewer] = useState(false);
 const [viewerVideo, setViewerVideo] = useState("");
 const [selectedMessage, setSelectedMessage] = useState<any>(null);
 const [showMessageMenu, setShowMessageMenu] = useState(false);
+
+useEffect(() => {
+  if (showMessageMenu && showStickerPanel) {
+    setShowStickerPanel(false);
+  }
+}, [showMessageMenu, showStickerPanel]);
+
+const [showComposer, setShowComposer] = useState(true);
+const [messageFocus, setMessageFocus] = useState(false);
+const menuAudioContextRef = useRef<AudioContext | null>(null);
+
+const clearMessageFocus = () => {
+  setMessageFocus(false);
+  setSelectedMessage(null);
+  setShowMessageMenu(false);
+};
+
+const playMenuSound = (unlockOnly = false) => {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as any).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    if (!menuAudioContextRef.current) {
+      menuAudioContextRef.current =
+        new AudioContextClass();
+    }
+
+    const audioContext =
+      menuAudioContextRef.current;
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
+    // Safari/iPhone audio unlock
+    if (unlockOnly) {
+      const oscillator =
+        audioContext.createOscillator();
+
+      const gain =
+        audioContext.createGain();
+
+      gain.gain.setValueAtTime(
+        0.0001,
+        audioContext.currentTime
+      );
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+
+      oscillator.start();
+
+      oscillator.stop(
+        audioContext.currentTime + 0.01
+      );
+
+      return;
+    }
+
+    // Actual menu click sound
+    const oscillator =
+      audioContext.createOscillator();
+
+    const gain =
+      audioContext.createGain();
+
+    oscillator.type = "sine";
+
+    oscillator.frequency.setValueAtTime(
+      180,
+      audioContext.currentTime
+    );
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      audioContext.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.06,
+      audioContext.currentTime + 0.01
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      audioContext.currentTime + 0.07
+    );
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start();
+
+    oscillator.stop(
+      audioContext.currentTime + 0.08
+    );
+  } catch {}
+};
+
+const unlockMenuAudio = () => {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as any).webkitAudioContext;
+
+    if (!menuAudioContextRef.current) {
+      menuAudioContextRef.current =
+        new AudioContextClass();
+    }
+
+    const audioContext =
+      menuAudioContextRef.current;
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
+    const oscillator =
+      audioContext.createOscillator();
+
+    const gain =
+      audioContext.createGain();
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      audioContext.currentTime
+    );
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(
+      audioContext.currentTime + 0.01
+    );
+  } catch {}
+};
+
+
 const [menuX, setMenuX] = useState(0);
 const [menuY, setMenuY] = useState(0);
 const [replyMessage, setReplyMessage] = useState<any>(null);
@@ -168,6 +398,39 @@ const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 const [showFullEmojiPicker, setShowFullEmojiPicker] = useState(false);
  console.count("ChatPage Render");
 console.log("ADMIN STATE:", admin);
+
+
+
+const startMessageLongPress = (message: any) => {
+  longPressTriggeredRef.current = false;
+
+  if (longPressTimerRef.current) {
+    clearTimeout(longPressTimerRef.current);
+  }
+
+  longPressTimerRef.current = setTimeout(() => {
+    longPressTriggeredRef.current = true;
+
+    setSelectedMessage(message);
+    setShowComposer(false);
+    setShowMessageMenu(true);
+  }, 1000);
+};
+
+const cancelMessageLongPress = () => {
+  if (longPressTimerRef.current) {
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  }
+};
+
+const closeMessageMenu = () => {
+  cancelMessageLongPress();
+
+  setShowMessageMenu(false);
+  setSelectedMessage(null);
+  setShowComposer(true);
+};
 
 
 
@@ -183,6 +446,14 @@ async function bootstrapChat() {
 
   setStartupComplete(true);
 }
+
+useEffect(() => {
+  if (hasBootstrappedRef.current) return;
+
+  hasBootstrappedRef.current = true;
+
+  void bootstrapChat();
+}, []);
 
 
 
@@ -214,102 +485,167 @@ useEffect(() => {
 
 
   useEffect(() => {
-    console.log("Main useEffect ran");const cached = localStorage.getItem(CHAT_CACHE_KEY);
- bootstrapChat().catch((err) => {
-  console.error("Bootstrap failed:", err);
-});
+  if (!conversationId) return;
 
-console.log("HEADER CACHE:", cached);
+  let mounted = true;
 
-if (cached) {
-  const header = JSON.parse(cached);
+  presenceMountedRef.current = true;
 
-  console.log("HEADER OBJECT:", header);
+  const setPresence = async (online: boolean) => {
+    if (!mounted) return;
 
-  setProfileName(header.profileName || "");
-  setProfilePhoto(header.profilePhoto || null);
+    const memberId =
+      localStorage.getItem("mspace_member_id");
 
-  if (header.admin) {
-    setAdmin(header.admin);
-  }
-}
+    if (!memberId) return;
 
-const cachedMessages = localStorage.getItem(MESSAGE_CACHE_KEY);
+    const requestId =
+      ++presenceRequestRef.current;
 
-if (cachedMessages) {
-  try {
-    setMessages(JSON.parse(cachedMessages));
-  } catch (err) {
-    console.error("Message cache parse error:", err);
-  }
-}
+    try {
+      await updateMemberOnlineStatus(
+        memberId,
+        online
+      );
 
-    const handleVisibility = async () => {
-      if (!startupComplete) return;
+      if (
+        !mounted ||
+        requestId !== presenceRequestRef.current
+      ) {
+        return;
+      }
 
-  const active =
+      console.log(
+        "MEMBER PRESENCE:",
+        online ? "ONLINE" : "OFFLINE"
+      );
+    } catch (error) {
+      console.error(
+        "Presence update error:",
+        error
+      );
+    }
+  };
+
+  const checkPresence = () => {
+    const active =
+      document.visibilityState === "visible" &&
+      document.hasFocus();
+
+    setIsChatActive(active);
+
+    void setPresence(active);
+
+    if (active && conversationId) {
+      void loadMessages(conversationId);
+
+      setTimeout(() => {
+        if (mounted) {
+          void markMessagesAsRead(
+            conversationId
+          );
+        }
+      }, 200);
+    }
+  };
+
+  // Entering the chat
+  void setPresence(true);
+
+  // Keep the member's online status alive.
+// This refreshes online_at every 30 seconds
+// while the member is actively using MSpace.
+const heartbeat = setInterval(() => {
+  if (
     document.visibilityState === "visible" &&
-    document.hasFocus();
-
-  console.log("Visibility:", document.visibilityState);
-  console.log("Has focus:", document.hasFocus());
-  console.log("Active:", active);
-
-  setIsChatActive(active);
-  await updateOnlineStatus(active);
-
-  if (active && conversationId) {
-    await loadMessages(conversationId);
-
-    setTimeout(async () => {
-      await markMessagesAsRead(conversationId);
-    }, 200);
+    document.hasFocus()
+  ) {
+    void setPresence(true);
   }
-};
-      
+}, 30000);
 
-   
-    document.addEventListener(
+  document.addEventListener(
+    "visibilitychange",
+    checkPresence
+  );
+
+  window.addEventListener(
+    "focus",
+    checkPresence
+  );
+
+  window.addEventListener(
+    "blur",
+    checkPresence
+  );
+
+  const handlePageHide = () => {
+    mounted = false;
+
+    presenceMountedRef.current = false;
+
+    const memberId =
+      localStorage.getItem(
+        "mspace_member_id"
+      );
+
+    if (memberId) {
+      void updateMemberOnlineStatus(
+        memberId,
+        false
+      );
+    }
+  };
+
+  window.addEventListener(
+    "pagehide",
+    handlePageHide
+  );
+
+  return () => {
+    mounted = false;
+
+    presenceMountedRef.current = false;
+
+    clearInterval(heartbeat);
+
+    document.removeEventListener(
       "visibilitychange",
-      handleVisibility
+      checkPresence
     );
 
-    setTimeout(handleVisibility, 200);
+    window.removeEventListener(
+      "focus",
+      checkPresence
+    );
 
-    const handleUnload = () => {
-  updateOnlineStatus(false);
-};
+    window.removeEventListener(
+      "blur",
+      checkPresence
+    );
 
-window.addEventListener("beforeunload", handleUnload);
+    window.removeEventListener(
+      "pagehide",
+      handlePageHide
+    );
 
-window.addEventListener("focus", handleVisibility);
-window.addEventListener("blur", handleVisibility);
+    const memberId =
+      localStorage.getItem(
+        "mspace_member_id"
+      );
 
+    if (memberId) {
+      void updateMemberOnlineStatus(
+        memberId,
+        false
+      );
+    }
 
-return () => {
-  updateOnlineStatus(false);
-
-  window.removeEventListener(
-    "focus",
-    handleVisibility
-  );
-
-  window.removeEventListener(
-    "blur",
-    handleVisibility
-  );
-
-  document.removeEventListener(
-    "visibilitychange",
-    handleVisibility
-  );
-
-  window.removeEventListener(
-    "beforeunload",
-    handleUnload
-  );
-};
-}, []);
+    console.log(
+      "CHAT PAGE UNMOUNTED → MEMBER OFFLINE"
+    );
+  };
+}, [conversationId]);
 
 useEffect(() => {
   if (!conversationId) return;
@@ -366,24 +702,43 @@ useEffect(() => {
           filter: `conversation_id=eq.${conversationId}`,
         },
        
-        async () => {
-          console.log("Messages table changed");
-          
-          await loadMessages(conversationId);
+        async (payload) => {
+  console.log("NEW MESSAGE:", payload);
 
-          if (showScrollButtonRef.current) {
+  if (pendingUploads.length === 0) {
+    await loadMessages(conversationId);
+  }
+
+  // If the member is currently at the bottom,
+  // the new message is considered seen immediately.
+  const el = messagesRef.current;
+
+  const distanceFromBottom =
+    el
+      ? el.scrollHeight -
+        el.scrollTop -
+        el.clientHeight
+      : 0;
+
+  const isNearBottom = distanceFromBottom <= 80;
+
+  if (
+  !isNearBottom &&
+  payload.new?.sender === "admin"
+) {
   setNewMessageCount((count) => count + 1);
 }
 
-          if (
-            document.visibilityState === "visible" &&
-            document.hasFocus()
-          ) {
-            setTimeout(async () => {
-              await markMessagesAsRead(conversationId);
-            }, 200);
-          }
-        }
+  if (
+    document.visibilityState === "visible" &&
+    document.hasFocus() &&
+    isNearBottom
+  ) {
+    setTimeout(async () => {
+      await markMessagesAsRead(conversationId);
+    }, 200);
+  }
+}
       )
 .on(
   "postgres_changes",
@@ -487,7 +842,6 @@ console.log(">>> CREATED:", conversation.id);
  
   setInitialLoad(true);
 
-  await updateOnlineStatus(true);
 
   await loadMessages(conversation.id);
 
@@ -586,19 +940,7 @@ if (!data) return;
   );
 }
 
-async function updateOnlineStatus(online: boolean) {
-  const memberId = localStorage.getItem("mspace_member_id");
-
-  if (!memberId) return;
-
-  try {
-  await updateMemberOnlineStatus(memberId, online);
-} catch (error) {
-  console.error("Online status error:", error);
-}
-}
-
-function handleMessageInput(
+async function handleMessageInput(
   e: React.ChangeEvent<HTMLTextAreaElement>
 ) {
   setMessage(e.target.value);
@@ -611,30 +953,38 @@ function handleMessageInput(
 
   if (!conversationId) return;
 
-  supabase
+  const { data, error } = await supabase
     .from("conversations")
     .update({
       member_typing: true,
     })
-    .eq(
-      "member_id",
-      localStorage.getItem("mspace_member_id")
-    );
+    .eq("id", conversationId)
+    .select();
+
+  console.log("MEMBER TYPING UPDATE:", {
+    conversationId,
+    data,
+    error,
+  });
 
   if (typingTimeout.current) {
     clearTimeout(typingTimeout.current);
   }
 
   typingTimeout.current = setTimeout(async () => {
-    await supabase
+    const { data, error } = await supabase
       .from("conversations")
       .update({
         member_typing: false,
       })
-      .eq(
-        "member_id",
-        localStorage.getItem("mspace_member_id")
-      );
+      .eq("id", conversationId)
+      .select();
+
+    console.log("MEMBER TYPING STOP:", {
+      conversationId,
+      data,
+      error,
+    });
   }, 1000);
 }
 
@@ -644,18 +994,6 @@ async function loadMessages(id: string) {
 
   const filteredMessages = (data || []).filter(
   (msg) => msg.deleted_for !== "member"
-);
-
-// Remove pending uploads that already exist in Supabase
-setPendingUploads((prev) =>
-  prev.filter((pending) => {
-    return !filteredMessages.some(
-      (real) =>
-        real.sender === pending.sender &&
-        real.file_name === pending.file_name &&
-        real.message_type === pending.message_type
-    );
-  })
 );
 
 console.log("Before setMessages:", messages.length);
@@ -994,8 +1332,6 @@ try {
 
 if (!data) return;
 
-setShowStickerPanel(false);
-
 // Clear the reply composer after sending
 setReplyMessage(null);
 setReplyPreview("");
@@ -1039,7 +1375,139 @@ const cancelUpload = (uploadId: string) => {
   });
 };
 
-async function uploadFile(file: File, uploadId?: string) {
+async function createTemporaryVideoThumbnail(
+  file: File
+): Promise<string | null> {
+  if (!file.type.startsWith("video/")) {
+    return null;
+  }
+
+  const video = document.createElement("video");
+  const videoUrl = URL.createObjectURL(file);
+
+  video.src = videoUrl;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "metadata";
+
+  try {
+    return await new Promise<string | null>((resolve) => {
+      let finished = false;
+
+      const finish = (result: string | null) => {
+        if (finished) return;
+
+        finished = true;
+
+        URL.revokeObjectURL(videoUrl);
+
+        resolve(result);
+      };
+
+      video.onloadedmetadata = () => {
+        try {
+          if (
+            !Number.isFinite(video.duration) ||
+            video.duration <= 0
+          ) {
+            finish(null);
+            return;
+          }
+
+          video.currentTime = Math.min(
+            0.1,
+            Math.max(0, video.duration / 2)
+          );
+        } catch {
+          finish(null);
+        }
+      };
+
+      video.onseeked = () => {
+        try {
+          if (
+            video.videoWidth <= 0 ||
+            video.videoHeight <= 0
+          ) {
+            finish(null);
+            return;
+          }
+
+          const canvas =
+            document.createElement("canvas");
+
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+
+          const ctx =
+            canvas.getContext("2d");
+
+          if (!ctx) {
+            finish(null);
+            return;
+          }
+
+          ctx.drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          const thumbnailUrl =
+            canvas.toDataURL(
+              "image/jpeg",
+              0.85
+            );
+
+          finish(thumbnailUrl);
+        } catch (error) {
+          console.error(
+            "Temporary video thumbnail error:",
+            error
+          );
+
+          finish(null);
+        }
+      };
+
+      video.onerror = () => {
+        console.error(
+          "Temporary video could not be decoded"
+        );
+
+        finish(null);
+      };
+
+      setTimeout(() => {
+        if (!finished) {
+          console.error(
+            "Temporary video thumbnail timed out"
+          );
+
+          finish(null);
+        }
+      }, 5000);
+
+      video.load();
+    });
+  } catch (error) {
+    console.error(
+      "Temporary video thumbnail exception:",
+      error
+    );
+
+    URL.revokeObjectURL(videoUrl);
+
+    return null;
+  }
+}
+
+async function uploadFile(
+  file: File,
+  uploadId?: string
+) {
   if (!conversationId) return;
 
   setUploading(true);
@@ -1062,32 +1530,25 @@ async function uploadFile(file: File, uploadId?: string) {
      * Videos above 10 MB are compressed before upload.
      */
     if (file.type.startsWith("video/")) {
-      console.log(
-        "Original video:",
-        (file.size / 1024 / 1024).toFixed(2),
-        "MB"
-      );
+  console.log(
+    "Member original video:",
+    (file.size / 1024 / 1024).toFixed(2),
+    "MB"
+  );
 
-      if (file.size > 15 * 1024 * 1024) {
-        console.log("Video is above 15 MB. Compressing...");
+  console.log(
+    "Member: converting video to MP4/H.264..."
+  );
 
-        uploadFile = await compressVideo(file);
+  uploadFile = await compressVideo(file);
 
-        console.log(
-          "Compressed video:",
-          (uploadFile.size / 1024 / 1024).toFixed(2),
-          "MB"
-        );
-
-        if (uploadFile.size > 10 * 1024 * 1024) {
-          throw new Error(
-            "The video could not be compressed below 10 MB."
-          );
-        }
-      } else {
-        console.log("Video is 15 MB or smaller. Uploading original.");
-      }
-    }
+  console.log(
+    "Member final video:",
+    (uploadFile.size / 1024 / 1024).toFixed(2),
+    "MB",
+    uploadFile.type
+  );
+}
 
     /*
      * Upload the FINAL file.
@@ -1183,133 +1644,254 @@ await new Promise<void>((resolve, reject) => {
       .getPublicUrl(filePath);
 
     /*
-     * CREATE VIDEO THUMBNAIL
-     *
-     * IMPORTANT:
-     * We create the thumbnail from uploadFile,
-     * so the thumbnail corresponds to the actual
-     * video stored in Supabase.
-     */
-    if (uploadFile.type.startsWith("video/")) {
-      const video = document.createElement("video");
+ * CREATE VIDEO THUMBNAIL
+ *
+ * Same thumbnail-generation method used
+ * by the working Admin implementation.
+ */
+if (uploadFile.type.startsWith("video/")) {
+  const video = document.createElement("video");
+  const videoUrl = URL.createObjectURL(uploadFile);
 
-      const videoUrl = URL.createObjectURL(uploadFile);
+  video.src = videoUrl;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
 
-      video.src = videoUrl;
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = "metadata";
+  try {
+    await new Promise<void>((resolve) => {
+      let finished = false;
 
-      await new Promise<void>((resolve, reject) => {
-        let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        resolve();
+      };
 
-        const finish = () => {
-          if (finished) return;
-          finished = true;
-          resolve();
-        };
+      const captureFrame = () => {
+        try {
+          if (
+            video.videoWidth <= 0 ||
+            video.videoHeight <= 0
+          ) {
+            console.error(
+              "Member video thumbnail: invalid video dimensions"
+            );
 
-        video.onloadedmetadata = () => {
-          video.currentTime = Math.min(
-            0.1,
-            Math.max(0, video.duration - 0.1)
-          );
-        };
-
-        video.onseeked = finish;
-        video.onerror = () => {
-          if (finished) return;
-          finished = true;
-          reject(new Error("Could not create video thumbnail."));
-        };
-
-        setTimeout(finish, 5000);
-      });
-
-      const canvas = document.createElement("canvas");
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      const ctx = canvas.getContext("2d");
-
-      if (ctx && canvas.width && canvas.height) {
-        ctx.drawImage(
-          video,
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(
-            resolve,
-            "image/jpeg",
-            0.8
-          )
-        );
-
-        if (blob) {
-          const thumbnailPath =
-            `${conversationId}/thumb-${Date.now()}.jpg`;
-
-          const { error: thumbnailError } =
-            await supabase.storage
-              .from("photos")
-              .upload(thumbnailPath, blob);
-
-          if (!thumbnailError) {
-            const { data: thumb } =
-              supabase.storage
-                .from("photos")
-                .getPublicUrl(thumbnailPath);
-
-            thumbnailUrl = thumb.publicUrl;
+            finish();
+            return;
           }
-        }
-      }
 
-      URL.revokeObjectURL(videoUrl);
-    }
+          const canvas =
+            document.createElement("canvas");
+
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+
+          const ctx =
+            canvas.getContext("2d");
+
+          if (!ctx) {
+            console.error(
+              "Member video thumbnail: canvas context unavailable"
+            );
+
+            finish();
+            return;
+          }
+
+          ctx.drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          canvas.toBlob(
+            async (blob) => {
+              if (!blob) {
+                console.error(
+                  "Member video thumbnail: canvas.toBlob() returned null"
+                );
+
+                finish();
+                return;
+              }
+
+              try {
+                const thumbnailPath =
+                  `${conversationId}/thumb-${uploadId || Date.now()}.jpg`;
+
+                const {
+                  error: thumbnailUploadError,
+                } = await supabase.storage
+                  .from("photos")
+                  .upload(
+                    thumbnailPath,
+                    blob,
+                    {
+                      contentType: "image/jpeg",
+                      upsert: true,
+                    }
+                  );
+
+                if (thumbnailUploadError) {
+                  console.error(
+                    "Member video thumbnail upload error:",
+                    thumbnailUploadError
+                  );
+
+                  finish();
+                  return;
+                }
+
+                const {
+                  data: thumb,
+                } = supabase.storage
+                  .from("photos")
+                  .getPublicUrl(
+                    thumbnailPath
+                  );
+
+                thumbnailUrl =
+                  thumb?.publicUrl || null;
+
+                console.log(
+                  "Member video thumbnail URL:",
+                  thumbnailUrl
+                );
+
+                finish();
+              } catch (error) {
+                console.error(
+                  "Member video thumbnail upload exception:",
+                  error
+                );
+
+                finish();
+              }
+            },
+            "image/jpeg",
+            0.85
+          );
+        } catch (error) {
+          console.error(
+            "Member video thumbnail capture error:",
+            error
+          );
+
+          finish();
+        }
+      };
+
+      video.onerror = () => {
+        console.error(
+          "Member video thumbnail: video could not be decoded"
+        );
+
+        finish();
+      };
+
+      video.onloadedmetadata = () => {
+        try {
+          if (video.duration > 0) {
+            video.currentTime = Math.min(
+              0.1,
+              Math.max(
+                0,
+                video.duration / 2
+              )
+            );
+          } else {
+            captureFrame();
+          }
+        } catch {
+          captureFrame();
+        }
+      };
+
+      video.onseeked = () => {
+        captureFrame();
+      };
+
+      // Same fallback protection as Admin.
+      setTimeout(() => {
+        if (!finished) {
+          console.error(
+            "Member video thumbnail: generation timed out"
+          );
+
+          finish();
+        }
+      }, 5000);
+
+      video.load();
+    });
+  } catch (thumbnailError) {
+    console.error(
+      "Member video thumbnail generation error:",
+      thumbnailError
+    );
+  } finally {
+    URL.revokeObjectURL(videoUrl);
+  }
+}
 
     console.log("Public URL:", data.publicUrl);
 
     /*
      * SAVE MESSAGE
      */
-    const { error } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: conversationId,
-        sender: "member",
+    const { data: insertedMessage, error } =
+  await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender: "member",
 
-        message_type: uploadFile.type.startsWith("image/")
-          ? "image"
-          : uploadFile.type.startsWith("video/")
-          ? "video"
-          : "file",
+      message_type: uploadFile.type.startsWith("image/")
+        ? "image"
+        : uploadFile.type.startsWith("video/")
+        ? "video"
+        : "file",
 
-        content: "",
+      content: "",
 
-        file_url: data.publicUrl,
+      file_url: data.publicUrl,
 
-        reply_thumbnail_url: thumbnailUrl,
+      upload_id: uploadId,
 
-        file_name: uploadFile.name,
+      reply_thumbnail_url: thumbnailUrl,
 
-        file_size: uploadFile.size,
+      file_name: uploadFile.name,
+      file_size: uploadFile.size,
+      mime_type: uploadFile.type,
 
-        mime_type: uploadFile.type,
+      is_read: false,
+    })
+    .select()
+    .single();
 
-        is_read: false,
-      });
+console.log(
+  "Inserted member media message:",
+  insertedMessage
+);
 
-    console.log("Insert error:", error);
+console.log(
+  "REAL MEMBER VIDEO THUMBNAIL:",
+  insertedMessage?.reply_thumbnail_url
+);
+
+console.log(
+  "Insert error:",
+  error
+);
 
 if (error) {
   throw new Error(error.message);
 }
+
 
 /*
  * SEND PUSH NOTIFICATION TO ADMIN
@@ -1322,17 +1904,23 @@ try {
     "/api/push/send",
     {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
-        title: "MSpace",
         body:
           uploadFile.type.startsWith("image/")
-            ? "📷 Photo"
+            ? "📷Photo"
             : uploadFile.type.startsWith("video/")
-            ? "🎥 Video"
-            : "📎 File",
+            ? "🎥Video"
+            : "📎File",
+
+        conversationId,
+
+        targetMemberId:
+          "11111111-1111-1111-1111-111111111111",
       }),
     }
   );
@@ -1345,24 +1933,17 @@ try {
     pushResult
   );
 
-  if (!pushResponse.ok) {
-    console.error(
-      "Member → Admin media push failed:",
-      pushResult
-    );
-  }
 } catch (pushError) {
-  /*
-   * Push failure must NOT break the
-   * successfully uploaded message.
-   */
   console.error(
     "Member → Admin media push error:",
     pushError
   );
 }
 
-await loadMessages(conversationId);
+
+return insertedMessage;
+
+
 
   } catch (error) {
     console.error("Upload failed:", error);
@@ -1370,7 +1951,7 @@ await loadMessages(conversationId);
     alert(
       error instanceof Error
         ? error.message
-        : "The file could not be uploaded."
+        : t.uploadFailed
     );
 
   } finally {
@@ -1465,15 +2046,15 @@ reply_preview:
   replyMessage?.message_type === "text"
     ? replyMessage.content
     : replyMessage?.message_type === "image"
-    ? "📷 Photo"
+    ? `📷 ${t.photo}`
     : replyMessage?.message_type === "video"
-    ? "🎥 Video"
+    ? `🎥 ${t.video}`
     : replyMessage?.message_type === "voice"
-    ? "🎤 Voice"
+    ? `🎤 ${t.voice}`
     : replyMessage?.message_type === "sticker"
-    ? "🏷️ Sticker"
+    ? `🏷️ ${t.sticker}`
     : replyMessage?.message_type === "location"
-    ? "📍 Location"
+    ? `📍 ${t.location}`
     : null,
 
 reply_file_url:
@@ -1516,8 +2097,7 @@ void fetch("/api/push/send", {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    title: "MSpace",
-    body: "New voice message",
+    body: "🎤 voice message",
     conversationId,
 
     // Same admin recipient used by text/sticker notifications.
@@ -1586,9 +2166,16 @@ setTimeout(() => {
 
 
 function formatTime(date: string) {
-  return new Date(date).toLocaleTimeString([], {
+  const locale =
+    typeof navigator !== "undefined" &&
+    navigator.language.startsWith("zh")
+      ? "zh-CN"
+      : "en-US";
+
+  return new Date(date).toLocaleTimeString(locale, {
     hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -1603,11 +2190,11 @@ function formatDateLabel(date: string) {
   const message = messageDate.toDateString();
 
   if (message === today.toDateString()) {
-    return "Today";
+    return t.today;
   }
 
   if (message === yesterday.toDateString()) {
-    return "Yesterday";
+    return t.yesterday;
   }
 
   return messageDate.toLocaleDateString([], {
@@ -1631,7 +2218,7 @@ function formatLastSeen(date: string) {
   const today = new Date();
 
   if (d.toDateString() === today.toDateString()) {
-    return `today at ${d.toLocaleTimeString([], {
+    return `${t.todayAt} ${d.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
     })}`;
@@ -1692,45 +2279,59 @@ return (
   y={menuY}
   selectedMessage={selectedMessage}
   currentUser="member"
-  onClose={() => setShowMessageMenu(false)}
+  onClose={() => {
+  clearMessageFocus();
+  setShowComposer(true);
+}}
   onReply={() => {
   console.log("REPLY SELECTED MESSAGE:", selectedMessage);
 
   setReplyMessage(selectedMessage);
 
+  flushSync(() => {
+    setShowComposer(true);
+  });
+
+  messageInputRef.current?.focus();
+
   if (selectedMessage?.message_type === "text") {
     setReplyPreview(selectedMessage.content);
 
   } else if (selectedMessage?.message_type === "image") {
-    setReplyPreview("📷 Photo");
+    setReplyPreview(`📷 ${t.photo}`);
 
   } else if (selectedMessage?.message_type === "video") {
-    setReplyPreview("🎥 Video");
+    setReplyPreview(`🎥 ${t.video}`);
 
   } else if (selectedMessage?.message_type === "voice") {
     const duration = selectedMessage.file_duration ?? 0;
 
     setReplyPreview(
-      `🎤 Voice message ${Math.floor(duration / 60)}:${String(
+  `🎤 ${t.voice} ${Math.floor(duration / 60)}:${String(
         Math.floor(duration % 60)
       ).padStart(2, "0")}`
     );
 
   } else if (selectedMessage?.message_type === "location") {
-    setReplyPreview("Location");
+    setReplyPreview(t.location);
 
   } else if (selectedMessage?.message_type === "sticker") {
-    setReplyPreview("🏷️ Sticker");
+    setReplyPreview(`🏷️ ${t.sticker}`);
   }
 
+  setMessageFocus(false);
   setShowMessageMenu(false);
+  setShowComposer(true);
 }}
   onCopy={() => {
-    navigator.clipboard.writeText(
-      selectedMessage?.content || ""
-    );
-    setShowMessageMenu(false);
-  }}
+  navigator.clipboard.writeText(
+    selectedMessage?.content || ""
+  );
+
+  setMessageFocus(false);
+  setShowMessageMenu(false);
+  setShowComposer(true);
+}}
 
   onSave={async () => {
   if (!selectedMessage?.file_url) return;
@@ -1757,9 +2358,13 @@ return (
 
     window.URL.revokeObjectURL(url);
   } finally {
+    clearMessageFocus();
+    setMessageFocus(false);
     setShowMessageMenu(false);
+    setShowComposer(true);
   }
 }}
+
 
 onDeleteForMe={async () => {
   if (!selectedMessage) return;
@@ -1771,8 +2376,9 @@ onDeleteForMe={async () => {
     })
     .eq("id", selectedMessage.id);
 
+  setMessageFocus(false);
   setShowMessageMenu(false);
-
+  setShowComposer(true);
   if (conversationId) {
     await loadMessages(conversationId);
   }
@@ -1793,8 +2399,9 @@ onDeleteForEveryone={async () => {
     })
     .eq("id", selectedMessage.id);
 
+  setMessageFocus(false);
   setShowMessageMenu(false);
-
+  setShowComposer(true);
   if (conversationId) {
     await loadMessages(conversationId);
   }
@@ -1829,9 +2436,9 @@ onDeleteForEveryone={async () => {
   setShowAttachmentMenu(false);
 
   if (!navigator.geolocation) {
-    alert("Location is not supported on this device.");
-    return;
-  }
+  alert(t.locationNotSupported);
+  return;
+}
 
   navigator.geolocation.getCurrentPosition(
     (position) => {
@@ -1851,11 +2458,10 @@ onDeleteForEveryone={async () => {
       );
 
       if (error.code === 1) {
-        alert(
-          "Please allow location access to share your location."
-        );
+       alert(t.allowLocation);
+
       } else {
-        alert("Unable to get your location.");
+        alert(t.unableLocation);
       }
     },
     {
@@ -1885,13 +2491,22 @@ onDeleteForEveryone={async () => {
 
     setShowLocationPreview(false);
     setLocationPreview(null);
+   await loadMessages(conversationId!);
+
+setTimeout(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
+
   } catch (error) {
     console.error(
       "Location send error:",
       error
     );
 
-    alert("Unable to send your location.");
+    alert(t.unableSendLocation);
   }
 }}
   />
@@ -1938,6 +2553,15 @@ onDeleteForEveryone={async () => {
   const tempId = "temp-" + Date.now();
   const uploadId = createId();
 
+  let temporaryThumbnail: string | null = null;
+
+if (fileToUpload.type.startsWith("video/")) {
+  temporaryThumbnail =
+    await createTemporaryVideoThumbnail(
+      fileToUpload
+    );
+}
+
   // Show the video immediately in the chat while uploading.
   setPendingUploads((prev) => [
     ...prev,
@@ -1949,6 +2573,7 @@ onDeleteForEveryone={async () => {
         ? "image"
         : "video",
       file_url: localPreviewUrl,
+      thumbnail_url: temporaryThumbnail,
       file_name: fileToUpload.name,
       created_at: new Date().toISOString(),
       uploading: true,
@@ -1956,6 +2581,15 @@ onDeleteForEveryone={async () => {
       is_read: false,
     },
   ]);
+
+  setTimeout(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
+
+ 
 
   // IMPORTANT:
   // Close and completely clear the full-screen preview
@@ -1966,12 +2600,75 @@ onDeleteForEveryone={async () => {
 
   try {
     // Upload using the captured file, NOT previewFile state.
-    await uploadFile(fileToUpload, uploadId);
+    const insertedMessage =
+  await uploadFile(fileToUpload, uploadId);
 
-    // Upload succeeded.
-    setPendingUploads((prev) =>
-      prev.filter((m) => m.id !== tempId)
-    );
+if (!insertedMessage?.file_url) {
+  throw new Error("Supabase did not return a file URL");
+}
+
+// Wait until the real Supabase image is fully loaded
+if (insertedMessage.message_type === "image") {
+  await new Promise<void>((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => resolve();
+
+    img.onerror = () => {
+      reject(
+        new Error("Real Supabase image failed to load")
+      );
+    };
+
+    img.src = insertedMessage.file_url;
+  });
+}
+
+// Wait until the real Supabase video thumbnail is fully loaded
+if (
+  insertedMessage.message_type === "video" &&
+  insertedMessage.reply_thumbnail_url
+) {
+  await new Promise<void>((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => resolve();
+
+    img.onerror = () => {
+      reject(
+        new Error(
+          "Real Supabase video thumbnail failed to load"
+        )
+      );
+    };
+
+    img.src = insertedMessage.reply_thumbnail_url;
+  });
+}
+
+
+// Put the real message into the chat
+setMessages((prev) => {
+  const alreadyExists = prev.some(
+    (message) => message.id === insertedMessage.id
+  );
+
+  if (alreadyExists) {
+    return prev;
+  }
+
+  return [
+    ...prev,
+    insertedMessage,
+  ];
+});
+
+// Remove the temporary uploading message
+setPendingUploads((prev) =>
+  prev.filter(
+    (message) => message.id !== tempId
+  )
+);
     
  setUploadProgress((prev) => {
   const next = { ...prev };
@@ -2006,14 +2703,25 @@ onDeleteForEveryone={async () => {
   }}
 >
       {/* Header */}
-<ChatHeader
-  profileName={profileName}
-  profilePhoto={profilePhoto}
-  admin={admin}
-  conversation={conversation}
-  formatLastSeen={formatLastSeen}
-  onBack={() => router.push("/members")}
-/>
+<div
+  style={{
+    position: "relative",
+    zIndex: 1,
+
+    filter: "none",
+    opacity: 1,
+    pointerEvents: "auto",
+  }}
+>
+  <ChatHeader
+    profileName={profileName}
+    profilePhoto={profilePhoto}
+    admin={admin}
+    conversation={conversation}
+    formatLastSeen={formatLastSeen}
+    onBack={() => router.push("/members")}
+  />
+</div>
 
       {/* Messages */}
 
@@ -2041,6 +2749,11 @@ onDeleteForEveryone={async () => {
   if (showStickerPanel) {
     setShowStickerPanel(false);
   }
+
+  if (showAttachmentMenu) {
+  setShowAttachmentMenu(false);
+}
+
 }}
 
    onContextMenu={(e) => {
@@ -2066,6 +2779,8 @@ onDeleteForEveryone={async () => {
   flex: 1,
   minHeight: 0,
 
+  position: "relative",
+
   overflowY: "auto",
   overflowX: "hidden",
 
@@ -2088,14 +2803,55 @@ onDeleteForEveryone={async () => {
         boxShadow: "0 2px 8px rgba(0,0,0,.08)",
       }}
     >
-      Hello 👋
-      <br />
-      Welcome to MSpace.
+     {t.hello} 👋
+<br />
+{t.welcome}
     </div>
-<Messages
-  messages={[...messages, ...pendingUploads]}
+
+   {messageFocus && (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+
+      background: "rgba(0, 0, 0, 0.18)",
+
+
+      zIndex: 0,
+
+      pointerEvents: "none",
+
+      transition: "opacity 0.2s ease",
+    }}
+  />
+)}
+
+<div
+  onClick={() => {
+  if (messageFocus) {
+    clearMessageFocus();
+  }
+}}
+  style={{
+    position: "relative",
+    zIndex: 1,
+  }}
+>
+  <Messages
+  messages={[
+  ...messages.filter(
+    (real) =>
+      !pendingUploads.some(
+        (pending) =>
+          pending.upload_id &&
+          real.upload_id === pending.upload_id
+      )
+  ),
+  ...pendingUploads,
+]}
   currentUser="member"
   profileName={profileName}
+  playMenuSound={playMenuSound}
   formatTime={formatTime}
   formatDateLabel={formatDateLabel}
   isNewDay={isNewDay}
@@ -2106,10 +2862,15 @@ onDeleteForEveryone={async () => {
   setViewerVideo={setViewerVideo}
   setShowVideoViewer={setShowVideoViewer}
   setSelectedMessage={setSelectedMessage}
+  selectedMessage={selectedMessage}
   setMenuX={setMenuX}
   setMenuY={setMenuY}
   setShowMessageMenu={setShowMessageMenu}
+  setShowComposer={setShowComposer}
+  messageFocus={messageFocus}
+setMessageFocus={setMessageFocus}
 />
+  </div>
   </div>
 
   {showScrollButton && (
@@ -2117,17 +2878,31 @@ onDeleteForEveryone={async () => {
   style={{
     position: "absolute",
     right: 20,
-    bottom: 95,
-    zIndex: 100,
+    bottom:
+  showStickerPanel
+    ? "calc(38vh + 95px)"
+    : showAttachmentMenu
+    ? "calc(25vh + 5px)"
+    : 95,
+    zIndex: 3000,
   }}
 >
     <button
-  onClick={() =>
-    messagesRef.current?.scrollTo({
-      top: messagesRef.current.scrollHeight,
-      behavior: "smooth",
-    })
-  }
+  type="button"
+  onMouseDown={(e) => {
+    e.preventDefault();
+  }}
+  onTouchStart={(e) => {
+    e.preventDefault();
+  }}
+  onClick={() => {
+  setNewMessageCount(0);
+
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}}
   style={{
     position: "relative",
 
@@ -2207,7 +2982,11 @@ onDeleteForEveryone={async () => {
 
       {/* Input */}
 
-      <ChatComposer
+      {showComposer && (
+  <ChatComposer
+  placeholder={language === "zh" ? "输入消息..." : "Type a message..."}
+  showComposer={showComposer}
+
   message={message}
   setMessage={setMessage}
 
@@ -2301,6 +3080,7 @@ onDeleteForEveryone={async () => {
   }
 }}
 />
+)}
    </main>
 </>
 );

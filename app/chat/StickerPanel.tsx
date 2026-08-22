@@ -119,31 +119,29 @@ export default function StickerPanel({
   {panelTab === "emoji" && (
   <div
   style={{
-    flex: "1 1 auto",
-    width: "calc(100% + 18px)",
+    flex: 1,
+    width: "100%",
     minWidth: 0,
-    marginRight: "-18px",
     overflow: "hidden",
-    display: "flex",
-    alignItems: "stretch",
+    boxSizing: "border-box",
   }}
 >
     <Picker
-      data={data}
-      theme="light"
-      onEmojiSelect={onEmojiSelect}
-      searchPosition="none"
-      previewPosition="none"
-      skinTonePosition="none"
-      perLine={9}
-      dynamicWidth={false}
-      width="100%"
-style={{
-  width: "100%",
-  maxWidth: "100%",
-  flex: "1 1 auto",
-}}
-    />
+  data={data}
+  theme="light"
+  onEmojiSelect={onEmojiSelect}
+  searchPosition="none"
+  previewPosition="none"
+  skinTonePosition="none"
+  dynamicWidth={false}
+  perLine={18}
+  style={{
+    width: "100%",
+    minWidth: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
+  }}
+/>
   </div>
 )}
 

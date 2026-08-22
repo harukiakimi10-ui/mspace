@@ -4,6 +4,9 @@ import {
   Camera,
   Video,
   MapPin,
+  Mic,
+  Sticker,
+  Trash2,
 } from "lucide-react";
 
 type Conversation = {
@@ -19,11 +22,13 @@ type Conversation = {
   };
 
   lastMessage?: {
-    content: string;
-    message_type: string;
-    sender: string;
-    created_at: string;
-  };
+  content: string;
+  message_type: string;
+  sender: string;
+  created_at: string;
+  file_duration?: number | null;
+  is_deleted?: boolean;
+};
 };
 
 type Props = {
@@ -35,6 +40,22 @@ export default function ConversationList({
 }: Props) {
 
 const router = useRouter();
+
+function formatVoiceDuration(duration?: number | null) {
+  if (!duration || duration < 1) {
+    return "0:00";
+  }
+
+  const totalSeconds = Math.floor(duration);
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${seconds
+    .toString()
+    .padStart(2, "0")}`;
+}
+
   return (
     <div
       style={{
@@ -115,7 +136,27 @@ const router = useRouter();
       }}
     >
       {chat.lastMessage ? (
-  chat.lastMessage.message_type === "image" ? (
+  chat.lastMessage.is_deleted ? (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      <Trash2
+        size={15}
+        strokeWidth={2.4}
+        color="#6d28d9"
+      />
+
+      <span>
+        {chat.lastMessage.sender === "admin"
+          ? "You deleted this message"
+          : "This message was deleted"}
+      </span>
+    </span>
+  ) : chat.lastMessage.message_type === "image" ? (
     <span
       style={{
         display: "inline-flex",
@@ -130,6 +171,7 @@ const router = useRouter();
       />
       <span>Photo</span>
     </span>
+
   ) : chat.lastMessage.message_type === "video" ? (
     <span
       style={{
@@ -145,6 +187,7 @@ const router = useRouter();
       />
       <span>Video</span>
     </span>
+
   ) : chat.lastMessage.message_type === "location" ? (
     <span
       style={{
@@ -160,6 +203,46 @@ const router = useRouter();
       />
       <span>Location</span>
     </span>
+
+  ) : chat.lastMessage.message_type === "sticker" ? (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      <Sticker
+        size={15}
+        strokeWidth={2.4}
+        color="#6d28d9"
+      />
+      <span>Sticker</span>
+    </span>
+
+  ) : chat.lastMessage.message_type === "voice" ? (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      <Mic
+        size={15}
+        strokeWidth={2.4}
+        color="#6d28d9"
+      />
+
+      <span>Voice message</span>
+
+      <span>
+        {formatVoiceDuration(
+          chat.lastMessage.file_duration
+        )}
+      </span>
+    </span>
+
   ) : (
     chat.lastMessage.content
   )

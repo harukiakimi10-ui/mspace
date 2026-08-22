@@ -3,12 +3,42 @@
 import { useEffect, useRef, useState } from "react";
 import {
   X,
-  Send,
+  SendHorizontal,
   MapPin,
   Search,
   Loader2,
 } from "lucide-react";
 import "leaflet/dist/leaflet.css";
+
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    sendLocation: "Send Location",
+    searchPlace: "Search for a place",
+    nearbyPlaces: "Nearby places",
+    findingNearby: "Finding nearby places...",
+    noNearby: "No nearby places found.",
+    nearbyPlace: "Nearby place",
+    cancel: "Cancel",
+    send: "Send",
+  },
+
+  zh: {
+    sendLocation: "发送位置",
+    searchPlace: "搜索地点",
+    nearbyPlaces: "附近地点",
+    findingNearby: "正在查找附近地点...",
+    noNearby: "未找到附近地点。",
+    nearbyPlace: "附近地点",
+    cancel: "取消",
+    send: "发送",
+  },
+}[language];
 
 type LocationPreviewProps = {
   latitude: number;
@@ -321,7 +351,7 @@ const markerRef = useRef<any>(null);
             color: "#111",
           }}
         >
-          Send Location
+          {t.sendLocation}
         </div>
 
         <button
@@ -396,7 +426,7 @@ const markerRef = useRef<any>(null);
             searchLocations();
           }
         }}
-        placeholder="Search for a place"
+        placeholder={t.searchPlace}
         style={{
           flex: 1,
           border: "none",
@@ -603,7 +633,7 @@ const markerRef = useRef<any>(null);
       marginBottom: 10,
     }}
   >
-    Nearby places
+    {t.nearbyPlaces}
   </div>
 
   {loadingNearby && (
@@ -614,7 +644,7 @@ const markerRef = useRef<any>(null);
         padding: "8px 0 12px",
       }}
     >
-      Finding nearby places...
+      {t.findingNearby}
     </div>
   )}
 
@@ -627,7 +657,7 @@ const markerRef = useRef<any>(null);
           padding: "8px 0 12px",
         }}
       >
-        No nearby places found.
+        {t.noNearby}
       </div>
     )}
 
@@ -757,7 +787,7 @@ borderLeft:
                   place.tags?.shop ||
                   place.tags?.tourism ||
                   place.tags?.leisure ||
-                  "Nearby place"}
+                  t.nearbyPlace}
               </div>
             </div>
           </button>
@@ -807,7 +837,7 @@ borderLeft:
               cursor: "pointer",
             }}
           >
-            Cancel
+            {t.cancel}
           </button>
 
           <button
@@ -832,8 +862,8 @@ borderLeft:
                 "0 6px 16px rgba(109,40,217,.25)",
             }}
           >
-            <Send size={18} />
-            Send
+            <SendHorizontal size={18} />
+            {t.send}
           </button>
         </div>
       </div>

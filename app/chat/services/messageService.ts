@@ -96,7 +96,6 @@ export async function sendTextMessage(payload: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      title: "MSpace",
       body: content || "New message",
       conversationId,
 
@@ -221,7 +220,7 @@ void fetch("/api/push/send", {
   },
   body: JSON.stringify({
     title: "MSpace",
-    body: "New sticker",
+    body: "💟sticker",
     conversationId,
 
     // We will verify this admin ID next.
@@ -305,41 +304,68 @@ export async function sendLocationMessage(
 }
 
 /*
- * Send push notification to the admin
- * only when the member sends the location.
+ * Send push notification to the correct recipient.
+ *
+ * Member → notify admin
+ * Admin → notify this conversation's member
  */
+
+let targetMemberId: string | null = null;
+
 if (sender === "member") {
+  // Member sent location → notify admin
+  targetMemberId =
+    "11111111-1111-1111-1111-111111111111";
+} else {
+  // Admin sent location → notify this member
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("member_id")
+    .eq("id", conversationId)
+    .single();
+
+  targetMemberId =
+    conversation?.member_id ?? null;
+}
+
+if (targetMemberId) {
   void fetch("/api/push/send", {
     method: "POST",
+
     headers: {
       "Content-Type": "application/json",
     },
+
     body: JSON.stringify({
-      title: "MSpace",
-      body: "New location",
+      title:
+        sender === "admin"
+          ? "MSpace Admin"
+          : "MSpace",
+
+      body: "📍 Location",
+
       conversationId,
 
-      // Same admin recipient used by the other notifications.
-      targetMemberId:
-        "11111111-1111-1111-1111-111111111111",
+      targetMemberId,
     }),
   })
     .then(async (pushResponse) => {
-      const pushResult = await pushResponse.text();
+      const pushResult =
+        await pushResponse.text();
 
       console.log(
-        "LOCATION PUSH RESPONSE STATUS:",
+        "LOCATION PUSH STATUS:",
         pushResponse.status
       );
 
       console.log(
-        "LOCATION PUSH RESPONSE BODY:",
+        "LOCATION PUSH BODY:",
         pushResult
       );
 
       if (!pushResponse.ok) {
         console.error(
-          "Location push request failed:",
+          "Location push failed:",
           pushResponse.status,
           pushResult
         );

@@ -52,6 +52,7 @@ const t = {
     loading: "Loading...",
     welcome:
       "Welcome to my personal space. View my exclusive photos, watch my latest videos and chat with me directly.",
+    copyright: "All Rights Reserved",
   },
 
   zh: {
@@ -63,6 +64,7 @@ const t = {
     loading: "加载中...",
     welcome:
       "欢迎来到我的个人空间。查看我的独家照片、观看最新视频，并直接与我聊天。",
+    copyright: "版权所有",
   },
 }[language];
 
@@ -786,7 +788,7 @@ async function loadUnreadCount() {
     borderTop: "1px solid #eee",
   }}
 >
-  © 2026 Donald Lee. All Rights Reserved.
+  ©️ 2026 {language === "zh" ? "黄定襄" : "Huang Dingxiang"}. {t.copyright}
 </footer>
 {selectedPhoto && (
   <div

@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import LocationMessage from "./LocationMessage";
 import {
   Video,
@@ -10,6 +10,7 @@ import {
   MapPin
 } from "lucide-react";
 import VoiceMessage from "./VoiceMessage";
+import VideoMessage from "./VideoMessage";
 
 import LocationThumbnail from "./LocationThumbnail";
 
@@ -21,6 +22,7 @@ type MessagesProps = {
   currentUser: "member" | "admin";
 
   profileName: string;
+  playMenuSound: (unlockOnly?: boolean) => void;
 
   formatTime: (date: string) => string;
   formatDateLabel: (date: string) => string;
@@ -34,11 +36,18 @@ type MessagesProps = {
   setShowVideoViewer: (open: boolean) => void;
 
   setSelectedMessage: (msg: any) => void;
+  selectedMessage: any;
+
   setMenuX: (x: number) => void;
   setMenuY: (y: number) => void;
   setShowMessageMenu: (open: boolean) => void;
 
-  onCancelUpload: (uploadId: string) => void;
+setShowComposer: (open: boolean) => void;
+
+messageFocus: boolean;
+setMessageFocus: (open: boolean) => void;
+
+onCancelUpload: (uploadId: string) => void;
 };
 
 function getEmojiCount(text: string) {
@@ -60,10 +69,56 @@ function getEmojiCount(text: string) {
 
   return emojis.length;
 }
+
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+    const t = {
+  en: {
+    today: "Today",
+    youDeleted: "You deleted this message",
+    messageDeleted: "This message was deleted",
+    location: "Location",
+    video: "Video",
+    photo: "Photo",
+    voiceMessage: "Voice message",
+    showLess: "Show less",
+    loadMore: "Load more",
+    reply: "Reply",
+    sticker: "Sticker",
+    profile: "Profile",
+    you: "You",
+    cancelUpload: "Cancel upload",
+    cancelVideoUpload: "Cancel video upload",
+  },
+
+  zh: {
+    today: "今天",
+    youDeleted: "你删除了这条消息",
+    messageDeleted: "此消息已删除",
+    location: "位置",
+    video: "视频",
+    photo: "照片",
+    voiceMessage: "语音消息",
+    showLess: "收起",
+    loadMore: "加载更多",
+    reply: "回复",
+    sticker: "贴纸",
+    profile: "个人资料",
+    you: "你",
+    cancelUpload: "取消上传",
+    cancelVideoUpload: "取消视频上传",
+  },
+}[language];
+
 export default function Messages({
   messages,
   currentUser,
   profileName,
+  playMenuSound,
   formatTime,
   formatDateLabel,
   isNewDay,
@@ -73,30 +128,237 @@ export default function Messages({
   setViewerVideo,
   setShowVideoViewer,
   setSelectedMessage,
+  selectedMessage,
   setMenuX,
   setMenuY,
   setShowMessageMenu,
-  onCancelUpload,
+  setShowComposer,
+
+messageFocus,
+setMessageFocus,
+
+onCancelUpload,
 }: MessagesProps) {
 
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(
   new Set()
 );
 
+const [messageFocusOffset, setMessageFocusOffset] = useState(0);
+const menuAudioContextRef = useRef<AudioContext | null>(null);
+const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+const unlockMenuAudio = () => {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as any).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    if (!menuAudioContextRef.current) {
+      menuAudioContextRef.current =
+        new AudioContextClass();
+    }
+
+    const audioContext =
+      menuAudioContextRef.current;
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
+    // Tiny silent sound to unlock audio on Safari/iPhone
+    const oscillator =
+      audioContext.createOscillator();
+
+    const gain =
+      audioContext.createGain();
+
+    gain.gain.setValueAtTime(
+      0.0001,
+      audioContext.currentTime
+    );
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start();
+
+    oscillator.stop(
+      audioContext.currentTime + 0.01
+    );
+  } catch {}
+};
+
+const calculateMessageFocus = (
+  msg: any,
+  messageElement: HTMLElement
+) => {
+  const rect = messageElement.getBoundingClientRect();
+
+  const menuWidth = 190;
+
+  const messageType = msg.message_type;
+
+  const isText = messageType === "text";
+
+  const isSaveable =
+    messageType === "image" ||
+    messageType === "video" ||
+    messageType === "voice";
+
+  const isMine = msg.sender === currentUser;
+
+  const itemCount =
+    2 +
+    (isText ? 1 : 0) +
+    (isSaveable ? 1 : 0) +
+    (isMine ? 1 : 0);
+
+  const menuHeight =
+    itemCount * 56 + 16;
+
+  const menuGap = 8;
+
+  // Total height of selected message + menu
+  const groupHeight =
+    rect.height +
+    menuGap +
+    menuHeight;
+
+  // Center the entire message + menu group
+  // in the visible screen.
+  const targetGroupTop =
+    (window.innerHeight - groupHeight) / 2;
+
+  // Positive = move message UP
+  // Negative = move message DOWN
+  const offset =
+    rect.top - targetGroupTop;
+
+  setMessageFocusOffset(offset);
+
+  // Keep the menu attached to the actual message.
+// Do not use the old message-focus offset.
+const screenPadding = 12;
+
+// Estimate the menu height
+
+
+const viewportHeight = window.innerHeight;
+const viewportWidth = window.innerWidth;
+
+// Try below the selected message first
+let menuTop = rect.bottom + menuGap;
+
+// If the menu would go below the screen,
+// place it above the selected message.
+if (
+  menuTop + menuHeight >
+  viewportHeight - screenPadding
+) {
+  menuTop =
+    rect.top - menuHeight - menuGap;
+}
+
+// Make sure it never goes above the screen.
+menuTop = Math.max(
+  screenPadding,
+  menuTop
+);
+
+// Horizontal position
+let menuLeft = isMine
+  ? rect.right - menuWidth
+  : rect.left;
+
+// Keep the menu inside the screen horizontally.
+menuLeft = Math.max(
+  screenPadding,
+  Math.min(
+    menuLeft,
+    viewportWidth - menuWidth - screenPadding
+  )
+);
+
+setMenuX(menuLeft);
+setMenuY(menuTop);
+};
+
 const formatDate = (date: string) => {
   const d = new Date(date);
   const today = new Date();
 
   if (d.toDateString() === today.toDateString()) {
-    return "Today";
-  }
+  return t.today;
+}
 
   return d.toLocaleDateString();
+};
+
+const handleMessageLongPress = (
+  msg: any,
+  messageElement: HTMLElement
+) => {
+  setSelectedMessage(msg);
+  setMessageFocus(true);
+  setShowComposer(false);
+
+  requestAnimationFrame(() => {
+    calculateMessageFocus(
+      msg,
+      messageElement
+    );
+
+    setMessageFocus(true);
+    setShowMessageMenu(true);
+  });
+};
+
+const scrollToRepliedMessage = (msg: any) => {
+  if (!msg?.reply_to_id) return;
+
+  const target = messageRefs.current[msg.reply_to_id];
+
+  if (!target) {
+    console.log(
+      "Original replied message not found:",
+      msg.reply_to_id
+    );
+    return;
+  }
+
+  target.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+  });
+
+  // Temporarily highlight the original message
+  target.style.transition =
+    "background 0.2s ease, box-shadow 0.2s ease";
+
+  target.style.background =
+    "rgba(109, 40, 217, 0.12)";
+
+  target.style.boxShadow =
+    "0 0 0 3px rgba(109, 40, 217, 0.35)";
+
+  setTimeout(() => {
+    target.style.background = "";
+    target.style.boxShadow = "";
+  }, 1200);
 };
 
   return (
     <>
       {messages.map((msg, index) => {
+
+        const displayProgress = Math.min(
+  msg.progress ?? 0,
+  95
+);
+
         const isReplyVideo =
   msg.reply_preview?.toLowerCase().includes("video");
 
@@ -119,7 +381,12 @@ const isReplyLocation =
 
 const isExpanded = expandedMessages.has(msg.id);
 
-  const isStickerReply =
+const isFocused =
+  messageFocus && selectedMessage?.id === msg.id;
+
+const isDeleted = msg.is_deleted === true;
+
+const isStickerReply =
   msg.message_type === "sticker" && !!msg.reply_preview;
 
   const getLocationCoordinates = () => {
@@ -176,17 +443,62 @@ const locationCoordinates = isReplyLocation
       </div>
     )}
 
-    <div
-          key={msg.id}
-          style={{
-            display: "flex",
-          justifyContent:
-              msg.sender === currentUser
-               ? "flex-end"
-              : "flex-start",
-            padding: "6px 0px",
-          }}
-        >
+   <div
+  key={msg.id}
+  ref={(el) => {
+    messageRefs.current[msg.id] = el;
+  }}
+
+  onContextMenu={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setSelectedMessage(msg);
+    setMessageFocus(true);
+
+    const messageElement = e.currentTarget as HTMLElement;
+
+    requestAnimationFrame(() => {
+  calculateMessageFocus(
+    msg,
+    messageElement
+  );
+
+  setMessageFocus(true);
+  setShowMessageMenu(true);
+});
+  }}
+
+  style={{
+    display: "flex",
+    justifyContent:
+      msg.sender === currentUser
+        ? "flex-end"
+        : "flex-start",
+    padding: "6px 0px",
+
+    position: "relative",
+
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+
+    zIndex: isFocused ? 6000 : 1,
+
+    filter: "none",
+
+    opacity: 1,
+
+    transition:
+      "filter 0.2s ease, opacity 0.2s ease, transform 0.2s ease",
+    
+
+  willChange: "auto", 
+
+    
+  transform: "translate3d(0, 0, 0)",
+  }}
+>
           <div
     style={{
   maxWidth:
@@ -198,24 +510,30 @@ width: "fit-content",
   
 
   padding:
-  (
-    msg.message_type === "image" ||
-    msg.message_type === "video" ||
-    msg.message_type === "sticker" ||
-    msg.message_type === "location"
-  ) && !msg.reply_preview
+  isDeleted
+    ? "12px 10px 8px 10px"
+    : (
+        msg.message_type === "image" ||
+        msg.message_type === "video" ||
+        msg.message_type === "sticker" ||
+        msg.message_type === "location"
+      ) && !msg.reply_preview
     ? "0"
     : emojiCount === 1 && !msg.reply_preview
     ? "0"
     : "12px 10px 4px 10px",
 
   borderRadius:
-  (
-    msg.message_type === "image" ||
-    msg.message_type === "video" ||
-    msg.message_type === "sticker" ||
-    msg.message_type === "location"
-  ) && !msg.reply_preview
+  isDeleted
+    ? msg.sender === currentUser
+      ? "18px 18px 4px 18px"
+      : "18px 18px 18px 4px"
+    : (
+        msg.message_type === "image" ||
+        msg.message_type === "video" ||
+        msg.message_type === "sticker" ||
+        msg.message_type === "location"
+      ) && !msg.reply_preview
     ? 0
     : emojiCount === 1 && !msg.reply_preview
     ? 0
@@ -224,12 +542,16 @@ width: "fit-content",
     : "18px 18px 18px 4px",
 
   background:
-  (
-    msg.message_type === "image" ||
-    msg.message_type === "video" ||
-    msg.message_type === "sticker" ||
-    msg.message_type === "location"
-  ) && !msg.reply_preview
+  isDeleted
+    ? msg.sender === currentUser
+      ? "#6d28d9"
+      : "#ffffff"
+    : (
+        msg.message_type === "image" ||
+        msg.message_type === "video" ||
+        msg.message_type === "sticker" ||
+        msg.message_type === "location"
+      ) && !msg.reply_preview
     ? "transparent"
     : emojiCount === 1 && !msg.reply_preview
     ? "transparent"
@@ -243,12 +565,16 @@ width: "fit-content",
       : "#111111",
 
   boxShadow:
-  (
-    msg.message_type === "image" ||
-    msg.message_type === "video" ||
-    msg.message_type === "sticker" ||
-    msg.message_type === "location"
-  ) && !msg.reply_preview
+  isFocused
+    ? "0 0 0 3px rgba(124,58,237,0.45), 0 8px 25px rgba(124,58,237,0.25)"
+    : isDeleted
+    ? "0 2px 8px rgba(0,0,0,.08)"
+    : (
+        msg.message_type === "image" ||
+        msg.message_type === "video" ||
+        msg.message_type === "sticker" ||
+        msg.message_type === "location"
+      ) && !msg.reply_preview
     ? "none"
     : emojiCount === 1 && !msg.reply_preview
     ? "none"
@@ -257,44 +583,79 @@ width: "fit-content",
   whiteSpace: "pre-wrap",
   wordBreak: "break-word",
 }}
-     onContextMenu={(e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  setSelectedMessage(msg);
-  setMenuX(e.clientX);
-  setMenuY(e.clientY);
-  setShowMessageMenu(true);
-}}
+     
 
 onTouchStart={(e) => {
+  const messageElement =
+    e.currentTarget as HTMLElement;
 
-  const touch = e.touches[0];
+  playMenuSound(true);
 
   const timer = setTimeout(() => {
-    setSelectedMessage(msg);
-    setMenuX(touch.clientX);
-    setMenuY(touch.clientY);
-    setShowMessageMenu(true);
+  playMenuSound();
+
+  if ("vibrate" in navigator) {
+    navigator.vibrate(15);
+  }
+
+  setSelectedMessage(msg);
+  setMessageFocus(true);
+  setShowComposer(false);
+
+  requestAnimationFrame(() => {
+      calculateMessageFocus(
+        msg,
+        messageElement
+      );
+
+      setMessageFocus(true);
+      setShowMessageMenu(true);
+    });
+
   }, 500);
 
-  (e.currentTarget as any)._pressTimer = timer;
+  (e.currentTarget as any)._pressTimer =
+    timer;
 }}
 
 onTouchEnd={(e) => {
-  clearTimeout((e.currentTarget as any)._pressTimer);
+  clearTimeout(
+    (e.currentTarget as any)._pressTimer
+  );
 }}
 
 onTouchMove={(e) => {
-  clearTimeout((e.currentTarget as any)._pressTimer);
+  // Allow small natural finger movement
 }}
 
 
 >
+{isDeleted ? (
+  <div
+    style={{
+      fontStyle: "italic",
+      color:
+        msg.sender === currentUser
+          ? "rgba(255,255,255,0.75)"
+          : "#666",
+      fontSize: "14px",
+      paddingBottom: "2px",
+    }}
+  >
+    {msg.sender === currentUser
+  ? `🗑 ${t.youDeleted}`
+  : `🗑 ${t.messageDeleted}`}
+  </div>
+) : (
+  <>
    {msg.reply_preview && (
      <div
-       style={{
-         borderLeft: "4px solid #a78bfa",
+  onClick={(e) => {
+    e.stopPropagation();
+    scrollToRepliedMessage(msg);
+  }}
+  style={{
+    borderLeft: "4px solid #a78bfa",
          background:
   msg.sender === currentUser
     ? "rgba(255,255,255,0.12)"
@@ -316,7 +677,7 @@ onTouchMove={(e) => {
     marginBottom: 6,
   }}
 >
-  {msg.reply_sender === currentUser ? "You" : profileName}
+  {msg.reply_sender === currentUser ? t.you : profileName}
 </div>
 
 
@@ -445,7 +806,7 @@ onTouchMove={(e) => {
       strokeWidth={2.2}
       
     />
-    <span>Location</span>
+    <span>{t.location}</span>
   </>
 ) : msg.reply_preview === "🎥 Video" ? (
   <>
@@ -453,7 +814,7 @@ onTouchMove={(e) => {
       size={16}
       strokeWidth={2.2}
     />
-    <span>Video</span>
+    <span>{t.video}</span>
   </>
 ) : isReplySticker ? null : (
   <>
@@ -461,7 +822,7 @@ onTouchMove={(e) => {
       size={16}
       strokeWidth={2.2}
     />
-    <span>Photo</span>
+    <span>{t.photo}</span>
   </>
 )}
 </div>
@@ -478,7 +839,7 @@ onTouchMove={(e) => {
       marginBottom: 2,
     }}
   >
-    {msg.reply_sender === currentUser ? "You" : profileName}
+    {msg.reply_sender === currentUser ? t.you : profileName}
   </div>
 
   <div
@@ -511,7 +872,7 @@ msg.reply_preview === "🎤 Voice message" ? (
     strokeWidth={2.2}
   />
 
-  <span>Voice message</span>
+  <span>{t.voiceMessage}</span>
 </div>
 
     <span
@@ -560,8 +921,8 @@ msg.reply_preview === "🎤 Voice message" ? (
   >
     {msg.is_deleted
   ? msg.sender === currentUser
-    ? "🗑 You deleted this message"
-    : "🗑 This message was deleted"
+    ? `🗑 ${t.youDeleted}`
+    : `🗑 ${t.messageDeleted}`
       : (
   <div
   style={{
@@ -637,7 +998,7 @@ msg.reply_preview === "🎤 Voice message" ? (
           : "flex-start",
     }}
   >
-    {isExpanded ? "Show less" : "Load more"}
+    {isExpanded ? t.showLess : t.loadMore}
   </button>
 )}
 
@@ -741,10 +1102,6 @@ msg.reply_preview === "🎤 Voice message" ? (
   src={msg.file_url}
   alt="Sticker"
   draggable={false}
-  onContextMenu={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }}
   style={{
     width: "auto",
     height: "160px",
@@ -754,6 +1111,7 @@ msg.reply_preview === "🎤 Voice message" ? (
     boxShadow: "none",
 
     WebkitTouchCallout: "none",
+    pointerEvents: "none",
     WebkitUserSelect: "none",
     userSelect: "none",
   }}
@@ -821,16 +1179,12 @@ msg.reply_preview === "🎤 Voice message" ? (
   >
     <img
       src={msg.file_url}
-      alt="Photo"
+      alt={t.photo}
       onClick={() => {
         setViewerImage(msg.file_url);
-        setViewerName(msg.file_name || "Photo");
+        setViewerName(msg.file_name || t.photo);
         setShowImageViewer(true);
       }}
-  onContextMenu={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-}}
       style={{
   width: "250px",
   height: "320px",
@@ -841,6 +1195,7 @@ msg.reply_preview === "🎤 Voice message" ? (
   background: "#000",
 
   WebkitTouchCallout: "none",
+  pointerEvents: "auto",
   WebkitUserSelect: "none",
   userSelect: "none",
 }}
@@ -859,7 +1214,7 @@ msg.reply_preview === "🎤 Voice message" ? (
       >
         <button
           type="button"
-          aria-label="Cancel upload"
+          aria-label={t.cancelUpload}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -890,7 +1245,7 @@ msg.reply_preview === "🎤 Voice message" ? (
               inset: 0,
               borderRadius: "50%",
               background: `conic-gradient(
-                #ffffff ${(msg.progress ?? 0) * 3.6}deg,
+                #ffffff ${displayProgress * 3.6}deg,
                 rgba(255,255,255,0.25) 0deg
               )`,
               WebkitMask:
@@ -948,102 +1303,82 @@ msg.reply_preview === "🎤 Voice message" ? (
 )}
 
 {msg.message_type === "video" && (
-  <div
-    onClick={() => {
-      setViewerVideo(msg.file_url);
-      setShowVideoViewer(true);
-    }}
-    style={{
-      position: "relative",
-      display: "inline-block",
-      width: "250px",
-      height: "320px",
-      cursor: "pointer",
-      overflow: "hidden",
-      borderRadius: "16px",
-      background: "#000",
-    }}
-  >
-    {msg.uploading ? (
-      <video
-        src={msg.file_url}
-        preload="auto"
-        playsInline
-        muted
-        autoPlay
-        loop
-        onLoadedData={(e) => {
-          const video = e.currentTarget;
-
-          video.pause();
-
-          try {
-            video.currentTime = 0.1;
-          } catch {}
-        }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        style={{
-          width: "250px",
-          height: "320px",
-          display: "block",
-          objectFit: "cover",
-          background: "#000",
-          borderRadius: "16px",
-          WebkitTouchCallout: "none",
-          WebkitUserSelect: "none",
-          userSelect: "none",
-        }}
-      />
-    ) : (
-      <img
-        src={msg.reply_thumbnail_url}
-        alt="Video"
-        draggable={false}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        style={{
-          width: "250px",
-          height: "320px",
-          display: "block",
-          objectFit: "cover",
-          background: "#000",
-          borderRadius: "16px",
-          WebkitTouchCallout: "none",
-          WebkitUserSelect: "none",
-          userSelect: "none",
-        }}
-      />
-    )}
-
-    {/* Center control */}
+  msg.uploading ? (
     <div
       style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        pointerEvents: "none",
+        position: "relative",
+        width: "250px",
+        height: "320px",
+        overflow: "hidden",
+        borderRadius: "16px",
+        background: "#000",
       }}
     >
-      {msg.uploading ? (
+      {/* TEMPORARY VIDEO THUMBNAIL */}
+
+      <video
+  src={msg.file_url}
+  muted
+  playsInline
+  preload="metadata"
+  ref={(video) => {
+    if (video) {
+      video.pause();
+
+      if (video.readyState >= 2) {
+        video.currentTime = 0;
+      }
+    }
+  }}
+  onLoadedMetadata={(e) => {
+    const video = e.currentTarget;
+
+    video.pause();
+    video.currentTime = 0;
+  }}
+  onLoadedData={(e) => {
+    const video = e.currentTarget;
+
+    video.pause();
+    video.currentTime = 0;
+  }}
+  style={{
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+    background: "#000",
+    pointerEvents: "none",
+  }}
+/>
+
+      {/* UPLOAD RING */}
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
         <button
           type="button"
-          aria-label="Cancel upload"
+          aria-label={t.cancelVideoUpload}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
 
-            onCancelUpload(msg.upload_id ?? msg.id);
+            if (msg.upload_id) {
+              onCancelUpload(msg.upload_id);
+            }
           }}
           style={{
             position: "relative",
-            zIndex: 10,
             width: "58px",
             height: "58px",
             borderRadius: "50%",
@@ -1057,22 +1392,25 @@ msg.reply_preview === "🎤 Voice message" ? (
             pointerEvents: "auto",
           }}
         >
-          {/* Progress ring */}
+          {/* PROGRESS RING */}
+
           <div
             style={{
               position: "absolute",
               inset: 0,
               borderRadius: "50%",
               background: `conic-gradient(
-                #ffffff ${(msg.progress ?? 0) * 3.6}deg,
-                rgba(255,255,255,0.25) 0deg
-              )`,
+  #ffffff ${displayProgress * 3.6}deg,
+  rgba(255,255,255,0.25) 0deg
+)`,
               WebkitMask:
                 "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
               mask:
                 "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
             }}
           />
+
+          {/* CANCEL */}
 
           <span
             style={{
@@ -1086,70 +1424,48 @@ msg.reply_preview === "🎤 Voice message" ? (
             ×
           </span>
         </button>
-      ) : (
-        <div
-          style={{
-            width: "46px",
-            height: "46px",
-            borderRadius: "50%",
-            background: "#ffffff",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
-          }}
-        >
-          <div
-            style={{
-              width: 0,
-              height: 0,
-              borderTop: "8px solid transparent",
-              borderBottom: "8px solid transparent",
-              borderLeft: "12px solid #000",
-              marginLeft: "3px",
-            }}
-          />
-        </div>
-      )}
-    </div>
+      </div>
 
-    {/* Timestamp */}
-    <div
-      style={{
-        position: "absolute",
-        right: "8px",
-        bottom: "8px",
-        display: "flex",
-        alignItems: "center",
-        gap: "4px",
-        padding: "2px 6px",
-        borderRadius: "12px",
-        background: "rgba(0,0,0,0.45)",
-        color: "#ffffff",
-        fontSize: "11px",
-        fontWeight: 500,
-        pointerEvents: "none",
-        zIndex: 5,
+      {/* TIMESTAMP */}
+
+      <div
+        style={{
+          position: "absolute",
+          right: 8,
+          bottom: 8,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "2px 6px",
+          borderRadius: "12px",
+          background: "rgba(0,0,0,.45)",
+          color: "#fff",
+          fontSize: "11px",
+          fontWeight: 500,
+          pointerEvents: "none",
+        }}
+      >
+        <span>{formatTime(msg.created_at)}</span>
+      </div>
+    </div>
+  ) : (
+    <VideoMessage
+      msg={msg}
+      currentUser={currentUser}
+      formatTime={formatTime}
+      onOpen={() => {
+        setViewerVideo(msg.file_url);
+        setShowVideoViewer(true);
       }}
-    >
-      <span>{formatTime(msg.created_at)}</span>
-
-      {msg.sender === currentUser && (
-        <span
-          style={{
-            color: msg.is_read ? "#53bdeb" : "#ffffff",
-            fontWeight: 700,
-          }}
-        >
-          {msg.is_read ? "✓✓" : "✓"}
-        </span>
-      )}
-    </div>
-  </div>
+      onClose={() => {
+        setShowVideoViewer(false);
+      }}
+    />
+  )
 )}
 
 
-      {msg.message_type === "voice" && (
+{msg.message_type === "voice" && (
   <VoiceMessage
     msg={msg}
     currentUser={currentUser}
@@ -1162,8 +1478,12 @@ msg.reply_preview === "🎤 Voice message" ? (
     msg={msg}
     currentUser={currentUser}
     formatTime={formatTime}
+    onLongPress={handleMessageLongPress}
   />
 )}
+  </>
+)}
+          
 
 
           </div>

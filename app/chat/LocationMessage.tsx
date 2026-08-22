@@ -7,15 +7,42 @@ type LocationMessageProps = {
   msg: any;
   currentUser: string;
   formatTime: (date: string) => string;
+  onLongPress?: (
+    msg: any,
+    element: HTMLElement
+  ) => void;
 };
 
 export default function LocationMessage({
   msg,
   currentUser,
   formatTime,
+  onLongPress,
 }: LocationMessageProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
+
+ const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const longPressTriggeredRef = useRef(false);
+
+const startLongPress = (element: HTMLElement) => {
+  if (longPressTimerRef.current) {
+    clearTimeout(longPressTimerRef.current);
+  }
+
+  longPressTimerRef.current = setTimeout(() => {
+    onLongPress?.(msg, element);
+  }, 500);
+};
+
+const cancelLongPress = () => {
+  if (longPressTimerRef.current) {
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  }
+};
+
+  
 
   const isMine = msg.sender === currentUser;
 
@@ -155,10 +182,22 @@ attribution.setPosition("bottomleft");
     };
   }, [msg.content]);
 
-  return (
-    <div
-      style={{
-        width: "min(330px, 75vw)",
+ return (
+  <div
+    onPointerDownCapture={(e) => {
+  if (e.pointerType === "touch") {
+    startLongPress(e.currentTarget);
+  }
+}}
+onPointerUpCapture={() => {
+  cancelLongPress();
+}}
+onPointerCancelCapture={() => {
+  cancelLongPress();
+}}
+    
+    style={{
+      width: "min(330px, 75vw)",
         marginLeft: isMine ? "auto" : "0",
         marginRight: isMine ? "0" : "auto",
         marginTop: "4px",
@@ -169,16 +208,22 @@ attribution.setPosition("bottomleft");
         background: "#f5f5f5",
         boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
         cursor: "pointer",
+        WebkitTouchCallout: "none",
       }}
     >
       {/* MAP */}
       <div
-        ref={mapRef}
-        style={{
-          width: "100%",
-          height: "180px",
-        }}
-      />
+  ref={mapRef}
+  style={{
+    width: "100%",
+    height: "180px",
+    pointerEvents: "none",
+    touchAction: "manipulation",
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+  }}
+/>
 
       {/* TIME + CHECK */}
       <div

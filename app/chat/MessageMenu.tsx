@@ -6,6 +6,29 @@ import {
   Trash,
 } from "lucide-react";
 
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    reply: "Reply",
+    copy: "Copy",
+    save: "Save",
+    deleteForMe: "Delete for me",
+    deleteForEveryone: "Delete for everyone",
+  },
+
+  zh: {
+    reply: "回复",
+    copy: "复制",
+    save: "保存",
+    deleteForMe: "删除此消息",
+    deleteForEveryone: "删除所有人",
+  },
+}[language];
 
 type MessageMenuProps = {
   open: boolean;
@@ -34,31 +57,65 @@ export default function MessageMenu({
   onDeleteForMe,
   onDeleteForEveryone,
 }: MessageMenuProps) {
-
   if (!open || !selectedMessage) return null;
 
+  // Message type
+  const messageType = selectedMessage?.message_type;
+
+  const isText = messageType === "text";
+
+  const isSaveable =
+    messageType === "image" ||
+    messageType === "video";
+
+  const isSticker = messageType === "sticker";
+
+  const isMine =
+    selectedMessage?.sender === currentUser;
+
+  /*
+    FINAL MENU RULES
+
+    Text:
+      Reply
+      Copy
+      Delete for me
+      Delete for everyone if mine
+
+    Image / Video:
+      Reply
+      Save
+      Delete for me
+      Delete for everyone if mine
+
+    Voice:
+      Reply
+      Delete for me
+      Delete for everyone if mine
+
+    Sticker:
+      Reply
+      Delete for me
+      Delete for everyone if mine
+  */
+
+  const itemCount =
+    2 + // Reply + Delete for me
+    (isText ? 1 : 0) +
+    (isSaveable ? 1 : 0) +
+    (isMine ? 1 : 0);
+
   const menuWidth = 190;
-const menuHeight =
-  selectedMessage?.sender === currentUser
-    ? 232
-    : 176;
+  const menuHeight = itemCount * 56 + 16;
 
-const padding = 12;
+  const padding = 12;
 
-const safeX = Math.min(
-  Math.max(x, padding),
-  window.innerWidth - menuWidth - padding
-);
+  const safeX = Math.min(
+    Math.max(x, padding),
+    window.innerWidth - menuWidth - padding
+  );
 
-let safeY = y;
-
-const bottomSpace = window.innerHeight - y;
-
-if (bottomSpace < menuHeight + padding) {
-  safeY = y - menuHeight - padding;
-}
-
-safeY = Math.max(safeY, padding);
+  const safeY = y;
 
   return (
     <div
@@ -69,238 +126,261 @@ safeY = Math.max(safeY, padding);
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
-        background: "rgba(0,0,0,0.15)",
-        zIndex: 9999,
+
+        background: "transparent",
+        zIndex: 4000,
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-  position: "absolute",
-  top: safeY,
-  left: safeX,
-  userSelect: "none",
-  WebkitUserSelect: "none",
-  WebkitTouchCallout: "none",
+          position: "absolute",
+          top: safeY,
+          left: safeX,
 
-  width: 190,
+          zIndex: 7000,
 
-  background:
-    "linear-gradient(180deg,#ffffff,#faf5ff)",
+          width: 190,
 
-  border: "1px solid #ede9fe",
+          background:
+            "linear-gradient(180deg,#ffffff,#faf5ff)",
 
-  borderRadius: "18px",
+          border: "1px solid #ede9fe",
 
-  boxShadow:
-    "0 18px 45px rgba(124,58,237,.18)",
+          borderRadius: "18px",
 
-  backdropFilter: "blur(16px)",
+          boxShadow:
+            "0 18px 45px rgba(124,58,237,.18)",
 
-  padding: "8px",
+          backdropFilter: "blur(16px)",
 
-  overflow: "hidden",
-}}
+          padding: "8px",
+
+          overflow: "hidden",
+        }}
       >
+
+        {/* REPLY */}
         <div
-  onClick={onReply}
-  onMouseEnter={(e)=>{
-    e.currentTarget.style.background="#f5f3ff";
-  }}
-  onMouseLeave={(e)=>{
-    e.currentTarget.style.background="transparent";
-  }}
-  style={{
-    display:"flex",
-    alignItems:"center",
-    gap:"12px",
+          onClick={() => {
+            onReply();
+            onClose();
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f5f3ff";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "13px 14px",
+            borderRadius: "12px",
+            cursor: "pointer",
+            transition: "0.2s",
+            fontWeight: 400,
+            fontSize: "14px",
+          }}
+        >
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              background: "#f5f3ff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Reply size={15} color="#7c3aed" />
+          </div>
 
-    padding:"13px 14px",
+          {t.reply}
+        </div>
 
-    borderRadius:"12px",
 
-    cursor:"pointer",
+        {/* COPY — TEXT ONLY */}
+        {isText && (
+          <div
+            onClick={() => {
+              onCopy();
+              onClose();
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#f5f3ff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "13px 14px",
+              borderRadius: "12px",
+              cursor: "pointer",
+              transition: "0.2s",
+              fontWeight: 400,
+              fontSize: "14px",
+            }}
+          >
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: "#f8f8f8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Copy size={15} color="#555" />
+            </div>
 
-    transition:"0.2s",
+            {t.copy}
+          </div>
+        )}
 
-    fontWeight:400,
-    fontSize: "14px",
-  }}
->
-  <div
-  style={{
-    width: 30,
-    height: 30,
-    borderRadius: "50%",
 
-    background: "#f5f3ff",
+        {/* SAVE — PHOTO / VIDEO ONLY */}
+        {isSaveable && (
+          <div
+            onClick={() => {
+              onSave();
+              onClose();
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#f5f3ff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "13px 14px",
+              borderRadius: "12px",
+              cursor: "pointer",
+              transition: "0.2s",
+              fontWeight: 400,
+              fontSize: "14px",
+            }}
+          >
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: "#f8f8f8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Download size={15} color="#555" />
+            </div>
 
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
+            {t.save}
+          </div>
+        )}
 
-    flexShrink: 0,
-  }}
->
-  <Reply size={15} color="#7c3aed" />
-</div>
-  Reply
-</div>
 
+        {/* DELETE FOR ME — EVERY MESSAGE TYPE */}
         <div
-  onClick={onCopy}
-  onMouseEnter={(e)=>{
-    e.currentTarget.style.background="#f5f3ff";
-  }}
-  onMouseLeave={(e)=>{
-    e.currentTarget.style.background="transparent";
-  }}
-  style={{
-    display:"flex",
-    alignItems:"center",
-    gap:"12px",
+          onClick={() => {
+            onDeleteForMe();
+            onClose();
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f5f3ff";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "13px 14px",
+            borderRadius: "12px",
+            cursor: "pointer",
+            transition: "0.2s",
+            fontWeight: 400,
+            fontSize: "14px",
+          }}
+        >
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              background: "#f8f8f8",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Trash2 size={15} color="#666" />
+          </div>
 
-    padding:"13px 14px",
+          {t.deleteForMe}
+        </div>
 
-    borderRadius:"12px",
 
-    cursor:"pointer",
+        {/* DELETE FOR EVERYONE — ONLY YOUR MESSAGE */}
+        {isMine && (
+          <div
+            onClick={() => {
+              onDeleteForEveryone();
+              onClose();
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#fef2f2";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "13px 14px",
+              borderRadius: "12px",
+              cursor: "pointer",
+              transition: "0.2s",
+              color: "#ef4444",
+              fontWeight: 500,
+              fontSize: "14px",
+            }}
+          >
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
+                background: "#fef2f2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Trash size={15} color="#ef4444" />
+            </div>
 
-    transition:"0.2s",
+            {t.deleteForEveryone}
+          </div>
+        )}
 
-    fontWeight:400,
-    fontSize: "14px",
-  }}
->
-  <div
-  style={{
-    width: 30,
-    height: 30,
-    borderRadius: "50%",
-    background: "#f8f8f8",
-
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-
-    flexShrink: 0,
-  }}
->
-  <Copy size={15} color="#555" />
-</div>
-  Copy
-</div>
-
-<div
-  onClick={onSave}
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    padding: "12px 18px",
-    cursor: "pointer",
-  }}
->
-  <Download
-    size={18}
-    strokeWidth={2}
-  />
-
-  <span>Save</span>
-</div>
-
-        <div
-  onClick={onDeleteForMe}
-  onMouseEnter={(e)=>{
-    e.currentTarget.style.background="#f5f3ff";
-  }}
-  onMouseLeave={(e)=>{
-    e.currentTarget.style.background="transparent";
-  }}
-  style={{
-    display:"flex",
-    alignItems:"center",
-    gap:"12px",
-
-    padding:"13px 14px",
-
-    borderRadius:"12px",
-
-    cursor:"pointer",
-
-    transition:"0.2s",
-
-    fontWeight:400,
-    fontSize: "14px",
-  }}
->
-  <div
-  style={{
-    width: 30,
-    height: 30,
-    borderRadius: "50%",
-    background: "#f8f8f8",
-
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-
-    flexShrink: 0,
-  }}
->
-  <Trash2 size={15} color="#666" />
-</div>
-  Delete for me
-</div>
-
-       {selectedMessage?.sender === currentUser && (
-  <div
-    onClick={onDeleteForEveryone}
-    onMouseEnter={(e)=>{
-      e.currentTarget.style.background="#fef2f2";
-    }}
-    onMouseLeave={(e)=>{
-      e.currentTarget.style.background="transparent";
-    }}
-    style={{
-      display:"flex",
-      alignItems:"center",
-      gap:"12px",
-
-      padding:"13px 14px",
-
-      borderRadius:"12px",
-
-      cursor:"pointer",
-
-      transition:"0.2s",
-
-      color:"#ef4444",
-
-      fontWeight:500,
-      fontSize: "14px",
-    }}
-  >
-    <div
-  style={{
-    width: 30,
-    height: 30,
-    borderRadius: "50%",
-
-    background: "#fef2f2",
-
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-
-    flexShrink: 0,
-  }}
->
-  <Trash size={15} color="#ef4444" />
-</div>
-    Delete for everyone
-  </div>
-)}
       </div>
     </div>
   );

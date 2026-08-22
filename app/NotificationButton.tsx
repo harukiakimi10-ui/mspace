@@ -3,6 +3,26 @@
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    enableNotifications: "Enable Notifications",
+    notificationsEnabled:
+      "Notifications are enabled successfully.",
+  },
+
+  zh: {
+    enableNotifications: "启用通知",
+    notificationsEnabled:
+      "通知已成功启用。",
+  },
+}[language];
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding =
     "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -18,7 +38,13 @@ function urlBase64ToUint8Array(base64String: string) {
   );
 }
 
-export default function NotificationButton() {
+type NotificationButtonProps = {
+  isAdmin?: boolean;
+};
+
+export default function NotificationButton({
+  isAdmin = false,
+}: NotificationButtonProps) {
   // IMPORTANT:
   // Always start with "default" so server and client
   // render the same HTML.
@@ -47,9 +73,6 @@ const [checking, setChecking] = useState(true);
 
       const memberId =
         localStorage.getItem("mspace_member_id");
-
-      const isAdmin =
-        localStorage.getItem("mspace_admin") === "true";
 
       const ADMIN_ID =
         "11111111-1111-1111-1111-111111111111";
@@ -134,11 +157,58 @@ const [checking, setChecking] = useState(true);
         return;
       }
 
-      const registration =
-        await navigator.serviceWorker.ready;
+      if (
+  window.location.protocol !== "https:" &&
+  window.location.hostname !== "localhost" &&
+  window.location.hostname !== "127.0.0.1"
+) {
+  return;
+}
 
-      const publicKey =
-        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      let registration =
+  await navigator.serviceWorker.getRegistration("/");
+
+if (!registration) {
+  registration =
+    await navigator.serviceWorker.register("/sw.js", {
+      scope: "/",
+    });
+}
+
+await registration.update();
+
+if (!registration.active) {
+  const worker =
+    registration.installing ||
+    registration.waiting;
+
+  if (worker) {
+    await new Promise<void>((resolve) => {
+      if (worker.state === "activated") {
+        resolve();
+        return;
+      }
+
+      worker.addEventListener(
+        "statechange",
+        () => {
+          if (worker.state === "activated") {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+}
+
+if (!registration.active) {
+  throw new Error(
+    "MSpace service worker is not active yet. Please try again."
+  );
+}
+
+const publicKey =
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
       if (!publicKey) {
         throw new Error(
@@ -161,8 +231,6 @@ const [checking, setChecking] = useState(true);
       const memberId =
   localStorage.getItem("mspace_member_id");
 
-const isAdmin =
-  localStorage.getItem("mspace_admin") === "true";
 
 const ADMIN_ID =
   "11111111-1111-1111-1111-111111111111";
@@ -208,8 +276,8 @@ const finalMemberId = isAdmin
       setSaved(true);
 
       alert(
-        "Notifications are enabled successfully."
-      );
+  t.notificationsEnabled
+);
     } catch (error: any) {
       console.error(
         "MSpace notification setup error:",
@@ -271,7 +339,7 @@ const finalMemberId = isAdmin
           strokeWidth={2.3}
         />
 
-        <span>Enable Notifications</span>
+        <span>{t.enableNotifications}</span>
       </button>
     )}
 

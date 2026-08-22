@@ -35,9 +35,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const title = body.title || "MSpace";
-
-const message =
+    const message =
   body.body || "You have a new message.";
 
 // Keep push notification payload small.
@@ -63,6 +61,102 @@ const notificationBody =
       "Push notification target:",
       targetMemberId
     );
+
+    // --------------------------------------------------
+// Determine the sender's profile for the notification
+// --------------------------------------------------
+
+let senderName = "MSpace";
+let senderPhoto = "/mspace-notification-icon.jpeg";
+
+const conversationId = body.conversationId;
+
+if (conversationId) {
+  if (targetMemberId === ADMIN_ID) {
+    // Member → Admin
+    // The recipient is the admin, so the sender is
+    // the member belonging to this conversation.
+
+    const {
+      data: conversation,
+      error: conversationError,
+    } = await supabase
+      .from("conversations")
+      .select("member_id")
+      .eq("id", conversationId)
+      .single();
+
+    if (conversationError) {
+      console.error(
+        "Conversation lookup error:",
+        conversationError
+      );
+    }
+
+    if (conversation?.member_id) {
+      const {
+        data: member,
+        error: memberError,
+      } = await supabase
+        .from("members")
+        .select("name, photo_url")
+        .eq("member_id", conversation.member_id)
+        .single();
+
+      if (memberError) {
+        console.error(
+          "Member profile lookup error:",
+          memberError
+        );
+      }
+
+      if (member) {
+        senderName =
+          member.name || "MSpace Member";
+
+        senderPhoto =
+  member.photo_url || "/mspace-notification-icon.jpeg";
+      }
+    }
+  } else {
+  // Admin → Member
+  // The admin profile is stored in the settings table.
+
+  const {
+    data: settings,
+    error: settingsError,
+  } = await supabase
+    .from("settings")
+    .select("profile_name, profile_photo")
+    .eq("id", 1)
+    .single();
+
+  if (settingsError) {
+    console.error(
+      "Admin settings lookup error:",
+      settingsError
+    );
+  }
+
+  if (settings) {
+    senderName =
+      settings.profile_name || "MSpace";
+
+    senderPhoto =
+  settings.profile_photo || "/mspace-notification-icon.jpeg";
+  }
+}
+}
+
+console.log(
+  "Notification sender:",
+  senderName
+);
+
+console.log(
+  "Notification sender photo:",
+  senderPhoto
+);
 
     const {
       data: subscriptions,
@@ -93,24 +187,50 @@ const notificationBody =
     }
 
     if (
-      !subscriptions ||
-      subscriptions.length === 0
-    ) {
-      return Response.json(
-        {
-          error:
-            "No push subscription found for target",
-          targetMemberId,
-        },
-        { status: 404 }
-      );
+  !subscriptions ||
+  subscriptions.length === 0
+) {
+  console.error(
+    "NO PUSH SUBSCRIPTION FOR TARGET:",
+    {
+      targetMemberId,
+      conversationId,
     }
+  );
+
+  return Response.json(
+    {
+      success: false,
+      error:
+        "No push subscription found for target",
+      targetMemberId,
+      conversationId,
+    },
+    { status: 404 }
+  );
+}
+
+console.log(
+  "FOUND PUSH SUBSCRIPTIONS:",
+  subscriptions.map((row) => ({
+    id: row.id,
+    member_id: row.member_id,
+    endpoint:
+      row.subscription?.endpoint
+        ? row.subscription.endpoint.substring(0, 80) + "..."
+        : null,
+  }))
+);
 
     const payload = JSON.stringify({
-  title,
+  title: senderName,
   body: notificationBody,
-  icon: "/icon-192.png",
-  badge: "/icon-192.png",
+
+  // Sender's profile picture
+  icon: senderPhoto,
+
+  // MSpace branding
+badge: "/mspace-notification-icon.jpeg",
 });
 
     const results = [];
@@ -138,21 +258,13 @@ const notificationBody =
           error
         );
 
-        // Remove expired/invalid subscriptions.
-        if (
-          error?.statusCode === 404 ||
-          error?.statusCode === 410
-        ) {
-          await supabase
-            .from("push_subscriptions")
-            .delete()
-            .eq("id", row.id);
-
-          console.log(
-            "Removed expired push subscription:",
-            row.id
-          );
-        }
+        console.error("PUSH DELIVERY DETAILS:", {
+  name: error?.name,
+  message: error?.message,
+  statusCode: error?.statusCode,
+  body: error?.body,
+  headers: error?.headers,
+});
 
         results.push({
           id: row.id,

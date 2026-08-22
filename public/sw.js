@@ -15,8 +15,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body || "You have a new message.",
-    icon: data.icon || "/icon-192.png",
-    badge: data.badge || "/icon-192.png",
+    icon: data.icon || "/mspace-notification-icon.jpeg",
+    badge: data.badge || "/mspace-notification-icon.jpeg",
     data: {
       url: data.url || "/members",
     },

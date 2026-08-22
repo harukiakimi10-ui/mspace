@@ -150,7 +150,9 @@ await Promise.all(
 
     const { data: lastMessage } = await supabase
       .from("messages")
-      .select("content, message_type, sender, created_at")
+      .select(
+  "content, message_type, sender, created_at, file_duration, is_deleted"
+)
       .eq("conversation_id", conversation.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -281,7 +283,7 @@ console.log("Inserted admin message:", data);
     padding: "8px 0 4px",
   }}
 >
-  <NotificationButton />
+  <NotificationButton isAdmin={true} />
 </div>
       </div>
 

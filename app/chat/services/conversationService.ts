@@ -68,13 +68,70 @@ export async function updateOnlineStatus(
   memberId: string,
   online: boolean
 ) {
-  const { error } = await supabase
-    .from("members")
-    .update({
-      is_online: online,
-      last_seen: new Date().toISOString(),
-    })
-    .eq("member_id", memberId);
+  if (!memberId) {
+    console.error("ONLINE STATUS: memberId is missing");
+    return;
+  }
 
-  if (error) throw error;
+  const now = new Date().toISOString();
+
+  console.log("ONLINE STATUS UPDATE:", {
+    memberId,
+    online,
+    now,
+  });
+
+  try {
+    const { data, error } = await supabase
+      .from("members")
+      .update(
+        online
+          ? {
+              is_online: true,
+              online_at: now,
+            }
+          : {
+              is_online: false,
+              online_at: null,
+              last_seen: now,
+            }
+      )
+      .eq("member_id", memberId)
+      .select("member_id,is_online,online_at,last_seen");
+
+    if (error) {
+      console.error("ONLINE STATUS SUPABASE ERROR:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+
+      return;
+    }
+
+    console.log(
+      "ONLINE STATUS UPDATE SUCCESS:",
+      data
+    );
+
+    if (!data || data.length === 0) {
+      console.error(
+        "ONLINE STATUS: No member row was updated.",
+        {
+          memberId,
+        }
+      );
+    }
+  } catch (error: any) {
+    console.error(
+      "ONLINE STATUS NETWORK ERROR:",
+      {
+        message: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+        error,
+      }
+    );
+  }
 }

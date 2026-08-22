@@ -9,9 +9,12 @@ import {
 } from "lucide-react";
 import { premiumButton } from "./premiumButton";
 
+
 type MessageInputProps = {
   message: string;
   messageInputRef: React.RefObject<HTMLTextAreaElement | null>;
+
+  placeholder: string;
 
   sendMessage: () => void;
 
@@ -41,6 +44,7 @@ type MessageInputProps = {
 export default function MessageInput({
   message,
   messageInputRef,
+  placeholder,
   sendMessage,
   onAttach,
   uploading,
@@ -118,6 +122,7 @@ export default function MessageInput({
 
       <textarea
   ref={messageInputRef}
+  id="mspace-message-input"
   value={message}
   onChange={onInput}
   onKeyDown={(e) => {
@@ -135,7 +140,7 @@ export default function MessageInput({
 }}
   onPointerDown={onFocusInput}
   
-  placeholder="Type a message..."
+  placeholder={placeholder}
   rows={1}
         style={{
           flex: 1,

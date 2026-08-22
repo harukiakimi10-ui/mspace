@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   description: "MSpace Social Platform",
   manifest: "/manifest.json",
   icons: {
-  icon: "/mspace-icon.png",
-  apple: "/mspace-icon.png",
+  icon: "/mspace-notification-icon.jpeg",
+  apple: "/mspace-notification-icon.jpeg",
 },
 };
 

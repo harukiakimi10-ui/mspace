@@ -15,44 +15,67 @@ export default function ImageViewer({
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.95)",
+        width: "100vw",
+        height: "100dvh",
+        background: "#000",
         display: "flex",
-        justifyContent: "center",
         alignItems: "center",
+        justifyContent: "center",
         zIndex: 9999,
+        overflow: "hidden",
+        touchAction: "none",
       }}
     >
+      {/* CLOSE BUTTON */}
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
+        type="button"
+        onClick={onClose}
+        aria-label="Close photo"
         style={{
           position: "absolute",
-          top: 20,
-          right: 20,
-          background: "transparent",
-          border: "none",
+          top: "calc(env(safe-area-inset-top) + 12px)",
+          left: 14,
+          width: 44,
+          height: 44,
+          borderRadius: "50%",
+          border: "1px solid rgba(255,255,255,0.25)",
+          background: "rgba(0,0,0,0.5)",
           color: "#fff",
-          fontSize: "32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          zIndex: 50,
           cursor: "pointer",
         }}
       >
-        ✕
+        <span
+          style={{
+            fontSize: 32,
+            fontWeight: 300,
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </span>
       </button>
 
+      {/* PHOTO */}
       <img
         src={image}
         alt={name}
-        onClick={(e) => e.stopPropagation()}
+        draggable={false}
         style={{
-          maxWidth: "95%",
-          maxHeight: "95%",
+          width: "100%",
+          height: "100%",
           objectFit: "contain",
+          display: "block",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          WebkitTouchCallout: "none",
         }}
       />
     </div>

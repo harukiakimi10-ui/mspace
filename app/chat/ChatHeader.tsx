@@ -11,6 +11,26 @@ type ChatHeaderProps = {
   onBack: () => void;
 };
 
+const language =
+  typeof navigator !== "undefined" &&
+  navigator.language.startsWith("zh")
+    ? "zh"
+    : "en";
+
+const t = {
+  en: {
+    typing: "Typing...",
+    online: "Online",
+    lastSeen: "Last seen",
+  },
+
+  zh: {
+    typing: "正在输入...",
+    online: "在线",
+    lastSeen: "最后上线",
+  },
+}[language];
+
 export default function ChatHeader({
   profileName,
   profilePhoto,
@@ -137,12 +157,12 @@ useEffect(() => {
   }}
 >
   {conversation?.admin_typing
-    ? "Typing..."
+    ? t.typing
     : admin
     ? admin.is_online
-      ? "Online"
+      ? t.online
       : admin.last_seen
-      ? `Last seen ${formatLastSeen(admin.last_seen)}`
+      ? `${t.lastSeen} ${formatLastSeen(admin.last_seen)}`
       : ""
     : ""}
 </div>

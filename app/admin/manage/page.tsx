@@ -23,10 +23,6 @@ const [onlineCount, setOnlineCount] = useState(0);
 const [totalMembers, setTotalMembers] = useState(0);
 const [bannedCount, setBannedCount] = useState(0);
 
-const [conversations, setConversations] = useState<any[]>([]);
-const [selectedConversation, setSelectedConversation] = useState<any>(null);
-const [chatMessages, setChatMessages] = useState<any[]>([]);
-const [reply, setReply] = useState("");
 
   useEffect(() => {
     const admin =
@@ -46,7 +42,7 @@ const [reply, setReply] = useState("");
   loadVideos();
   loadMembers();
   loadVisits();
-  loadConversations();
+  
 
   const interval = setInterval(() => {
     loadMembers();
@@ -196,97 +192,7 @@ async function loadVisits() {
   }
 }
 
-async function loadConversations() {
-  const supabase = createClient();
 
-  // Load conversations
-  const { data: conversationsData } = await supabase
-    .from("conversations")
-    .select("*")
-    .order("updated_at", { ascending: false });
-
-  if (!conversationsData) return;
-
-  // Load members
-  const { data: membersData } = await supabase
-    .from("members")
-    .select("member_id, name, photo_url");
-
-  const memberMap = new Map();
-
-  membersData?.forEach((member) => {
-    memberMap.set(member.member_id, member);
-  });
-
-  // Remove orphan conversations
-  const validConversations = conversationsData.filter((conversation) =>
-    memberMap.has(conversation.member_id)
-  );
-
-  // Automatically delete orphan conversations
-  const orphanConversations = conversationsData.filter(
-    (conversation) => !memberMap.has(conversation.member_id)
-  );
-
-  for (const orphan of orphanConversations) {
-    await supabase
-      .from("messages")
-      .delete()
-      .eq("conversation_id", orphan.id);
-
-    await supabase
-      .from("conversations")
-      .delete()
-      .eq("id", orphan.id);
-  }
-
-  // Attach member info
-  const finalData = validConversations.map((conversation) => ({
-    ...conversation,
-    members: memberMap.get(conversation.member_id),
-  }));
-
-  setConversations(finalData);
-}
-
-async function openConversation(conversation: any) {
-  setSelectedConversation(conversation);
-
-  const supabase = createClient();
-
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("conversation_id", conversation.id)
-    .order("created_at", { ascending: true });
-
-  if (data) {
-    setChatMessages(data);
-  }
-}
-
-async function sendReply() {
-  if (!selectedConversation || !reply.trim()) return;
-
-  const supabase = createClient();
-
-  const { data } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: selectedConversation.id,
-      sender: "admin",
-      message_type: "text",
-      content: reply,
-      is_read: false,
-    })
-    .select()
-    .single();
-
-  if (data) {
-    setChatMessages([...chatMessages, data]);
-    setReply("");
-  }
-}
 
 async function uploadPhoto() {
   if (!photoFile) {
@@ -528,11 +434,7 @@ async function deleteMember(id: number) {
     return;
   }
 
-  setSelectedConversation(null);
-  setChatMessages([]);
-
   loadMembers();
-  loadConversations();
 
   alert("Member deleted successfully.");
 }
@@ -1177,105 +1079,6 @@ function getLastSeenText(lastSeen: string | null) {
       </small>
     </div>
   ))}
-</div>
-<h2 style={{ marginTop: "40px" }}>Member Chats</h2>
-
-<div
-  style={{
-    display: "flex",
-    gap: "20px",
-    marginTop: "20px",
-  }}
->
-  <div
-    style={{
-      width: "300px",
-      border: "1px solid #ddd",
-      borderRadius: "10px",
-      padding: "10px",
-      maxHeight: "500px",
-      overflowY: "auto",
-    }}
-  >
-    <p>Total conversations: {conversations.length}</p>
-    {conversations.map((conversation) => (
-      <div
-        key={conversation.id}
-        onClick={() => openConversation(conversation)}
-        style={{
-          padding: "12px",
-          borderBottom: "1px solid #eee",
-          cursor: "pointer",
-        }}
-      >
-        <strong>
-          {conversation.members?.name || "Unknown Member"}
-        </strong>
-      </div>
-    ))}
-  </div>
-
-  <div
-    style={{
-      flex: 1,
-      border: "1px solid #ddd",
-      borderRadius: "10px",
-      padding: "15px",
-    }}
-  >
-    <div
-      style={{
-        height: "400px",
-        overflowY: "auto",
-        marginBottom: "15px",
-      }}
-    >
-      {chatMessages.map((msg) => (
-        <div
-          key={msg.id}
-          style={{
-            textAlign:
-              msg.sender === "admin" ? "right" : "left",
-            marginBottom: "10px",
-          }}
-        >
-          <span
-            style={{
-              display: "inline-block",
-              background:
-                msg.sender === "admin"
-                  ? "#7c3aed"
-                  : "#eeeeee",
-              color:
-                msg.sender === "admin"
-                  ? "#fff"
-                  : "#000",
-              padding: "10px",
-              borderRadius: "12px",
-            }}
-          >
-            {msg.content}
-          </span>
-        </div>
-      ))}
-    </div>
-
-    <div style={{ display: "flex", gap: "10px" }}>
-      <input
-        value={reply}
-        onChange={(e) => setReply(e.target.value)}
-        placeholder="Reply..."
-        style={{
-          flex: 1,
-          padding: "10px",
-        }}
-      />
-
-      <button onClick={sendReply}>
-        Send
-      </button>
-    </div>
-  </div>
 </div>
 
 </div>
