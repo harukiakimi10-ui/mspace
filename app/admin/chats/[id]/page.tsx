@@ -2718,6 +2718,7 @@ setMessageFocus={setMessageFocus}
 
 
     <ChatComposer
+    placeholder="Type a message..."
   showComposer={showComposer}
 
   message={reply}
