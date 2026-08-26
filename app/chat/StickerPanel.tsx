@@ -39,15 +39,15 @@ export default function StickerPanel({
     pointerEvents: "none",
   }}
 />
-      {/* Panel */}
       <div
-        style={{
-          position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
+  data-mspace-sticker-panel="true"
+  style={{
+    position: "fixed",
+    left: 0,
+    right: 0,
+    bottom: 0,
 
-          background: "#fff",
+    background: "#fff",
 
           borderTopLeftRadius: 0,
           borderTopRightRadius: 0,

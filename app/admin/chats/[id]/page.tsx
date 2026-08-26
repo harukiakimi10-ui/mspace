@@ -1347,7 +1347,42 @@ async function markMessagesAsRead() {
     .eq("conversation_id", id)
     .eq("sender", "member")
     .eq("is_read", false);
+
+    // Update the MSpace Home Screen badge
+const { count: unreadCount, error: unreadCountError } =
+  await supabase
+    .from("messages")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .eq("sender", "member")
+    .eq("is_read", false);
+
+if (unreadCountError) {
+  console.error(
+    "MSpace unread badge count error:",
+    unreadCountError
+  );
+} else {
+  try {
+    const registration =
+      await navigator.serviceWorker.ready;
+
+    registration.active?.postMessage({
+      type: "MSPACE_UPDATE_BADGE",
+      count: unreadCount ?? 0,
+    });
+  } catch (error) {
+    console.error(
+      "MSpace service worker badge update error:",
+      error
+    );
+  }
 }
+}
+
+
 
 
 function getReplyData(message: any) {

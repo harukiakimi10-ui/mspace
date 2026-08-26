@@ -379,6 +379,11 @@ const isReplyLocation =
   msg.message_type === "text" &&
   (msg.content || "").length > 500;
 
+  const isShortText =
+  msg.message_type === "text" &&
+  (msg.content || "").length <= 25 &&
+  emojiCount === 0;
+
 const isExpanded = expandedMessages.has(msg.id);
 
 const isFocused =
@@ -475,7 +480,11 @@ const locationCoordinates = isReplyLocation
       msg.sender === currentUser
         ? "flex-end"
         : "flex-start",
-    padding: "6px 0px",
+    padding:
+  msg.message_type === "video" &&
+  msg.sender === currentUser
+    ? "6px 8px"
+    : "6px 0px",
 
     position: "relative",
 
@@ -507,6 +516,12 @@ const locationCoordinates = isReplyLocation
     : "70%",
 
 width: "fit-content",
+
+marginRight:
+      msg.sender === currentUser &&
+      msg.message_type === "video"
+        ? "16px"
+        : "0",
   
 
   padding:
@@ -521,6 +536,8 @@ width: "fit-content",
     ? "0"
     : emojiCount === 1 && !msg.reply_preview
     ? "0"
+    : msg.message_type === "text"
+    ? "7px 10px 4px 10px"
     : "12px 10px 4px 10px",
 
   borderRadius:
@@ -933,11 +950,11 @@ msg.reply_preview === "🎤 Voice message" ? (
   style={{
     display: "inline-flex",
     flexDirection: "column",
-    alignItems:  
+    alignItems:
       msg.sender === currentUser
         ? "flex-end"
         : "flex-start",
-        
+    position: "relative",
   }}
 >
   {msg.message_type !== "location" && (

@@ -45,6 +45,10 @@ type NotificationButtonProps = {
 export default function NotificationButton({
   isAdmin = false,
 }: NotificationButtonProps) {
+
+  const isWeChat =
+    typeof navigator !== "undefined" &&
+    /MicroMessenger/i.test(navigator.userAgent);
   // IMPORTANT:
   // Always start with "default" so server and client
   // render the same HTML.
@@ -59,9 +63,17 @@ const [checking, setChecking] = useState(true);
   useEffect(() => {
   const checkSavedSubscription = async () => {
     setMounted(true);
+
+    if (isWeChat) {
+      setChecking(false);
+      return;
+    }
+
     setChecking(true);
 
     try {
+
+      
       if (
         !("Notification" in window) ||
         !("serviceWorker" in navigator)
@@ -127,7 +139,7 @@ const [checking, setChecking] = useState(true);
   };
 
   checkSavedSubscription();
-}, []);
+}, [isWeChat]);
 
   const enableNotifications = async () => {
     try {
@@ -293,9 +305,9 @@ const finalMemberId = isAdmin
   };
 
   // Prevent server/client mismatch.
-  if (!mounted) {
-    return null;
-  }
+  if (!mounted || isWeChat) {
+  return null;
+}
 
  return (
   <>

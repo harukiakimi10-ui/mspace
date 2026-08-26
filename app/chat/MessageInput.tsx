@@ -143,19 +143,25 @@ export default function MessageInput({
   placeholder={placeholder}
   rows={1}
         style={{
-          flex: 1,
-          minHeight: "38px",
-          maxHeight: "140px",
-          padding: "7px 14px",
-          borderRadius: "20px",
-          border: "1px solid #ccc",
-          outline: "none",
-          resize: "none",
-          overflowY: "auto",
-          fontFamily: "inherit",
-          fontSize: "14px",
-          lineHeight: 1.5,
-        }}
+  flex: 1,
+  minHeight: "38px",
+  maxHeight: "140px",
+  padding: "7px 14px",
+  borderRadius: "20px",
+  border: "1px solid #ccc",
+  outline: "none",
+  resize: "none",
+  overflowY: "auto",
+  fontFamily: "inherit",
+  fontSize: "14px",
+  lineHeight: 1.5,
+
+  // Keep text readable on iPhone Dark Mode
+  color: "#222222",
+  backgroundColor: "#ffffff",
+  WebkitTextFillColor: "#222222",
+  caretColor: "#222222",
+}}
       />
 
       <button

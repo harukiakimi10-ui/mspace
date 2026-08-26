@@ -222,15 +222,85 @@ console.log(
   }))
 );
 
-    const payload = JSON.stringify({
+    // --------------------------------------------------
+// Calculate the recipient's unread message count
+// --------------------------------------------------
+
+let unreadCount = 0;
+
+if (targetMemberId === ADMIN_ID) {
+  // Member → Admin
+  // Count unread member messages across all conversations.
+
+  const { count, error: unreadError } = await supabase
+    .from("messages")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .eq("sender", "member")
+    .eq("is_read", false);
+
+  if (unreadError) {
+    console.error(
+      "Unread count lookup error:",
+      unreadError
+    );
+  } else {
+    unreadCount = count ?? 0;
+  }
+} else {
+  // Admin → Member
+  // Find this member's conversation.
+
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id")
+    .eq("member_id", targetMemberId)
+    .single();
+
+  if (conversation?.id) {
+    const { count, error: unreadError } = await supabase
+      .from("messages")
+      .select("*", {
+        count: "exact",
+        head: true,
+      })
+      .eq("conversation_id", conversation.id)
+      .eq("sender", "admin")
+      .eq("is_read", false);
+
+    if (unreadError) {
+      console.error(
+        "Unread count lookup error:",
+        unreadError
+      );
+    } else {
+      unreadCount = count ?? 0;
+    }
+  }
+}
+
+console.log(
+  "MSpace unread badge count:",
+  unreadCount
+);
+
+const payload = JSON.stringify({
   title: senderName,
   body: notificationBody,
+
+  // Tell the service worker which conversation this notification belongs to
+  conversationId,
+
+  // Unread count for the recipient
+  unreadCount,
 
   // Sender's profile picture
   icon: senderPhoto,
 
   // MSpace branding
-badge: "/mspace-notification-icon.jpeg",
+  badge: "/mspace-notification-icon.jpeg",
 });
 
     const results = [];

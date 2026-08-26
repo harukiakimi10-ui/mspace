@@ -59,8 +59,10 @@ useEffect(() => {
       ? "18px 18px 4px 18px"
       : "18px 18px 18px 4px",
 
-  minWidth: isAndroid ? 220 : 240,
-  maxWidth: isAndroid ? 280 : 300,
+  width: "min(300px, calc(100vw - 32px))",
+  maxWidth: "100%",
+  minWidth: 0,
+  boxSizing: "border-box",
 
   display: "flex",
   alignItems: "flex-start",

@@ -96,9 +96,15 @@ function formatVoiceDuration(duration?: number | null) {
       alignItems: "center",
     }}
   >
-    <strong>
-      {chat.member?.name || "Unknown Member"}
-    </strong>
+    <strong
+  style={{
+    color: "#333333",
+    WebkitTextFillColor: "#333333",
+    opacity: 1,
+  }}
+>
+  {chat.member?.name || "Unknown Member"}
+</strong>
 
     <span
       style={{

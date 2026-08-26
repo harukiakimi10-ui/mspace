@@ -665,18 +665,18 @@ export default function VideoMessage({
          ========================= */}
 
       <div
-        onClick={openPlayer}
-        style={{
-          position: "relative",
-          width: "250px",
-          height: "320px",
-          overflow: "hidden",
-          borderRadius: "16px",
-          background: "#000",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-      >
+  onClick={openPlayer}
+  style={{
+    position: "relative",
+    width: "250px",
+    height: "320px",
+    overflow: "hidden",
+    borderRadius: "16px",
+    background: "#000",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
         {/* Thumbnail */}
 
         {thumbnail && (

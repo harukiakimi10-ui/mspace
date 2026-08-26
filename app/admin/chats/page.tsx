@@ -136,10 +136,10 @@ console.log("Supabase error:", error);
 await Promise.all(
   (data || []).map(async (conversation) => {
     const { data: member } = await supabase
-      .from("members")
-      .select("name, photo_url, is_online")
-      .eq("member_id", conversation.member_id)
-      .single();
+  .from("members")
+  .select("name, photo_url, is_online, online_at, last_seen")
+  .eq("member_id", conversation.member_id)
+  .single();
 
     const { count } = await supabase
       .from("messages")
@@ -181,9 +181,23 @@ result.sort((a, b) => {
   return bTime - aTime;
 });
 setConversations(result);
-setOnlineCount(
-  result.filter((c) => c.member?.is_online).length
-);
+const now = Date.now();
+
+const activeOnlineCount = result.filter((c) => {
+  if (!c.member?.is_online) return false;
+
+  if (!c.member?.online_at) return false;
+
+  const onlineAt = new Date(
+    c.member.online_at
+  ).getTime();
+
+  // Consider online only if the
+  // presence heartbeat is recent.
+  return now - onlineAt < 2 * 60 * 1000;
+}).length;
+
+setOnlineCount(activeOnlineCount);
 
 console.timeEnd("loadConversations");
 }

@@ -83,21 +83,21 @@ export async function updateOnlineStatus(
 
   try {
     const { data, error } = await supabase
-      .from("members")
-      .update(
-        online
-          ? {
-              is_online: true,
-              online_at: now,
-            }
-          : {
-              is_online: false,
-              online_at: null,
-              last_seen: now,
-            }
-      )
-      .eq("member_id", memberId)
-      .select("member_id,is_online,online_at,last_seen");
+  .from("members")
+  .update(
+    online
+      ? {
+          is_online: true,
+          online_at: now,
+        }
+      : {
+          is_online: false,
+          online_at: null,
+          last_seen: now,
+        }
+  )
+  .eq("member_id", memberId)
+  .select("member_id,is_online,online_at,last_seen");
 
     if (error) {
       console.error("ONLINE STATUS SUPABASE ERROR:", {
@@ -111,18 +111,12 @@ export async function updateOnlineStatus(
     }
 
     console.log(
-      "ONLINE STATUS UPDATE SUCCESS:",
-      data
-    );
-
-    if (!data || data.length === 0) {
-      console.error(
-        "ONLINE STATUS: No member row was updated.",
-        {
-          memberId,
-        }
-      );
-    }
+  "ONLINE STATUS UPDATE SUCCESS:",
+  {
+    memberId,
+    online,
+  }
+);
   } catch (error: any) {
     console.error(
       "ONLINE STATUS NETWORK ERROR:",

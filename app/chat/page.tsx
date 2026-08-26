@@ -126,6 +126,64 @@ const t = {
   const supabase = createClient();
 
   const [conversationId, setConversationId] = useState<string | null>(null);
+   useEffect(() => {
+  if (!conversationId) return;
+
+  const sendOpenConversation = async () => {
+    try {
+      const registration =
+        await navigator.serviceWorker.ready;
+
+      const worker =
+        navigator.serviceWorker.controller ||
+        registration.active;
+
+      if (!worker) {
+        console.error(
+          "MSpace: no active service worker available"
+        );
+        return;
+      }
+
+      worker.postMessage({
+  type: "MSPACE_SET_OPEN_CONVERSATION",
+  conversationId,
+});
+
+console.log(
+  "MSpace: open conversation saved:",
+  conversationId
+);
+
+      console.log(
+        "MSpace: open conversation sent to service worker:",
+        conversationId
+      );
+    } catch (error) {
+      console.error(
+        "MSpace: failed to set open conversation:",
+        error
+      );
+    }
+  };
+
+  sendOpenConversation();
+
+  return () => {
+    navigator.serviceWorker.ready.then((registration) => {
+      const worker =
+        navigator.serviceWorker.controller ||
+        registration.active;
+
+      worker?.postMessage({
+        type: "MSPACE_SET_OPEN_CONVERSATION",
+        conversationId: null,
+      });
+    });
+  };
+}, [conversationId]);
+
+
   const [messages, setMessages] = useState<any[]>([]);
    useEffect(() => {
   console.log("messages changed");
@@ -1040,6 +1098,51 @@ console.log("Updating messages to read...");
     .eq("sender", "admin")
     .eq("is_read", false);
 
+    // Update the MSpace Home Screen badge
+const { count: unreadCount, error: unreadCountError } =
+  await supabase
+    .from("messages")
+    .select("*", {
+      count: "exact",
+      head: true,
+    })
+    .eq("conversation_id", id)
+    .eq("sender", "admin")
+    .eq("is_read", false);
+
+if (unreadCountError) {
+  console.error(
+    "MSpace member unread badge count error:",
+    unreadCountError
+  );
+} else {
+  try {
+  const count = unreadCount ?? 0;
+
+  if (
+    "setAppBadge" in navigator &&
+    typeof navigator.setAppBadge === "function"
+  ) {
+    if (
+  "setAppBadge" in navigator &&
+  typeof navigator.setAppBadge === "function"
+) {
+  await navigator.setAppBadge(count);
+}
+  }
+
+  console.log(
+    "MSpace member badge updated:",
+    count
+  );
+} catch (error) {
+  console.error(
+    "MSpace member badge update error:",
+    error
+  );
+}
+}
+
   await loadMessages(id);
 console.log("Finished updating read status");
 }
@@ -1093,12 +1196,22 @@ try {
 }
 
 if (!data) return;
-  resetComposer();
+  const isAndroid =
+  /Android/i.test(navigator.userAgent);
+
+const stickerPanelIsOpen =
+  !!document.querySelector(
+    '[data-mspace-sticker-panel="true"]'
+  );
+
+resetComposer();
 await loadMessages(conversationId);
 
-requestAnimationFrame(() => {
-  messageInputRef.current?.focus();
-});
+if (!(isAndroid && stickerPanelIsOpen)) {
+  requestAnimationFrame(() => {
+    messageInputRef.current?.focus();
+  });
+}
 
 setTimeout(() => {
   const el = messagesRef.current;
@@ -1556,10 +1669,17 @@ async function uploadFile(
      * For videos above 10 MB this is the compressed MP4.
      * For videos 10 MB or smaller this is the original file.
      */
-    const filePath = `${conversationId}/${Date.now()}-${uploadFile.name}`;
+    // Create a Storage-safe filename.
+// Keep the original filename separately in the database.
+const safeFileName = uploadFile.name
+  .replace(/[^a-zA-Z0-9._-]/g, "_");
 
-    console.log("Uploading:", filePath);
+const filePath =
+  `${conversationId}/${Date.now()}-${safeFileName}`;
 
+console.log("Original filename:", uploadFile.name);
+console.log("Storage filename:", safeFileName);
+console.log("Uploading:", filePath);
     /*
  * RESUMABLE UPLOAD WITH REAL PROGRESS
  */
@@ -2794,19 +2914,21 @@ setPendingUploads((prev) =>
 }}
   >
     <div
-      style={{
-        background: "#ffffff",
-        padding: "12px",
-        borderRadius: "15px",
-        maxWidth: "250px",
-        marginBottom: "15px",
-        boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-      }}
-    >
-     {t.hello} 👋
-<br />
-{t.welcome}
-    </div>
+  style={{
+    background: "#ffffff",
+    color: "#222222",
+    WebkitTextFillColor: "#222222",
+    padding: "12px",
+    borderRadius: "15px",
+    maxWidth: "250px",
+    marginBottom: "15px",
+    boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+  }}
+>
+  {t.hello} 👋
+  <br />
+  {t.welcome}
+</div>
 
    {messageFocus && (
   <div
@@ -2828,10 +2950,10 @@ setPendingUploads((prev) =>
 
 <div
   onClick={() => {
-  if (messageFocus) {
-    clearMessageFocus();
-  }
-}}
+    if (messageFocus) {
+      clearMessageFocus();
+    }
+  }}
   style={{
     position: "relative",
     zIndex: 1,
