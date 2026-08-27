@@ -35,7 +35,30 @@ export default function ChatPage() {
   const supabase = createClient();
 
   const [messages, setMessages] = useState<any[]>([]);
+  const [cacheReady, setCacheReady] = useState(false);
   const [member, setMember] = useState<any>(null);
+  function getAvatarColors(value: string) {
+  const colors = [
+    { background: "#E8F5E9", icon: "#2E7D32" },
+    { background: "#E3F2FD", icon: "#1565C0" },
+    { background: "#FFF3E0", icon: "#EF6C00" },
+    { background: "#FCE4EC", icon: "#C2185B" },
+    { background: "#EDE7F6", icon: "#6A1B9A" },
+    { background: "#E0F7FA", icon: "#00838F" },
+    { background: "#FFF8E1", icon: "#F9A825" },
+    { background: "#F3E5F5", icon: "#8E24AA" },
+  ];
+
+  let hash = 0;
+
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
   const [conversation, setConversation] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -334,6 +357,23 @@ const [viewerVideo, setViewerVideo] = useState("");
 
 const [unreadCount, setUnreadCount] = useState(0);
 
+useEffect(() => {
+  try {
+    const cachedUnread = localStorage.getItem(
+      "mspace-unread-conversation-count"
+    );
+
+    if (cachedUnread !== null) {
+      setUnreadCount(Number(cachedUnread));
+    }
+  } catch (error) {
+    console.error(
+      "MSpace unread count cache read error:",
+      error
+    );
+  }
+}, []);
+
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
 const [newMessageCount, setNewMessageCount] = useState(0);
@@ -465,6 +505,68 @@ const messageInputRef =
 }
 
   useEffect(() => {
+
+  if (id) {
+    const cacheKey = `mspace-messages-${id}`;
+
+    try {
+      const cachedMessages = localStorage.getItem(cacheKey);
+
+      if (cachedMessages) {
+        const parsedMessages = JSON.parse(cachedMessages);
+
+        const visibleCachedMessages = parsedMessages.filter(
+          (msg: any) => msg.deleted_for !== "admin"
+        );
+
+        setMessages(visibleCachedMessages);
+      }
+    } catch (error) {
+      console.error(
+        "MSpace cache initialization error:",
+        error
+      );
+    }
+  }
+
+  if (id) {
+    const headerCacheKey =
+      `mspace-chat-header-${id}`;
+
+    try {
+      const cachedHeader =
+        localStorage.getItem(headerCacheKey);
+
+      if (cachedHeader) {
+        const parsedHeader =
+          JSON.parse(cachedHeader);
+
+        if (parsedHeader.conversation) {
+          setConversation(
+            parsedHeader.conversation
+          );
+        }
+
+        if (parsedHeader.member) {
+          setMember(
+            parsedHeader.member
+          );
+
+          memberIdRef.current =
+            parsedHeader.conversation?.member_id ??
+            null;
+        }
+      }
+    } catch (error) {
+      console.error(
+        "MSpace header cache error:",
+        error
+      );
+    }
+  }
+
+  setCacheReady(true);
+
   loadConversation();
 
   loadUnreadConversationCount();
@@ -524,16 +626,51 @@ setTimeout(() => {
       filter: `conversation_id=eq.${id}`,
     },
     async (payload) => {
-      await loadMessages();
 
-      if (
-        document.visibilityState === "visible" &&
-        document.hasFocus()
-      ) {
-        await markMessagesAsRead();
-      }
+  if (payload.eventType === "INSERT") {
+    const newMessage = payload.new as any;
 
-      // Badge when a new member message arrives
+    if (newMessage?.deleted_for !== "admin") {
+      setMessages((currentMessages) => {
+        const alreadyExists = currentMessages.some(
+          (message) => message.id === newMessage.id
+        );
+
+        if (alreadyExists) {
+          return currentMessages;
+        }
+
+        return [
+          ...currentMessages,
+          newMessage,
+        ];
+      });
+    }
+  }
+
+  if (payload.eventType === "UPDATE") {
+  const updatedMessage = payload.new as any;
+
+  setMessages((currentMessages) =>
+    currentMessages.map((message) =>
+      message.id === updatedMessage.id
+        ? {
+            ...message,
+            ...updatedMessage,
+          }
+        : message
+    )
+  );
+}
+
+  if (
+    document.visibilityState === "visible" &&
+    document.hasFocus()
+  ) {
+    await markMessagesAsRead();
+  }
+
+  // Badge when a new member message arrives
       if (
         payload.eventType === "INSERT" &&
         (payload.new as any).sender === "member"
@@ -985,7 +1122,85 @@ async function sendVoiceMessage(duration: number) {
 
   setUploading(true);
 
-  try {
+// Show the voice message immediately in the chat
+const optimisticId = `optimistic-voice-${Date.now()}`;
+
+const optimisticUrl = URL.createObjectURL(audioBlob);
+
+const optimisticMessage = {
+  id: optimisticId,
+  conversation_id: id,
+  sender: "admin",
+  message_type: "voice",
+  content: "",
+  file_url: optimisticUrl,
+  file_name: `voice-${Date.now()}.audio`,
+  file_size: audioBlob.size,
+  mime_type: audioBlob.type,
+  file_duration: duration,
+  is_read: false,
+  created_at: new Date().toISOString(),
+
+  reply_to_id: replyMessage?.id ?? null,
+
+  reply_file_duration:
+    replyMessage?.message_type === "voice"
+      ? replyMessage.file_duration
+      : null,
+
+  reply_preview:
+    replyMessage?.message_type === "text"
+      ? replyMessage.content
+      : replyMessage?.message_type === "image"
+      ? "📷 Photo"
+      : replyMessage?.message_type === "video"
+      ? "🎥 Video"
+      : replyMessage?.message_type === "voice"
+      ? "🎤 Voice"
+      : replyMessage?.message_type === "sticker"
+      ? "🏷️ Sticker"
+      : replyMessage?.message_type === "location"
+      ? "📍 Location"
+      : null,
+
+  reply_file_url:
+    replyMessage?.message_type === "image" ||
+    replyMessage?.message_type === "video" ||
+    replyMessage?.message_type === "voice" ||
+    replyMessage?.message_type === "sticker"
+      ? replyMessage.file_url
+      : replyMessage?.message_type === "location"
+      ? replyMessage.content
+      : null,
+
+  reply_thumbnail_url:
+    replyMessage?.message_type === "video"
+      ? (
+          replyMessage.reply_thumbnail_url ??
+          replyMessage.thumbnail_url ??
+          replyMessage.file_url
+        )
+      : null,
+
+  reply_message_type:
+    replyMessage?.message_type ?? null,
+
+  reply_sender:
+    replyMessage?.sender ?? null,
+
+  _optimistic: true,
+};
+
+setMessages((prev) => [...prev, optimisticMessage]);
+
+requestAnimationFrame(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "auto",
+  });
+});
+
+try {
     const mimeType =
       audioBlob.type || "audio/mp4";
 
@@ -1132,6 +1347,17 @@ async function sendVoiceMessage(duration: number) {
       insertedMessage
     );
 
+    // Replace the temporary voice message with the real database message
+if (insertedMessage) {
+  setMessages((prev) =>
+    prev.map((message) =>
+      message.id === optimisticId
+        ? insertedMessage
+        : message
+    )
+  );
+}
+
     if (error) {
       console.error(
         "Admin voice message insert error:",
@@ -1195,7 +1421,7 @@ async function sendVoiceMessage(duration: number) {
     /*
      * Refresh chat
      */
-    await loadMessages();
+
 
     deleteRecording();
 
@@ -1203,14 +1429,17 @@ async function sendVoiceMessage(duration: number) {
     setReplyPreview("");
 
     requestAnimationFrame(() => {
-      messagesRef.current?.scrollTo({
-        top:
-          messagesRef.current
-            .scrollHeight,
+  requestAnimationFrame(() => {
+    const container = messagesRef.current;
 
-        behavior: "smooth",
-      });
+    if (!container) return;
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "auto",
     });
+  });
+});
 
   } catch (error) {
     console.error(
@@ -1269,8 +1498,25 @@ async function loadConversation() {
   });
 
   setMember(memberData);
-  setConversation(data);
-  setLoadingProfile(false);
+setConversation(data);
+
+// Save the latest conversation header locally
+try {
+  localStorage.setItem(
+    `mspace-chat-header-${id}`,
+    JSON.stringify({
+      conversation: data,
+      member: memberData,
+    })
+  );
+} catch (error) {
+  console.error(
+    "MSpace header cache save error:",
+    error
+  );
+}
+
+setLoadingProfile(false);
 }
 
 async function updateAdminOnlineStatus(online: boolean) {
@@ -1290,9 +1536,43 @@ async function updateAdminOnlineStatus(online: boolean) {
 
 }
   async function loadMessages() {
-    console.log("loadMessages() called");
+  console.log("loadMessages() called");
 
-    const { data } = await supabase
+  if (!id) return;
+
+  const cacheKey = `mspace-messages-${id}`;
+
+  const cachedMessages = localStorage.getItem(cacheKey);
+
+  if (cachedMessages) {
+    try {
+      const parsedMessages = JSON.parse(cachedMessages);
+
+      const visibleCachedMessages = parsedMessages.filter(
+        (msg: any) => msg.deleted_for !== "admin"
+      );
+
+      setMessages(visibleCachedMessages);
+
+      requestAnimationFrame(() => {
+        if (messagesRef.current) {
+          messagesRef.current.scrollTo({
+            top: messagesRef.current.scrollHeight,
+            behavior: "auto",
+          });
+        }
+      });
+    } catch (error) {
+      console.error(
+        "MSpace message cache error:",
+        error
+      );
+
+      localStorage.removeItem(cacheKey);
+    }
+  }
+
+  const { data } = await supabase
      
       .from("messages")
       .select("*")
@@ -1309,6 +1589,19 @@ const wasNearBottom =
   (data || []).filter(
     (msg) => msg.deleted_for !== "admin"
   );
+
+// Save the latest messages locally
+try {
+  localStorage.setItem(
+    `mspace-messages-${id}`,
+    JSON.stringify(visibleMessages)
+  );
+} catch (error) {
+  console.error(
+    "MSpace message cache save error:",
+    error
+  );
+}
 
 setMessages(visibleMessages);
 
@@ -1489,7 +1782,12 @@ function getReplyData(message: any) {
 
   const messageText = reply.trim();
 
-  const replyData = getReplyData(replyMessage);
+const replyData = getReplyData(replyMessage);
+
+// Clear the composer immediately
+setReply("");
+setReplyMessage(null);
+setReplyPreview("");
 
   if (!conversation?.member_id) {
   console.error(
@@ -1528,21 +1826,34 @@ reply_file_duration:
   .single();
 
   if (error) {
-    console.error(
-      "Admin message insert error:",
-      error
-    );
-    return;
-  }
+  console.error(
+    "Admin message insert error:",
+    error
+  );
+
+  // Restore the message if sending failed
+  setReply(messageText);
+
+  return;
+}
 
   console.log(
     "Admin message inserted:",
     data
   );
 
-  setReply("");
-  setReplyMessage(null);
-setReplyPreview("");
+  requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const container = messagesRef.current;
+
+    if (!container) return;
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "auto",
+    });
+  });
+});
 
   // Send push notification to THIS member only
   try {
@@ -1582,14 +1893,6 @@ setReplyPreview("");
     );
   }
 
-  await loadMessages();
-
-  setTimeout(() => {
-    messagesRef.current?.scrollTo({
-      top: messagesRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, 50);
 }
 
 async function sendSticker(sticker: string) {
@@ -1661,7 +1964,6 @@ async function sendSticker(sticker: string) {
     setReplyMessage(null);
     setReplyPreview("");
 
-    await loadMessages();
 
     setTimeout(() => {
       messagesRef.current?.scrollTo({
@@ -2189,11 +2491,24 @@ async function loadUnreadConversationCount() {
   );
 
   const count = (conversations || []).filter(
-    (conversation) =>
-      unreadConversationIds.has(conversation.id)
-  ).length;
+  (conversation) =>
+    unreadConversationIds.has(conversation.id)
+).length;
 
-  setUnreadCount(count);
+// Save the latest unread count locally
+try {
+  localStorage.setItem(
+    "mspace-unread-conversation-count",
+    String(count)
+  );
+} catch (error) {
+  console.error(
+    "MSpace unread count cache save error:",
+    error
+  );
+}
+
+setUnreadCount(count);
 }
 
   return (
@@ -2411,18 +2726,84 @@ setTimeout(() => {
 </button>
 </div>
 
-      <img
-  src={member?.photo_url || "/avatar.png"}
-  onError={(e) => {
-    e.currentTarget.src = "/avatar.png";
-  }}
-  style={{
-    width: 45,
-    height: 45,
-    borderRadius: "50%",
-    objectFit: "cover",
-  }}
-/>
+      {member?.photo_url ? (
+  <img
+    src={member.photo_url}
+    onError={(e) => {
+      e.currentTarget.style.display = "none";
+    }}
+    style={{
+      width: 45,
+      height: 45,
+      borderRadius: "50%",
+      objectFit: "cover",
+      flexShrink: 0,
+    }}
+  />
+) : (
+  <div
+    style={{
+      width: 45,
+      height: 45,
+      borderRadius: "50%",
+      background: getAvatarColors(
+        member?.member_id ||
+        member?.name ||
+        id
+      ).background,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      position: "relative",
+      overflow: "hidden",
+    }}
+  >
+    <div
+      style={{
+        position: "relative",
+        width: 30,
+        height: 30,
+      }}
+    >
+      {/* Head */}
+      <div
+        style={{
+          position: "absolute",
+          top: 4,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: getAvatarColors(
+            member?.member_id ||
+            member?.name ||
+            id
+          ).icon,
+        }}
+      />
+
+      {/* Shoulders */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 4,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 20,
+          height: 10,
+          borderRadius: "18px 18px 6px 6px",
+          background: getAvatarColors(
+            member?.member_id ||
+            member?.name ||
+            id
+          ).icon,
+        }}
+      />
+    </div>
+  </div>
+)}
       <div>
   <div style={{ fontWeight: 600 }}>
   {member?.name || "Member"}
@@ -2802,6 +3183,10 @@ setMessageFocus={setMessageFocus}
       await stopRecording(true);
     }
 
+    // Clear the voice recorder UI immediately
+    // for both recording mode and preview mode.
+    setVoiceState("idle");
+
     await sendVoiceMessage(duration);
   } catch (error) {
     console.error(
@@ -2835,29 +3220,34 @@ onCloseStickerPanel={() => {
   e.target.value = "";
 }}
 
-  onInput={async (e) => {
-    setReply(e.target.value);
+  onInput={(e) => {
+  const value = e.target.value;
 
-    await supabase
+  // Update the textarea immediately
+  setReply(value);
+
+  // Tell the member that admin is typing
+  supabase
+    .from("conversations")
+    .update({
+      admin_typing: true,
+    })
+    .eq("id", id);
+
+  // Reset the typing timer
+  if (typingTimeout.current) {
+    clearTimeout(typingTimeout.current);
+  }
+
+  typingTimeout.current = setTimeout(() => {
+    supabase
       .from("conversations")
       .update({
-        admin_typing: true,
+        admin_typing: false,
       })
       .eq("id", id);
-
-    if (typingTimeout.current) {
-      clearTimeout(typingTimeout.current);
-    }
-
-    typingTimeout.current = setTimeout(async () => {
-      await supabase
-        .from("conversations")
-        .update({
-          admin_typing: false,
-        })
-        .eq("id", id);
-    }, 1000);
-  }}
+  }, 1000);
+}}
 
   onKeyDown={() => {}}
 />

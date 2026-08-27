@@ -8,6 +8,7 @@ import {
   Mic,
 } from "lucide-react";
 import { premiumButton } from "./premiumButton";
+import { useLayoutEffect } from "react";
 
 
 type MessageInputProps = {
@@ -57,6 +58,22 @@ export default function MessageInput({
   onInput,
   onKeyDown,
 }: MessageInputProps) {
+
+  useLayoutEffect(() => {
+    if (message !== "") return;
+
+    const input = messageInputRef.current;
+
+    if (!input) return;
+
+    input.scrollLeft = 0;
+    input.scrollTop = 0;
+
+    try {
+      input.setSelectionRange(0, 0);
+    } catch {}
+  }, [message, messageInputRef]);
+
   return (
   <div
     style={{

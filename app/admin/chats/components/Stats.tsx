@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import {
   Activity,
   Users,
@@ -17,6 +19,12 @@ export default function Stats({
   totalMembers,
   unreadCount,
 }: StatsProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const cardStyle = {
     flex: 1,
 
@@ -107,7 +115,7 @@ export default function Stats({
             color: "#16a34a",
           }}
         >
-          {onlineCount}
+          {mounted ? onlineCount : 0}
         </div>
       </div>
 
@@ -150,7 +158,7 @@ export default function Stats({
             color: "#2563eb",
           }}
         >
-          {totalMembers}
+          {mounted ? totalMembers : 0}
         </div>
       </div>
 
@@ -193,7 +201,7 @@ export default function Stats({
             color: "#dc2626",
           }}
         >
-          {unreadCount}
+          {mounted ? unreadCount : 0}
         </div>
       </div>
     </div>

@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -16,10 +19,11 @@ type Conversation = {
   unreadCount?: number;
 
   member?: {
-    name: string;
-    photo_url: string;
-    is_online?: boolean;
-  };
+  member_id?: string;
+  name: string;
+  photo_url: string;
+  is_online?: boolean;
+};
 
   lastMessage?: {
   content: string;
@@ -39,7 +43,34 @@ export default function ConversationList({
   conversations,
 }: Props) {
 
-const router = useRouter();
+  const router = useRouter();
+  function getAvatarColors(value: string) {
+  const colors = [
+    { background: "#E8F5E9", icon: "#2E7D32" },
+    { background: "#E3F2FD", icon: "#1565C0" },
+    { background: "#FFF3E0", icon: "#EF6C00" },
+    { background: "#FCE4EC", icon: "#C2185B" },
+    { background: "#EDE7F6", icon: "#6A1B9A" },
+    { background: "#E0F7FA", icon: "#00838F" },
+    { background: "#FFF8E1", icon: "#F9A825" },
+    { background: "#F3E5F5", icon: "#8E24AA" },
+  ];
+
+  let hash = 0;
+
+  for (let i = 0; i < value.length; i++) {
+    hash =
+      (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
 function formatVoiceDuration(duration?: number | null) {
   if (!duration || duration < 1) {
@@ -63,7 +94,8 @@ function formatVoiceDuration(duration?: number | null) {
   overflowY: "auto",
 }}
     >
-      {conversations.map((chat) => (
+      {mounted &&
+        conversations.map((chat) => (
         <div
         key={chat.id}
         onClick={() => router.push(`/admin/chats/${chat.id}`)}
@@ -76,16 +108,85 @@ function formatVoiceDuration(duration?: number | null) {
   cursor: "pointer",
 }}
         >
-          <img
-            src={chat.member?.photo_url || "/avatar.png"}
-            alt=""
-            style={{
-              width: "54px",
-              height: "54px",
-              borderRadius: "50%",
-              objectFit: "cover",
-            }}
-          />
+          {chat.member?.photo_url ? (
+  <img
+    src={chat.member.photo_url}
+    alt=""
+    onError={(e) => {
+      e.currentTarget.style.display = "none";
+    }}
+    style={{
+      width: "54px",
+      height: "54px",
+      borderRadius: "50%",
+      objectFit: "cover",
+      flexShrink: 0,
+    }}
+  />
+) : (
+  <div
+    style={{
+      width: "54px",
+      height: "54px",
+      borderRadius: "50%",
+      background: getAvatarColors(
+        chat.member?.member_id ||
+        chat.member?.name ||
+        chat.id
+      ).background,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      position: "relative",
+      overflow: "hidden",
+    }}
+  >
+    <div
+      style={{
+        position: "relative",
+        width: 34,
+        height: 34,
+      }}
+    >
+      {/* Head */}
+      <div
+        style={{
+          position: "absolute",
+          top: 6,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: getAvatarColors(
+            chat.member?.member_id ||
+            chat.member?.name ||
+            chat.id
+          ).icon,
+        }}
+      />
+
+      {/* Shoulders */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 6,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 20,
+          height: 10,
+          borderRadius: "18px 18px 7px 7px",
+          background: getAvatarColors(
+            chat.member?.member_id ||
+            chat.member?.name ||
+            chat.id
+          ).icon,
+        }}
+      />
+    </div>
+  </div>
+)}
 
           <div style={{ flex: 1, minWidth: 0 }}>
 

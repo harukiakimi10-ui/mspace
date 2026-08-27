@@ -5,23 +5,62 @@ import Stats from "./components/Stats";
 import ConversationList from "./components/ConversationList";
 import NotificationButton from "@/app/NotificationButton";
 import { createClient } from "@/utils/supabase/client";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 
 export default function AdminChatsPage() {
 
   
 
 
-const [conversations, setConversations] = useState<any[]>([]);
+const [conversations, setConversations] = useState<any[]>(() => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cached =
+      localStorage.getItem(
+        "mspace-admin-conversations"
+      );
+
+    return cached
+      ? JSON.parse(cached)
+      : [];
+  } catch {
+    return [];
+  }
+});
+
+
 const [selectedConversation, setSelectedConversation] = useState<any>(null);
 const [messages, setMessages] = useState<any[]>([]);
 const [reply, setReply] = useState("");
 const [onlineCount, setOnlineCount] = useState(0);
+const conversationRefreshTimeout =
+  useRef<ReturnType<typeof setTimeout> | null>(null);
+
+const conversationListRef = useRef<HTMLDivElement>(null);  
 
 const totalMembers = conversations.length;
 const unreadCount = conversations.filter(
   (c) => c.has_unread
 ).length;
+
+function scheduleConversationRefresh() {
+  if (conversationRefreshTimeout.current) {
+    clearTimeout(conversationRefreshTimeout.current);
+  }
+
+  conversationRefreshTimeout.current =
+    setTimeout(() => {
+      loadConversations();
+      conversationRefreshTimeout.current = null;
+    }, 300);
+}
 
 
 async function testPushNotification() {
@@ -66,25 +105,83 @@ useEffect(() => {
   const channel = supabase
     .channel("admin-conversations")
     .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "messages",
-      },
-      () => {
-        loadConversations();
+  "postgres_changes",
+  {
+    event: "*",
+    schema: "public",
+    table: "messages",
+  },
+  (payload) => {
+    console.log(
+      "Admin conversation realtime message:",
+      payload.eventType
+    );
 
-        if (selectedConversation) {
-          loadMessages(selectedConversation.id);
-        }
-      }
-    )
+    scheduleConversationRefresh();
+
+    if (
+  selectedConversation &&
+  (payload.new as any)?.conversation_id ===
+    selectedConversation.id
+) {
+  loadMessages(selectedConversation.id);
+}
+  }
+)
     .subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+  if (conversationRefreshTimeout.current) {
+    clearTimeout(conversationRefreshTimeout.current);
+    conversationRefreshTimeout.current = null;
+  }
+
+  supabase.removeChannel(channel);
+};
+}, []);
+
+useEffect(() => {
+  const list = conversationListRef.current;
+
+  if (!list) return;
+
+  const saveScrollPosition = () => {
+    sessionStorage.setItem(
+      "mspace-conversation-list-scroll",
+      String(list.scrollTop)
+    );
   };
+
+  list.addEventListener(
+    "scroll",
+    saveScrollPosition,
+    { passive: true }
+  );
+
+  return () => {
+    list.removeEventListener(
+      "scroll",
+      saveScrollPosition
+    );
+  };
+}, []);
+
+useEffect(() => {
+  const savedScroll = sessionStorage.getItem(
+    "mspace-conversation-list-scroll"
+  );
+
+  if (!savedScroll) return;
+
+  const restoreScrollPosition = () => {
+    const list = conversationListRef.current;
+
+    if (!list) return;
+
+    list.scrollTop = Number(savedScroll);
+  };
+
+  requestAnimationFrame(restoreScrollPosition);
 }, []);
 
 useEffect(() => {
@@ -137,7 +234,9 @@ await Promise.all(
   (data || []).map(async (conversation) => {
     const { data: member } = await supabase
   .from("members")
-  .select("name, photo_url, is_online, online_at, last_seen")
+  .select(
+  "member_id, name, photo_url, is_online, online_at, last_seen"
+)
   .eq("member_id", conversation.member_id)
   .single();
 
@@ -181,6 +280,19 @@ result.sort((a, b) => {
   return bTime - aTime;
 });
 setConversations(result);
+
+try {
+  localStorage.setItem(
+    "mspace-admin-conversations",
+    JSON.stringify(result)
+  );
+} catch (error) {
+  console.error(
+    "MSpace conversation cache save error:",
+    error
+  );
+}
+
 const now = Date.now();
 
 const activeOnlineCount = result.filter((c) => {
@@ -311,6 +423,7 @@ console.log("Inserted admin message:", data);
 
     {/* ONLY THIS AREA SCROLLS */}
 <div
+ref={conversationListRef}
   style={{
     flex: 1,
     minHeight: 0,
