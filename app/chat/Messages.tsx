@@ -140,6 +140,10 @@ setMessageFocus,
 onCancelUpload,
 }: MessagesProps) {
 
+  const isAndroid =
+  typeof navigator !== "undefined" &&
+  /Android/i.test(navigator.userAgent);
+
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(
   new Set()
 );
@@ -482,7 +486,8 @@ const locationCoordinates = isReplyLocation
         : "flex-start",
     padding:
   msg.message_type === "video" &&
-  msg.sender === currentUser
+  msg.sender === currentUser &&
+  isAndroid
     ? "6px 8px"
     : "6px 0px",
 
@@ -518,10 +523,11 @@ const locationCoordinates = isReplyLocation
 width: "fit-content",
 
 marginRight:
-      msg.sender === currentUser &&
-      msg.message_type === "video"
-        ? "16px"
-        : "0",
+  msg.sender === currentUser &&
+  msg.message_type === "video" &&
+  isAndroid
+    ? "16px"
+    : "0",
   
 
   padding:
