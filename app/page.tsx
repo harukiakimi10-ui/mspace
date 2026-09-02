@@ -24,6 +24,8 @@ export default function Home() {
   const [photoCount, setPhotoCount] = useState(0);
   const [videoCount, setVideoCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const [showInstallButton, setShowInstallButton] =
   useState(false);
 
@@ -33,6 +35,10 @@ const [deferredPrompt, setDeferredPrompt] =
 
 const [language, setLanguage] =
   useState<"en" | "zh">("en");
+
+  useEffect(() => {
+  setMounted(true);
+}, []);
 
 useEffect(() => {
   if (
@@ -116,62 +122,82 @@ ownerSpace: "黄定襄的",
 }[language];
 
   useEffect(() => {
-  async function restoreMember() {
-    console.log("=== RESTORE START ===");
+  async function restoreMember(): Promise<boolean> {
+  console.log("=== RESTORE START ===");
 
-    const memberId = localStorage.getItem("mspace_member_id");
-    console.log("Member ID:", memberId);
+  const memberId = localStorage.getItem("mspace_member_id");
+  console.log("Member ID:", memberId);
 
-    if (memberId) {
-      console.log("Already logged in");
-      router.push("/members");
-      return;
-    }
-
-    const deviceId = localStorage.getItem("mspace_device_id");
-    console.log("Device ID:", deviceId);
-
-    if (!deviceId) {
-      console.log("No device ID");
-      return;
-    }
-
-    const supabase = createClient();
-
-    const { data: members, error } = await supabase
-  .from("members")
-  .select("*")
-  .eq("device_id", deviceId)
-  .order("created_at", { ascending: false });
-
-const member = members?.[0];
-
-    console.log("Supabase error:", error);
-    console.log("Member found:", member);
-
-    if (!member) {
-      console.log("No member matched this device");
-      return;
-    }
-
-    if (member.banned) {
-      console.log("Member is banned");
-      return;
-    }
-
-    console.log("Restoring login...");
-
-    localStorage.setItem(
-      "mspace_member_id",
-      member.member_id
-    );
-
-    console.log("Redirecting...");
-
-    router.push("/members");
+  // We already know this browser has a member.
+  if (memberId) {
+    console.log("Already logged in");
+    router.replace("/members");
+    return false;
   }
 
-  restoreMember();
+  const deviceId = localStorage.getItem("mspace_device_id");
+  console.log("Device ID:", deviceId);
+
+  // No device ID means this is a genuinely new visitor.
+  if (!deviceId) {
+    console.log("No device ID");
+    return true;
+  }
+
+  const supabase = createClient();
+
+  const { data: members, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("device_id", deviceId)
+    .order("created_at", { ascending: false });
+
+  const member = members?.[0];
+
+  console.log("Supabase error:", error);
+  console.log("Member found:", member);
+
+  // Network/database failure.
+  // DO NOT show signup.
+  if (error) {
+    console.log(
+      "Could not check member because of a network/database error."
+    );
+    return false;
+  }
+
+  // Supabase successfully answered and confirmed
+  // that this device has no member.
+  if (!member) {
+    console.log("No member matched this device");
+    return true;
+  }
+
+  // Existing account is banned.
+  if (member.banned) {
+    console.log("Member is banned");
+    return true;
+  }
+
+  console.log("Restoring login...");
+
+  localStorage.setItem(
+    "mspace_member_id",
+    member.member_id
+  );
+
+  console.log("Redirecting...");
+
+  router.replace("/members");
+
+  return false;
+}
+
+  restoreMember().then((shouldShowSignup) => {
+  if (shouldShowSignup) {
+    setRestoring(false);
+  }
+});
 }, []);
 
 useEffect(() => {
@@ -427,6 +453,10 @@ setLoading(false);
 
 router.push("/members");
   }
+if (!mounted || restoring) {
+  return null;
+}
+
 return (
   <>
     

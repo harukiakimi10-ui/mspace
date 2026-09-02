@@ -34,8 +34,25 @@ const supabase = createClient();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+ useEffect(() => {
+  const updateNetworkStatus = () => {
+    setIsOffline(!navigator.onLine);
+  };
 
+  updateNetworkStatus();
+
+  window.addEventListener("online", updateNetworkStatus);
+  window.addEventListener("offline", updateNetworkStatus);
+
+  return () => {
+    window.removeEventListener("online", updateNetworkStatus);
+    window.removeEventListener("offline", updateNetworkStatus);
+  };
+}, []);
+ 
+   
   const language =
   typeof navigator !== "undefined" &&
   navigator.language.startsWith("zh")
@@ -227,11 +244,18 @@ async function checkBanStatus() {
     .eq("member_id", memberId)
     .single();
 
-  if (error || !member) {
-    localStorage.removeItem("mspace_member_id");
-    router.push("/");
-    return;
-  }
+  if (error) {
+  console.log(
+    "Could not verify member because of a network error. Staying on members page."
+  );
+  return;
+}
+
+if (!member) {
+  localStorage.removeItem("mspace_member_id");
+  router.push("/");
+  return;
+}
 
   // Account ban
   if (member.banned) {
@@ -337,28 +361,82 @@ async function openChat() {
 }
 
 
-if (loading) {
+if (isOffline) {
   return (
     <div
-  style={{
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-    width: "100%",
-    background: "#6d28d9",
-  }}
->
-  <img
-    src="/mspace-icon.png"
-    alt="MSpace"
-    style={{
-      width: "110px",
-      height: "110px",
-      objectFit: "contain",
-    }}
-  />
-</div>
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        background: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "30px 20px",
+        boxSizing: "border-box",
+        fontFamily: "Arial, sans-serif",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          width: "90px",
+          height: "90px",
+          borderRadius: "24px",
+          background: "#f3f4f6",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "28px",
+        }}
+      >
+        <img
+          src="/mspace-icon.png"
+          alt="MSpace"
+          style={{
+            width: "65px",
+            height: "65px",
+            objectFit: "contain",
+            opacity: 0.75,
+          }}
+        />
+      </div>
+
+      <h1
+        style={{
+          margin: "0 0 10px",
+          fontSize: "26px",
+          fontWeight: "700",
+          color: "#202124",
+        }}
+      >
+        You're offline
+      </h1>
+
+      <p
+        style={{
+          margin: 0,
+          maxWidth: "420px",
+          fontSize: "16px",
+          lineHeight: "1.6",
+          color: "#5f6368",
+        }}
+      >
+        No internet connection is available.
+        <br />
+        Check your network connection and try again.
+      </p>
+
+      <div
+        style={{
+          marginTop: "30px",
+          fontSize: "14px",
+          color: "#9ca3af",
+        }}
+      >
+        MSpace
+      </div>
+    </div>
   );
 }
 

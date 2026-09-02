@@ -35,6 +35,7 @@ export default function ChatPage() {
   const supabase = createClient();
 
   const [messages, setMessages] = useState<any[]>([]);
+  const [pendingMessageIds, setPendingMessageIds] = useState<string[]>([]);
   const [cacheReady, setCacheReady] = useState(false);
   const [member, setMember] = useState<any>(null);
   function getAvatarColors(value: string) {
@@ -81,6 +82,70 @@ useEffect(() => {
 
 
 const [showComposer, setShowComposer] = useState(true);
+const [composerHeight, setComposerHeight] = useState(0);
+console.log("COMPOSER HEIGHT:", composerHeight);
+
+useEffect(() => {
+  let observer: ResizeObserver | null = null;
+  let frame: number | null = null;
+
+  const measureComposer = () => {
+  const composer = composerRef.current;
+
+  console.log("COMPOSER REF:", composer);
+
+  if (!composer) {
+    console.log("COMPOSER REF IS NULL");
+    return;
+  }
+
+  const height = composer.getBoundingClientRect().height;
+
+  console.log("MEASURED COMPOSER HEIGHT:", height);
+
+  if (height > 0) {
+    setComposerHeight(height);
+  }
+};
+
+  frame = requestAnimationFrame(() => {
+    measureComposer();
+
+    const composer = composerRef.current;
+
+    if (!composer) return;
+
+    observer = new ResizeObserver(() => {
+      measureComposer();
+    });
+
+    observer.observe(composer);
+  });
+
+  return () => {
+    if (frame !== null) {
+      cancelAnimationFrame(frame);
+    }
+
+    observer?.disconnect();
+  };
+}, [showComposer, showStickerPanel]);
+
+const scrollToLatest = () => {
+  const container = messagesRef.current;
+
+  if (!container) return;
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  });
+};
+
 const [messageFocus, setMessageFocus] = useState(false);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 
@@ -388,6 +453,7 @@ const [locationPreview, setLocationPreview] = useState<{
 } | null>(null);
 
   const messagesRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoScrolled = useRef(false);
   const memberIdRef = useRef<string | null>(null);
@@ -1194,10 +1260,7 @@ const optimisticMessage = {
 setMessages((prev) => [...prev, optimisticMessage]);
 
 requestAnimationFrame(() => {
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "auto",
-  });
+  scrollToLatest();
 });
 
 try {
@@ -1429,16 +1492,7 @@ if (insertedMessage) {
     setReplyPreview("");
 
     requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const container = messagesRef.current;
-
-    if (!container) return;
-
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: "auto",
-    });
-  });
+  scrollToLatest();
 });
 
   } catch (error) {
@@ -1838,20 +1892,28 @@ reply_file_duration:
 }
 
   console.log(
-    "Admin message inserted:",
-    data
+  "Admin message inserted:",
+  data
+);
+
+setMessages((prev) => {
+  const alreadyExists = prev.some(
+    (message) => message.id === data.id
   );
 
-  requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const container = messagesRef.current;
+  if (alreadyExists) {
+    return prev;
+  }
 
-    if (!container) return;
+  return [
+    ...prev,
+    data,
+  ];
+});
 
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: "auto",
-    });
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    scrollToLatest();
   });
 });
 
@@ -1899,9 +1961,9 @@ async function sendSticker(sticker: string) {
   if (!id) return;
 
   try {
-    const { error } = await supabase
-      .from("messages")
-      .insert({
+    const { data, error } = await supabase
+       .from("messages")
+       .insert({
         conversation_id: id,
         sender: "admin",
         message_type: "sticker",
@@ -1954,12 +2016,29 @@ async function sendSticker(sticker: string) {
 
         reply_sender:
           replyMessage?.sender ?? null,
-      });
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error("Admin sticker error:", error);
       return;
     }
+
+    setMessages((prev) => {
+  const alreadyExists = prev.some(
+    (message) => message.id === data.id
+  );
+
+  if (alreadyExists) {
+    return prev;
+  }
+
+  return [
+    ...prev,
+    data,
+  ];
+});
 
     setReplyMessage(null);
     setReplyPreview("");
@@ -2962,8 +3041,8 @@ setTimeout(() => {
     
     padding: 20,
     paddingBottom: showStickerPanel
-  ? "calc(38vh + 90px)"
-  : 90,
+  ? `calc(38vh + ${composerHeight + 20}px)`
+  : composerHeight + 20,
     boxSizing: "border-box",
   }}
 >
@@ -3008,6 +3087,7 @@ setTimeout(() => {
   ...pendingUploads,
 ]}
   currentUser="admin"
+  pendingMessageIds={pendingMessageIds}
   profileName={member?.name || "Member"}
   playMenuSound={playMenuSound}
   onCancelUpload={() => {}}
@@ -3134,6 +3214,7 @@ setMessageFocus={setMessageFocus}
 
 
     <ChatComposer
+    composerRef={composerRef}
     placeholder="Type a message..."
   showComposer={showComposer}
 

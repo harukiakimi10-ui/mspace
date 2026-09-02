@@ -7,7 +7,8 @@ import {
   Play,
   Pause,
   Mic,
-  MapPin
+  MapPin,
+  LoaderCircle
 } from "lucide-react";
 import VoiceMessage from "./VoiceMessage";
 import VideoMessage from "./VideoMessage";
@@ -20,6 +21,7 @@ type MessagesProps = {
   messages: any[];
 
   currentUser: "member" | "admin";
+  pendingMessageIds: string[];
 
   profileName: string;
   playMenuSound: (unlockOnly?: boolean) => void;
@@ -117,6 +119,7 @@ const language =
 export default function Messages({
   messages,
   currentUser,
+  pendingMessageIds,
   profileName,
   playMenuSound,
   formatTime,
@@ -355,7 +358,17 @@ const scrollToRepliedMessage = (msg: any) => {
 };
 
   return (
-    <>
+  <>
+    <style jsx global>{`
+      @keyframes mspacePendingSpin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    `}</style>
       {messages.map((msg, index) => {
 
         const displayProgress = Math.min(
@@ -392,6 +405,12 @@ const isExpanded = expandedMessages.has(msg.id);
 
 const isFocused =
   messageFocus && selectedMessage?.id === msg.id;
+
+  const isPending =
+  pendingMessageIds?.includes(msg.id) ?? false;
+
+  const isOfflineUpload =
+  msg.offline === true;
 
 const isDeleted = msg.is_deleted === true;
 
@@ -1054,15 +1073,25 @@ msg.reply_preview === "🎤 Voice message" ? (
       <span>{formatTime(msg.created_at)}</span>
 
       {msg.sender === currentUser && (
-        <span
-          style={{
-            color: msg.is_read ? "#53bdeb" : "#d1d5db",
-            fontWeight: 700,
-          }}
-        >
-          {msg.is_read ? "✓✓" : "✓"}
-        </span>
-      )}
+  isPending ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        animation: "mspacePendingSpin 1s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: msg.is_read ? "#53bdeb" : "#d1d5db",
+        fontWeight: 700,
+      }}
+    >
+      {msg.is_read ? "✓✓" : "✓"}
+    </span>
+  )
+)}
     </div>
   )}
 </div>
@@ -1090,15 +1119,25 @@ msg.reply_preview === "🎤 Voice message" ? (
     <span>{formatTime(msg.created_at)}</span>
 
     {msg.sender === currentUser && (
-      <span
-        style={{
-          color: msg.is_read ? "#53bdeb" : "#d1d5db",
-          fontWeight: 700,
-        }}
-      >
-        {msg.is_read ? "✓✓" : "✓"}
-      </span>
-    )}
+  isPending ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        animation: "mspacePendingSpin 1s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: msg.is_read ? "#53bdeb" : "#d1d5db",
+        fontWeight: 700,
+      }}
+    >
+      {msg.is_read ? "✓✓" : "✓"}
+    </span>
+  )
+)}
   </div>
 )}
 </div>
@@ -1180,15 +1219,25 @@ msg.reply_preview === "🎤 Voice message" ? (
       <span>{formatTime(msg.created_at)}</span>
 
       {msg.sender === currentUser && (
-        <span
-          style={{
-            color: msg.is_read ? "#53bdeb" : "#d1d5db",
-            fontWeight: 700,
-          }}
-        >
-          {msg.is_read ? "✓✓" : "✓"}
-        </span>
-      )}
+  isPending ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        animation: "mspacePendingSpin 1s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: msg.is_read ? "#53bdeb" : "#d1d5db",
+        fontWeight: 700,
+      }}
+    >
+      {msg.is_read ? "✓✓" : "✓"}
+    </span>
+  )
+)}
     </div>
   </div>
 )}
@@ -1261,22 +1310,36 @@ msg.reply_preview === "🎤 Voice message" ? (
             pointerEvents: "auto",
           }}
         >
-          {/* Progress ring */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "50%",
-              background: `conic-gradient(
-                #ffffff ${displayProgress * 3.6}deg,
-                rgba(255,255,255,0.25) 0deg
-              )`,
-              WebkitMask:
-                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-              mask:
-                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-            }}
-          />
+          {/* Progress / offline ring */}
+{isOfflineUpload ? (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      borderRadius: "50%",
+      border: "3px solid rgba(255,255,255,0.25)",
+      borderTopColor: "#ffffff",
+      animation:
+        "mspacePendingSpin 0.8s linear infinite",
+    }}
+  />
+) : (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      borderRadius: "50%",
+      background: `conic-gradient(
+        #ffffff ${displayProgress * 3.6}deg,
+        rgba(255,255,255,0.25) 0deg
+      )`,
+      WebkitMask:
+        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+      mask:
+        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+    }}
+  />
+)}
 
           {/* X */}
           <span
@@ -1313,14 +1376,26 @@ msg.reply_preview === "🎤 Voice message" ? (
       <span>{formatTime(msg.created_at)}</span>
 
       {msg.sender === currentUser && (
-        <span
-          style={{
-            color: msg.is_read ? "#53bdeb" : "#ffffff",
-          }}
-        >
-          {msg.is_read ? "✓✓" : "✓"}
-        </span>
-      )}
+  isOfflineUpload ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        color: "#ffffff",
+        animation:
+          "mspacePendingSpin 0.8s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: msg.is_read ? "#53bdeb" : "#ffffff",
+      }}
+    >
+      {msg.is_read ? "✓✓" : "✓"}
+    </span>
+  )
+)}
     </div>
   </div>
 )}
@@ -1417,21 +1492,35 @@ msg.reply_preview === "🎤 Voice message" ? (
         >
           {/* PROGRESS RING */}
 
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "50%",
-              background: `conic-gradient(
-  #ffffff ${displayProgress * 3.6}deg,
-  rgba(255,255,255,0.25) 0deg
-)`,
-              WebkitMask:
-                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-              mask:
-                "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-            }}
-          />
+          {isOfflineUpload ? (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      borderRadius: "50%",
+      border: "3px solid rgba(255,255,255,0.25)",
+      borderTopColor: "#ffffff",
+      animation:
+        "mspacePendingSpin 0.8s linear infinite",
+    }}
+  />
+) : (
+  <div
+    style={{
+      position: "absolute",
+      inset: 0,
+      borderRadius: "50%",
+      background: `conic-gradient(
+        #ffffff ${displayProgress * 3.6}deg,
+        rgba(255,255,255,0.25) 0deg
+      )`,
+      WebkitMask:
+        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+      mask:
+        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
+    }}
+  />
+)}
 
           {/* CANCEL */}
 
@@ -1469,6 +1558,28 @@ msg.reply_preview === "🎤 Voice message" ? (
         }}
       >
         <span>{formatTime(msg.created_at)}</span>
+        {msg.sender === currentUser && (
+  isOfflineUpload ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        color: "#ffffff",
+        animation:
+          "mspacePendingSpin 0.8s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: "#ffffff",
+        fontWeight: 700,
+      }}
+    >
+      ✓
+    </span>
+  )
+)}
       </div>
     </div>
   ) : (

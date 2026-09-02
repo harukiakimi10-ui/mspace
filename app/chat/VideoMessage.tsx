@@ -6,6 +6,7 @@ import {
   Play,
   Pause,
   X,
+  LoaderCircle,
 } from "lucide-react";
 
 const language =
@@ -700,45 +701,57 @@ export default function VideoMessage({
   />
 )}
 
-        {/* Play */}
+        {/* Play / Offline loading */}
 
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent:
-              "center",
-            pointerEvents: "none",
-          }}
-        >
-          <span
-            style={{
-              width: 54,
-              height: 54,
-              borderRadius: "50%",
-              background:
-                "rgba(255,255,255,0.96)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent:
-                "center",
-              boxShadow:
-                "0 3px 14px rgba(0,0,0,0.35)",
-            }}
-          >
-            <Play
-              size={24}
-              strokeWidth={2.4}
-              fill="#000"
-              color="#000"
-              style={{
-                marginLeft: 3,
-              }}
-            />
-          </span>
-        </div>
+<div
+  style={{
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "none",
+  }}
+>
+  {msg.offline ? (
+    <div
+      style={{
+        width: 58,
+        height: 58,
+        borderRadius: "50%",
+        border: "3px solid rgba(255,255,255,0.25)",
+        borderTopColor: "#ffffff",
+        animation:
+          "mspacePendingSpin 0.8s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        width: 54,
+        height: 54,
+        borderRadius: "50%",
+        background:
+          "rgba(255,255,255,0.96)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow:
+          "0 3px 14px rgba(0,0,0,0.35)",
+      }}
+    >
+      <Play
+        size={24}
+        strokeWidth={2.4}
+        fill="#000"
+        color="#000"
+        style={{
+          marginLeft: 3,
+        }}
+      />
+    </span>
+  )}
+</div>
 
         {/* REAL VIDEO DURATION */}
 
@@ -790,21 +803,32 @@ export default function VideoMessage({
             )}
           </span>
 
-          {msg.sender ===
-            currentUser && (
-            <span
-              style={{
-                color: msg.is_read
-                  ? "#53bdeb"
-                  : "#fff",
-                fontWeight: 700,
-              }}
-            >
-              {msg.is_read
-                ? "✓✓"
-                : "✓"}
-            </span>
-          )}
+          {msg.sender === currentUser && (
+  msg.offline ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        color: "#ffffff",
+        animation:
+          "mspacePendingSpin 0.8s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: msg.is_read
+          ? "#53bdeb"
+          : "#fff",
+        fontWeight: 700,
+      }}
+    >
+      {msg.is_read
+        ? "✓✓"
+        : "✓"}
+    </span>
+  )
+)}
         </div>
       </div>
 

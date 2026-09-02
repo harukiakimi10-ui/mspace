@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { LoaderCircle } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 
 type LocationMessageProps = {
@@ -45,6 +46,7 @@ const cancelLongPress = () => {
   
 
   const isMine = msg.sender === currentUser;
+  const isPending = msg.pending === true;
 
   // Get latitude and longitude from the saved Google Maps URL
   const getCoordinates = () => {
@@ -250,15 +252,25 @@ onPointerCancelCapture={() => {
         </span>
 
         {isMine && (
-          <span
-            style={{
-              fontSize: "14px",
-              lineHeight: "14px",
-            }}
-          >
-            ✓
-          </span>
-        )}
+  isPending ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        animation: "mspacePendingSpin 1s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        fontSize: "14px",
+        lineHeight: "14px",
+      }}
+    >
+      ✓
+    </span>
+  )
+)}
       </div>
     </div>
   );

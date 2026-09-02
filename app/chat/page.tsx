@@ -40,6 +40,12 @@ import {
   getAdminStatus,
 } from "./services/conversationService";
 
+import {
+  saveOfflineUpload,
+  getOfflineUploads,
+  deleteOfflineUpload,
+} from "./services/offlineUploadQueue";
+
 
 
 
@@ -185,6 +191,7 @@ console.log(
 
 
   const [messages, setMessages] = useState<any[]>([]);
+  const [pendingMessageIds, setPendingMessageIds] = useState<string[]>([]);
    useEffect(() => {
   console.log("messages changed");
 }, [messages]);
@@ -221,6 +228,7 @@ const [audioChunks, setAudioChunks] =
 
 const CHAT_CACHE_KEY = `mspace-chat-header-${memberId ?? "default"}`;
 const MESSAGE_CACHE_KEY = `mspace-chat-messages-${memberId ?? "default"}`;
+const OUTBOX_CACHE_KEY = `mspace-chat-outbox-${memberId ?? "default"}`;
 
 
   const [cachedHeader, setCachedHeader] = useState<any>(null);
@@ -259,6 +267,8 @@ const [startupComplete, setStartupComplete] = useState(false);
 const [uploading, setUploading] = useState(false);
 
 const messagesRef = useRef<HTMLDivElement>(null);
+const syncingOutboxRef = useRef(false);
+const syncingUploadsRef = useRef(false);
 const longPressTimerRef =
   useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -314,6 +324,7 @@ useEffect(() => {
 }, [showMessageMenu, showStickerPanel]);
 
 const [showComposer, setShowComposer] = useState(true);
+const composerRef = useRef<HTMLDivElement | null>(null);
 const [messageFocus, setMessageFocus] = useState(false);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 
@@ -496,6 +507,116 @@ const closeMessageMenu = () => {
 
 
 async function bootstrapChat() {
+  if (!navigator.onLine) {
+    console.log("MSpace: offline startup");
+
+    // Restore cached header information
+    const cachedHeader =
+      localStorage.getItem(CHAT_CACHE_KEY);
+
+    if (cachedHeader) {
+      try {
+        const header = JSON.parse(cachedHeader);
+
+        if (header.profileName) {
+          setProfileName(header.profileName);
+        }
+
+        if (header.profilePhoto) {
+          setProfilePhoto(header.profilePhoto);
+        }
+
+        if (header.admin) {
+          setAdmin(header.admin);
+        }
+
+        if (header.conversation) {
+          setConversation(header.conversation);
+          setConversationId(header.conversation.id);
+        }
+      } catch (error) {
+        console.error(
+          "MSpace: cached header restore failed:",
+          error
+        );
+      }
+    }
+
+    // Restore cached messages
+    const cachedMessages =
+      localStorage.getItem(MESSAGE_CACHE_KEY);
+
+    if (cachedMessages) {
+      try {
+        const parsedMessages =
+          JSON.parse(cachedMessages);
+
+        if (Array.isArray(parsedMessages)) {
+          setMessages(
+            parsedMessages.filter(
+              (msg: any) =>
+                msg.deleted_for !== "member"
+            )
+          );
+        }
+      } catch (error) {
+        console.error(
+          "MSpace: cached messages restore failed:",
+          error
+        );
+      }
+    }
+
+    // Restore messages waiting to be sent
+    const cachedOutbox =
+      localStorage.getItem(OUTBOX_CACHE_KEY);
+
+    if (cachedOutbox) {
+      try {
+        const outbox = JSON.parse(cachedOutbox);
+
+        if (
+          Array.isArray(outbox) &&
+          outbox.length > 0
+        ) {
+          setMessages((prev) => {
+            const existingIds = new Set(
+              prev.map((msg) => msg.id)
+            );
+
+            const pendingMessages =
+              outbox.filter(
+                (msg: any) =>
+                  !existingIds.has(msg.id)
+              );
+
+            return [
+              ...prev,
+              ...pendingMessages,
+            ];
+          });
+
+          setPendingMessageIds(
+            outbox.map(
+              (msg: any) => msg.id
+            )
+          );
+        }
+      } catch (error) {
+        console.error(
+          "MSpace: offline outbox restore failed:",
+          error
+        );
+      }
+    }
+
+    // Do not wait for Supabase while offline.
+    setStartupComplete(true);
+
+    return;
+  }
+
+  // Normal online startup
   await Promise.all([
     loadConversation(),
     loadProfile(),
@@ -511,6 +632,67 @@ useEffect(() => {
   hasBootstrappedRef.current = true;
 
   void bootstrapChat();
+}, []);
+
+useEffect(() => {
+  let cancelled = false;
+
+  async function restoreOfflineUploads() {
+    if (typeof window === "undefined") return;
+
+    try {
+      const uploads = await getOfflineUploads();
+
+      if (cancelled || uploads.length === 0) return;
+
+      const restoredUploads = uploads.map((upload) => ({
+        id: upload.id,
+        upload_id: upload.upload_id,
+        sender: "member",
+        message_type: upload.file.type.startsWith("image/")
+          ? "image"
+          : upload.file.type.startsWith("video/")
+          ? "video"
+          : "file",
+        file_url: URL.createObjectURL(upload.file),
+        file_name: upload.file.name,
+        created_at: new Date().toISOString(),
+        uploading: true,
+        offline: true,
+        progress: 0,
+        is_read: false,
+      }));
+
+      setPendingUploads((prev) => {
+        const existingIds = new Set(
+          prev.map((item) => item.id)
+        );
+
+        return [
+          ...prev,
+          ...restoredUploads.filter(
+            (item) => !existingIds.has(item.id)
+          ),
+        ];
+      });
+
+      console.log(
+        "MSpace: restored offline uploads:",
+        uploads.length
+      );
+    } catch (error) {
+      console.error(
+        "MSpace: failed to restore offline uploads:",
+        error
+      );
+    }
+  }
+
+  void restoreOfflineUploads();
+
+  return () => {
+    cancelled = true;
+  };
 }, []);
 
 
@@ -594,17 +776,21 @@ useEffect(() => {
 
     void setPresence(active);
 
-    if (active && conversationId) {
-      void loadMessages(conversationId);
+    if (
+  active &&
+  conversationId &&
+  navigator.onLine
+) {
+  void loadMessages(conversationId);
 
-      setTimeout(() => {
-        if (mounted) {
-          void markMessagesAsRead(
-            conversationId
-          );
-        }
-      }, 200);
+  setTimeout(() => {
+    if (mounted) {
+      void markMessagesAsRead(
+        conversationId
+      );
     }
+  }, 200);
+}
   };
 
   // Entering the chat
@@ -1048,6 +1234,12 @@ async function handleMessageInput(
 
 
 async function loadMessages(id: string) {
+  if (!navigator.onLine) {
+  console.log(
+    "MSpace: offline — using cached/local messages."
+  );
+  return;
+}
   const data = await getMessages(id);
 
   const filteredMessages = (data || []).filter(
@@ -1182,6 +1374,75 @@ async function sendMessage() {
 
   if (!message.trim()) return;
 
+  const messageId = `pending-${Date.now()}-${Math.random()
+  .toString(36)
+  .slice(2)}`;
+
+const messageContent = message;
+
+setPendingMessageIds((prev) => [
+  ...prev,
+  messageId,
+]);
+
+const temporaryMessage = {
+  id: messageId,
+  conversation_id: conversationId,
+  sender: "member",
+  message_type: "text",
+  content: messageContent,
+  created_at: new Date().toISOString(),
+  is_read: false,
+  pending: true,
+};
+
+setMessages((prev) => [
+  ...prev,
+  temporaryMessage,
+]);
+
+const existingOutbox =
+  localStorage.getItem(OUTBOX_CACHE_KEY);
+
+let outbox: any[] = [];
+
+if (existingOutbox) {
+  try {
+    outbox = JSON.parse(existingOutbox);
+  } catch {
+    outbox = [];
+  }
+}
+
+outbox.push({
+  ...temporaryMessage,
+  replyMessage: replyMessage ?? null,
+});
+
+localStorage.setItem(
+  OUTBOX_CACHE_KEY,
+  JSON.stringify(outbox)
+);
+
+resetComposer();
+
+if (!navigator.onLine) {
+  console.log("MSpace: message queued because device is offline.");
+
+  setTimeout(() => {
+    const el = messagesRef.current;
+
+    if (!el) return;
+
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth",
+    });
+  }, 50);
+
+  return;
+}
+
   let data;
 
 try {
@@ -1196,6 +1457,31 @@ try {
 }
 
 if (!data) return;
+
+setPendingMessageIds((prev) =>
+  prev.filter((id) => id !== messageId)
+);
+
+const currentOutbox =
+  localStorage.getItem(OUTBOX_CACHE_KEY);
+
+if (currentOutbox) {
+  try {
+    const outbox = JSON.parse(currentOutbox);
+
+    const updatedOutbox = outbox.filter(
+      (item: any) => item.id !== messageId
+    );
+
+    localStorage.setItem(
+      OUTBOX_CACHE_KEY,
+      JSON.stringify(updatedOutbox)
+    );
+  } catch {
+    localStorage.removeItem(OUTBOX_CACHE_KEY);
+  }
+}
+
   const isAndroid =
   /Android/i.test(navigator.userAgent);
 
@@ -1224,6 +1510,312 @@ setTimeout(() => {
   });
 }, 50);
 }
+
+async function syncPendingMessages() {
+  if (syncingOutboxRef.current) {
+  console.log(
+    "MSpace: sync skipped — another sync is already running."
+  );
+  return;
+}
+
+syncingOutboxRef.current = true;
+
+try {
+  console.log("MSpace: sync started", {
+    online: navigator.onLine,
+    conversationId,
+  });
+
+  if (!navigator.onLine) {
+    console.log(
+      "MSpace: sync stopped — still offline."
+    );
+    return;
+  }
+
+  const existingOutbox =
+    localStorage.getItem(OUTBOX_CACHE_KEY);
+
+  console.log(
+    "MSpace: outbox found:",
+    existingOutbox
+  );
+
+  if (!existingOutbox) {
+    console.log(
+      "MSpace: sync stopped — no outbox."
+    );
+    return;
+  }
+
+  let outbox: any[] = [];
+
+  try {
+    outbox = JSON.parse(existingOutbox);
+  } catch {
+    outbox = [];
+  }
+
+  if (!Array.isArray(outbox) || outbox.length === 0) {
+    console.log(
+      "MSpace: sync stopped — outbox is empty."
+    );
+    return;
+  }
+
+  // After an offline reload, React may not have
+  // restored conversationId yet. Use the ID stored
+  // inside the pending message instead.
+  const syncConversationId =
+    conversationId ??
+    outbox[0]?.conversation_id ??
+    null;
+
+  if (!syncConversationId) {
+    console.log(
+      "MSpace: sync stopped — no conversation ID available."
+    );
+    return;
+  }
+
+  // Restore it into React state as well.
+  if (!conversationId) {
+    setConversationId(syncConversationId);
+  }
+
+  console.log(
+    "MSpace: syncing pending messages:",
+    outbox.length,
+    "conversation:",
+    syncConversationId
+  );
+
+  for (const pendingMessage of outbox) {
+    try {
+      const data =
+  pendingMessage.message_type === "sticker"
+    ? await sendStickerMessage(
+        pendingMessage.conversation_id ??
+          syncConversationId,
+        pendingMessage.file_url,
+        pendingMessage.replyMessage ?? null
+      )
+    : pendingMessage.message_type === "location"
+    ? await sendLocationMessage(
+        pendingMessage.conversation_id ??
+          syncConversationId,
+        Number(
+          new URL(pendingMessage.content).searchParams.get("q")?.split(",")[0]
+        ),
+        Number(
+          new URL(pendingMessage.content).searchParams.get("q")?.split(",")[1]
+        ),
+        "member"
+      )
+    : await sendTextMessage({
+        conversationId:
+          pendingMessage.conversation_id ??
+          syncConversationId,
+        content: pendingMessage.content,
+        replyMessage:
+          pendingMessage.replyMessage ?? null,
+      });
+
+      if (!data) continue;
+
+      setPendingMessageIds((prev) =>
+        prev.filter(
+          (id) => id !== pendingMessage.id
+        )
+      );
+
+      outbox = outbox.filter(
+        (item) => item.id !== pendingMessage.id
+      );
+
+      localStorage.setItem(
+        OUTBOX_CACHE_KEY,
+        JSON.stringify(outbox)
+      );
+
+      console.log(
+        "MSpace: pending message synced:",
+        pendingMessage.id
+      );
+    } catch (error) {
+      console.error(
+        "MSpace: failed to sync pending message:",
+        error
+      );
+
+      // Keep the failed message in the outbox.
+      break;
+    }
+  }
+
+  if (outbox.length === 0) {
+    localStorage.removeItem(OUTBOX_CACHE_KEY);
+  }
+
+ await loadMessages(syncConversationId);
+} finally {
+  syncingOutboxRef.current = false;
+}
+
+}  
+
+async function syncPendingUploads() {
+  if (syncingUploadsRef.current) {
+  console.log(
+    "MSpace: media sync skipped — another sync is already running."
+  );
+  return;
+}
+
+if (!navigator.onLine) {
+  console.log(
+    "MSpace: media sync stopped — still offline."
+  );
+  return;
+}
+
+syncingUploadsRef.current = true;
+
+  try {
+    const uploads = await getOfflineUploads();
+
+    if (uploads.length === 0) {
+      console.log(
+        "MSpace: media sync stopped — no queued uploads."
+      );
+      return;
+    }
+
+    console.log(
+      "MSpace: queued media uploads found:",
+      uploads.length
+    );
+
+    for (const pendingUpload of uploads) {
+      try {
+        console.log(
+          "MSpace: syncing offline media:",
+          pendingUpload.file.name
+        );
+
+        setPendingUploads((prev) =>
+  prev.map((item) =>
+    item.upload_id === pendingUpload.upload_id
+      ? { ...item, offline: false }
+      : item
+  )
+);
+
+        const insertedMessage = await uploadFile(
+        pendingUpload.file,
+        pendingUpload.upload_id,
+        pendingUpload.conversation_id
+      );
+
+        if (!insertedMessage?.file_url) {
+          throw new Error(
+            "Media upload did not return a file URL."
+          );
+        }
+
+        // Add the real Supabase message to the chat.
+        setMessages((prev) => {
+          const alreadyExists = prev.some(
+            (message) =>
+              message.id === insertedMessage.id
+          );
+
+          if (alreadyExists) {
+            return prev;
+          }
+
+          return [
+            ...prev,
+            insertedMessage,
+          ];
+        });
+
+        // Remove the temporary uploading message.
+        setPendingUploads((prev) =>
+          prev.filter(
+            (message) =>
+              message.upload_id !==
+              pendingUpload.upload_id
+          )
+        );
+
+        // Remove the successfully uploaded file
+        // from IndexedDB.
+        await deleteOfflineUpload(
+          pendingUpload.id
+        );
+
+        console.log(
+          "MSpace: offline media synced successfully:",
+          pendingUpload.file.name
+        );
+      } catch (error) {
+        console.error(
+          "MSpace: failed to sync offline media:",
+          pendingUpload.file.name,
+          error
+        );
+
+        // Keep this upload in IndexedDB.
+        // It will be retried when the network
+        // is available again.
+        break;
+      }
+    }
+  } catch (error) {
+    console.error(
+      "MSpace: offline media sync error:",
+      error
+    );
+  } finally {
+    syncingUploadsRef.current = false;
+  }
+}
+
+useEffect(() => {
+  const handleOnline = () => {
+  console.log("MSpace TEST: ONLINE EVENT FIRED");
+  console.log(
+    "MSpace TEST: conversationId =",
+    conversationId
+  );
+  console.log(
+    "MSpace TEST: outbox =",
+    localStorage.getItem(OUTBOX_CACHE_KEY)
+  );
+
+  setTimeout(() => {
+  console.log("MSpace TEST: STARTING SYNC");
+
+  void loadProfile();
+  void syncPendingMessages();
+  void syncPendingUploads();
+}, 1500);
+};
+
+  window.addEventListener("online", handleOnline);
+
+  if (navigator.onLine && conversationId) {
+  void loadProfile();
+  void syncPendingMessages();
+  void syncPendingUploads();
+}
+
+  return () => {
+    window.removeEventListener("online", handleOnline);
+  };
+}, [conversationId, startupComplete]);
 
 const startRecording = async () => {
 
@@ -1430,7 +2022,78 @@ const deleteRecording = () => {
 async function sendSticker(sticker: string) {
   if (!conversationId) return;
 
-  let data;
+  const messageId = `pending-sticker-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+
+  const temporarySticker = {
+    id: messageId,
+    conversation_id: conversationId,
+    sender: "member",
+    message_type: "sticker",
+    content: "[sticker]",
+    file_url: sticker,
+    created_at: new Date().toISOString(),
+    is_read: false,
+    pending: true,
+  };
+
+  setPendingMessageIds((prev) => [
+    ...prev,
+    messageId,
+  ]);
+
+  setMessages((prev) => [
+  ...prev,
+  temporarySticker,
+]);
+
+const existingOutbox =
+  localStorage.getItem(OUTBOX_CACHE_KEY);
+
+let outbox: any[] = [];
+
+if (existingOutbox) {
+  try {
+    outbox = JSON.parse(existingOutbox);
+  } catch {
+    outbox = [];
+  }
+}
+
+outbox.push({
+  ...temporarySticker,
+  replyMessage: replyMessage ?? null,
+});
+
+localStorage.setItem(
+  OUTBOX_CACHE_KEY,
+  JSON.stringify(outbox)
+);
+
+if (!navigator.onLine) {
+  console.log(
+    "MSpace: sticker queued because device is offline."
+  );
+
+  setReplyMessage(null);
+  setReplyPreview("");
+
+  setTimeout(() => {
+    const el = messagesRef.current;
+
+    if (!el) return;
+
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth",
+    });
+  }, 50);
+
+  return;
+}
+
+let data;
 
 try {
   data = await sendStickerMessage(
@@ -1444,6 +2107,30 @@ try {
 }
 
 if (!data) return;
+
+setPendingMessageIds((prev) =>
+  prev.filter((id) => id !== messageId)
+);
+
+const currentOutbox =
+  localStorage.getItem(OUTBOX_CACHE_KEY);
+
+if (currentOutbox) {
+  try {
+    const outbox = JSON.parse(currentOutbox);
+
+    const updatedOutbox = outbox.filter(
+      (item: any) => item.id !== messageId
+    );
+
+    localStorage.setItem(
+      OUTBOX_CACHE_KEY,
+      JSON.stringify(updatedOutbox)
+    );
+  } catch {
+    localStorage.removeItem(OUTBOX_CACHE_KEY);
+  }
+}
 
 // Clear the reply composer after sending
 setReplyMessage(null);
@@ -1619,9 +2306,13 @@ async function createTemporaryVideoThumbnail(
 
 async function uploadFile(
   file: File,
-  uploadId?: string
+  uploadId?: string,
+  conversationIdOverride?: string
 ) {
-  if (!conversationId) return;
+  const activeConversationId =
+    conversationIdOverride ?? conversationId;
+
+  if (!activeConversationId) return;
 
   setUploading(true);
 
@@ -1674,8 +2365,7 @@ async function uploadFile(
 const safeFileName = uploadFile.name
   .replace(/[^a-zA-Z0-9._-]/g, "_");
 
-const filePath =
-  `${conversationId}/${Date.now()}-${safeFileName}`;
+const filePath = `${activeConversationId}/${Date.now()}-${safeFileName}`;
 
 console.log("Original filename:", uploadFile.name);
 console.log("Storage filename:", safeFileName);
@@ -1841,7 +2531,7 @@ if (uploadFile.type.startsWith("video/")) {
 
               try {
                 const thumbnailPath =
-                  `${conversationId}/thumb-${uploadId || Date.now()}.jpg`;
+                  `${activeConversationId}/thumb-${uploadId || Date.now()}.jpg`;
 
                 const {
                   error: thumbnailUploadError,
@@ -1967,7 +2657,7 @@ if (uploadFile.type.startsWith("video/")) {
   await supabase
     .from("messages")
     .insert({
-      conversation_id: conversationId,
+      conversation_id: activeConversationId,
       sender: "member",
 
       message_type: uploadFile.type.startsWith("image/")
@@ -2037,7 +2727,7 @@ try {
             ? "🎥Video"
             : "📎File",
 
-        conversationId,
+        conversationId: activeConversationId,
 
         targetMemberId:
           "11111111-1111-1111-1111-111111111111",
@@ -2602,6 +3292,78 @@ onDeleteForEveryone={async () => {
       setLocationPreview(null);
     }}
     onSend={async (latitude, longitude) => {
+  const messageId = `pending-location-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+
+  const locationUrl =
+    `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+  const temporaryLocation = {
+    id: messageId,
+    conversation_id: conversationId!,
+    sender: "member",
+    message_type: "location",
+    content: locationUrl,
+    created_at: new Date().toISOString(),
+    is_read: false,
+    pending: true,
+  };
+
+  setPendingMessageIds((prev) => [
+    ...prev,
+    messageId,
+  ]);
+
+  setMessages((prev) => [
+    ...prev,
+    temporaryLocation,
+  ]);
+
+  const existingOutbox =
+    localStorage.getItem(OUTBOX_CACHE_KEY);
+
+  let outbox: any[] = [];
+
+  if (existingOutbox) {
+    try {
+      outbox = JSON.parse(existingOutbox);
+    } catch {
+      outbox = [];
+    }
+  }
+
+  outbox.push({
+    ...temporaryLocation,
+  });
+
+  localStorage.setItem(
+    OUTBOX_CACHE_KEY,
+    JSON.stringify(outbox)
+  );
+
+  if (!navigator.onLine) {
+    console.log(
+      "MSpace: location queued because device is offline."
+    );
+
+    setShowLocationPreview(false);
+    setLocationPreview(null);
+
+    setTimeout(() => {
+      const el = messagesRef.current;
+
+      if (!el) return;
+
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: "smooth",
+      });
+    }, 50);
+
+    return;
+  }
+
   try {
     await sendLocationMessage(
       conversationId!,
@@ -2697,6 +3459,7 @@ if (fileToUpload.type.startsWith("video/")) {
       file_name: fileToUpload.name,
       created_at: new Date().toISOString(),
       uploading: true,
+      offline: !navigator.onLine,
       progress: 0,
       is_read: false,
     },
@@ -2715,10 +3478,44 @@ if (fileToUpload.type.startsWith("video/")) {
   // Close and completely clear the full-screen preview
   // immediately when Send is pressed.
   setShowPreview(false);
-  setPreviewFile(null);
-  setPreviewUrl("");
+setPreviewFile(null);
+setPreviewUrl("");
 
+// OFFLINE MEDIA QUEUE
+if (!navigator.onLine) {
   try {
+    await saveOfflineUpload({
+      id: tempId,
+      conversation_id: conversationId!,
+      upload_id: uploadId,
+      file: fileToUpload,
+    });
+
+    console.log(
+      "MSpace: media queued for offline upload:",
+      fileToUpload.name
+    );
+
+    return;
+  } catch (error) {
+    console.error(
+      "MSpace: failed to save offline media:",
+      error
+    );
+
+    // Remove the temporary message if it could not
+    // be saved into the offline queue.
+    setPendingUploads((prev) =>
+      prev.filter(
+        (message) => message.id !== tempId
+      )
+    );
+
+    return;
+  }
+}
+
+try {
     // Upload using the captured file, NOT previewFile state.
     const insertedMessage =
   await uploadFile(fileToUpload, uploadId);
@@ -2972,6 +3769,7 @@ setPendingUploads((prev) =>
   ...pendingUploads,
 ]}
   currentUser="member"
+  pendingMessageIds={pendingMessageIds}
   profileName={profileName}
   playMenuSound={playMenuSound}
   formatTime={formatTime}
@@ -3106,6 +3904,7 @@ setMessageFocus={setMessageFocus}
 
       {showComposer && (
   <ChatComposer
+  composerRef={composerRef}
   placeholder={language === "zh" ? "输入消息..." : "Type a message..."}
   showComposer={showComposer}
 

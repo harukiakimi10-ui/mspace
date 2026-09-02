@@ -7,6 +7,8 @@ import VoiceRecorder from "./VoiceRecorder";
 
 
 type ChatComposerProps = {
+  composerRef: React.RefObject<HTMLDivElement | null>;
+
   placeholder: string;
   showComposer?: boolean;
 
@@ -79,6 +81,7 @@ type ChatComposerProps = {
 };
 
 export default function ChatComposer({
+  composerRef,
   placeholder,
 
   showComposer,
@@ -138,8 +141,9 @@ if (!showComposer) {
 
   return (
     <div
+      ref={composerRef}
       style={{
-  position: "fixed",
+        position: "fixed",
   left: 0,
   right: 0,
   bottom: stickerOpen ? "38vh" : 0,
