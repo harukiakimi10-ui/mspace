@@ -2712,7 +2712,7 @@ setTimeout(() => {
     minHeight: 0,
     display: "flex",
     flexDirection: "column",
-    background: "#f8f5ff",
+    background: "#f8f7ff",
     position: "fixed",
     inset: 0,
     overflow: "hidden",
@@ -2725,8 +2725,8 @@ setTimeout(() => {
     height: 70,
     minHeight: 70,
     flexShrink: 0,
-    background: "#6d28d9",
-    color: "#fff",
+    background: "#fff",
+    color: "#111",
     display: "flex",
     alignItems: "center",
     padding: "0 20px",
@@ -2754,7 +2754,7 @@ setTimeout(() => {
       borderRadius: "50%",
       border: "1px solid rgba(255,255,255,0.22)",
       background: "rgba(255,255,255,0.12)",
-      color: "#fff",
+      color: "#111",
 
       display: "flex",
       alignItems: "center",
@@ -2884,11 +2884,21 @@ setTimeout(() => {
   </div>
 )}
       <div>
-  <div style={{ fontWeight: 600 }}>
+  <div
+  style={{
+    fontWeight: 600,
+    color: "#111",
+  }}
+>
   {member?.name || "Member"}
 </div>
 
-  <div style={{ fontSize: 13 }}>
+  <div
+  style={{
+    fontSize: 13,
+    color: "#666",
+  }}
+>
   {conversation?.member_typing
     ? "Typing..."
     : member?.is_online

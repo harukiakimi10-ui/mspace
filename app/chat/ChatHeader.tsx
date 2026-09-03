@@ -71,9 +71,9 @@ useEffect(() => {
       minHeight: "60px",
       flexShrink: 0,
 
-      background: "linear-gradient(90deg,#7c3aed,#9333ea)",
+      background: "#fff",
       color: "#fff",
-      boxShadow: "0 2px 12px rgba(0,0,0,.12)",
+      boxShadow: "none",
     }}
   >
       <button
@@ -85,7 +85,7 @@ useEffect(() => {
 
     border: "1px solid rgba(255,255,255,0.22)",
     background: "rgba(255,255,255,0.12)",
-    color: "#fff",
+    color: "#111",
 
     display: "flex",
     alignItems: "center",
@@ -143,6 +143,7 @@ useEffect(() => {
   style={{
     fontWeight: "bold",
     fontSize: "17px",
+    color: "#111",
 
     WebkitUserSelect: "none",
     userSelect: "none",
@@ -154,6 +155,7 @@ useEffect(() => {
         <div
   style={{
     fontSize: "13px",
+    color: "#666",
   }}
 >
   {conversation?.admin_typing

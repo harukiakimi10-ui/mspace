@@ -649,11 +649,13 @@ useEffect(() => {
         id: upload.id,
         upload_id: upload.upload_id,
         sender: "member",
-        message_type: upload.file.type.startsWith("image/")
-          ? "image"
-          : upload.file.type.startsWith("video/")
-          ? "video"
-          : "file",
+        message_type: upload.message_type === "voice"
+  ? "voice"
+  : upload.file.type.startsWith("image/")
+  ? "image"
+  : upload.file.type.startsWith("video/")
+  ? "video"
+  : "file",
         file_url: URL.createObjectURL(upload.file),
         file_name: upload.file.name,
         created_at: new Date().toISOString(),
@@ -661,6 +663,7 @@ useEffect(() => {
         offline: true,
         progress: 0,
         is_read: false,
+        file_duration: upload.file_duration,
       }));
 
       setPendingUploads((prev) => {
@@ -1713,10 +1716,12 @@ syncingUploadsRef.current = true;
 );
 
         const insertedMessage = await uploadFile(
-        pendingUpload.file,
-        pendingUpload.upload_id,
-        pendingUpload.conversation_id
-      );
+  pendingUpload.file,
+  pendingUpload.upload_id,
+  pendingUpload.conversation_id,
+  pendingUpload.file_duration,
+  pendingUpload.replyMessage
+);
 
         if (!insertedMessage?.file_url) {
           throw new Error(
@@ -2307,7 +2312,9 @@ async function createTemporaryVideoThumbnail(
 async function uploadFile(
   file: File,
   uploadId?: string,
-  conversationIdOverride?: string
+  conversationIdOverride?: string,
+  voiceDuration?: number,
+  voiceReplyMessage?: any
 ) {
   const activeConversationId =
     conversationIdOverride ?? conversationId;
@@ -2660,12 +2667,13 @@ if (uploadFile.type.startsWith("video/")) {
       conversation_id: activeConversationId,
       sender: "member",
 
-      message_type: uploadFile.type.startsWith("image/")
-        ? "image"
-        : uploadFile.type.startsWith("video/")
-        ? "video"
-        : "file",
-
+      message_type: voiceDuration !== undefined
+  ? "voice"
+  : uploadFile.type.startsWith("image/")
+  ? "image"
+  : uploadFile.type.startsWith("video/")
+  ? "video"
+  : "file",
       content: "",
 
       file_url: data.publicUrl,
@@ -2676,9 +2684,14 @@ if (uploadFile.type.startsWith("video/")) {
 
       file_name: uploadFile.name,
       file_size: uploadFile.size,
-      mime_type: uploadFile.type,
+mime_type: uploadFile.type,
 
-      is_read: false,
+file_duration:
+  voiceDuration !== undefined
+    ? voiceDuration
+    : null,
+
+is_read: false,
     })
     .select()
     .single();
@@ -2776,6 +2789,31 @@ async function sendVoiceMessage(duration: number) {
 
   sendingVoiceRef.current = true;
 
+  const activeConversationId =
+    conversationId ??
+    (() => {
+      try {
+        const cachedHeader =
+          localStorage.getItem(CHAT_CACHE_KEY);
+
+        if (!cachedHeader) return null;
+
+        const header = JSON.parse(cachedHeader);
+
+        return header?.conversation?.id ?? null;
+      } catch {
+        return null;
+      }
+    })();
+
+  if (!activeConversationId) {
+    console.log(
+      "MSpace: voice send stopped — no conversation ID available."
+    );
+    sendingVoiceRef.current = false;
+    return;
+  }
+
   console.log("Sending voice duration:", duration);
 
 console.log("MEMBER ID:", localStorage.getItem("mspace_member_id"));
@@ -2783,8 +2821,10 @@ console.log("DEVICE ID:", localStorage.getItem("mspace_device_id"));
 console.log("CONVERSATION ID:", conversationId);
 
 
-  if (!conversationId) {
-  alert("CONVERSATION ID IS EMPTY");
+  if (!activeConversationId) {
+  console.log(
+    "MSpace: voice send waiting for conversation ID."
+  );
   return;
 }
 
@@ -2815,8 +2855,90 @@ const file = new File(
   }
 );
 
+const voiceUploadId =
+  `voice-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+
+const temporaryVoiceMessage = {
+  id: `pending-${voiceUploadId}`,
+  conversation_id: activeConversationId,
+  sender: "member",
+  message_type: "voice",
+  content: "",
+  file_url: URL.createObjectURL(file),
+  file_name: file.name,
+  file_size: file.size,
+  mime_type: file.type,
+  file_duration: duration,
+  created_at: new Date().toISOString(),
+  is_read: false,
+  uploading: true,
+  offline: true,
+  upload_id: voiceUploadId,
+};
+
+setMessages((prev) => [
+  ...prev,
+  temporaryVoiceMessage,
+]);
+
+await saveOfflineUpload({
+  id: voiceUploadId,
+  conversation_id: activeConversationId,
+  upload_id: voiceUploadId,
+  file,
+  replyMessage: replyMessage ?? null,
+  message_type: "voice",
+  file_duration: duration,
+});
+
+deleteRecording();
+
+recordedAudioRef.current = null;
+
+if (!navigator.onLine) {
+  console.log(
+    "MSpace: voice message queued because device is offline."
+  );
+
+  requestAnimationFrame(() => {
+    messageInputRef.current?.focus();
+  });
+
+  setTimeout(() => {
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, 50);
+
+  return;
+}
+
 const filePath =
   `${conversationId}/${file.name}`;
+
+  if (!navigator.onLine) {
+  console.log(
+    "MSpace: voice message queued because device is offline."
+  );
+
+  const uploadId = `voice-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`;
+
+  await saveOfflineUpload({
+    id: uploadId,
+    conversation_id: activeConversationId,
+    upload_id: uploadId,
+    file,
+    file_duration: duration,
+    replyMessage: replyMessage ?? null,
+  });
+
+  return;
+}
 
   const { error: uploadError } = await supabase.storage
   .from("photos")
@@ -2943,7 +3065,7 @@ void fetch("/api/push/send", {
     );
   });
 
-await loadMessages(conversationId);
+await loadMessages(activeConversationId);
 
 deleteRecording();
 
@@ -3636,7 +3758,7 @@ setPendingUploads((prev) =>
     admin={admin}
     conversation={conversation}
     formatLastSeen={formatLastSeen}
-    onBack={() => router.push("/members")}
+    onBack={() => router.back()}
   />
 </div>
 

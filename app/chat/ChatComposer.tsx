@@ -150,13 +150,13 @@ if (!showComposer) {
 
   zIndex: 5000,
         borderTop: "1px solid rgba(0,0,0,.08)",
-        background: "#f8f7ff",
+        background: "#fff",
 
         paddingTop: "8px",
         paddingBottom:
           "max(8px, env(safe-area-inset-bottom))",
 
-        boxShadow: "0 -2px 12px rgba(0,0,0,.06)",
+        boxShadow: "none",
       }}
     >
       <ReplyPreview

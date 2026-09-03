@@ -8,6 +8,8 @@ export type OfflineUpload = {
   upload_id: string;
   file: File;
   replyMessage?: any;
+  message_type?: string;
+  file_duration?: number;
 };
 
 function openDatabase(): Promise<IDBDatabase> {

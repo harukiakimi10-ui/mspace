@@ -11,13 +11,60 @@ import {
   MessageCircleMore,
   ChevronLeft,
   ChevronRight,
-  X,
+  X,WifiOff,
 } from "lucide-react";
 
 
 export default function MembersPage() {
 const router = useRouter();
 const supabase = createClient();
+
+const PROFILE_CACHE_KEY = "mspace-members-profile";
+const PHOTOS_CACHE_KEY = "mspace-members-photos";
+const VIDEOS_CACHE_KEY = "mspace-members-videos";
+const MEDIA_CACHE_NAME = "mspace-members-media-v1";
+
+async function cacheMedia(url: string) {
+  if (!url || typeof window === "undefined") return;
+
+  if (!("caches" in window)) return;
+
+  try {
+    const cache = await caches.open(MEDIA_CACHE_NAME);
+
+    const existing = await cache.match(url);
+
+    if (!existing) {
+      const response = await fetch(url);
+
+      if (response.ok) {
+        await cache.put(url, response);
+      }
+    }
+  } catch (error) {
+    console.log("Media cache failed:", error);
+  }
+}
+
+async function getCachedMediaUrl(url: string) {
+  if (!url || typeof window === "undefined") return url;
+
+  if (!("caches" in window)) return url;
+
+  try {
+    const cache = await caches.open(MEDIA_CACHE_NAME);
+    const response = await cache.match(url);
+
+    if (!response) return url;
+
+    const blob = await response.blob();
+
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    console.log("Cached media read failed:", error);
+    return url;
+  }
+}
 
   const [photos, setPhotos] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
@@ -70,6 +117,7 @@ const t = {
     welcome:
       "Welcome to my personal space. View my exclusive photos, watch my latest videos and chat with me directly.",
     copyright: "All Rights Reserved",
+    offline: "No internet connection",
   },
 
   zh: {
@@ -82,6 +130,7 @@ const t = {
     welcome:
       "欢迎来到我的个人空间。查看我的独家照片、观看最新视频，并直接与我聊天。",
     copyright: "版权所有",
+    offline: "网络不可用，请检查网络",
   },
 }[language];
 
@@ -176,6 +225,32 @@ async function loadInitialData() {
 async function loadProfile() {
   const supabase = createClient();
 
+  // Offline: restore the cached profile
+  if (!navigator.onLine) {
+    try {
+      const cachedProfile =
+        localStorage.getItem(PROFILE_CACHE_KEY);
+
+      if (cachedProfile) {
+        const profile = JSON.parse(cachedProfile);
+
+        setProfileName(profile.profile_name || "");
+        setProfileBio(profile.profile_bio || "");
+
+        if (profile.profile_photo) {
+  setProfilePhoto(profile.profile_photo);
+} else {
+  setProfilePhoto("");
+}
+      }
+    } catch (error) {
+      console.log("Cached profile restore failed:", error);
+    }
+
+    return;
+  }
+
+  // Online: load the latest profile from Supabase
   const { data, error } = await supabase
     .from("settings")
     .select("*")
@@ -186,6 +261,25 @@ async function loadProfile() {
     setProfileName(data.profile_name);
     setProfileBio(data.profile_bio);
     setProfilePhoto(data.profile_photo);
+
+    // Save profile information locally
+    try {
+      localStorage.setItem(
+        PROFILE_CACHE_KEY,
+        JSON.stringify({
+          profile_name: data.profile_name,
+          profile_bio: data.profile_bio,
+          profile_photo: data.profile_photo,
+        })
+      );
+    } catch (error) {
+      console.log("Profile cache save failed:", error);
+    }
+
+    // Save the actual profile image locally
+    if (data.profile_photo) {
+      await cacheMedia(data.profile_photo);
+    }
   }
 
   if (error) {
@@ -196,6 +290,41 @@ async function loadProfile() {
 async function loadPhotos() {
   const supabase = createClient();
 
+  // Offline: restore cached photos
+  if (!navigator.onLine) {
+    try {
+      const cachedPhotos =
+        localStorage.getItem(PHOTOS_CACHE_KEY);
+
+      if (cachedPhotos) {
+        const parsedPhotos = JSON.parse(cachedPhotos);
+
+        const restoredPhotos = await Promise.all(
+          parsedPhotos.map(async (photo: any) => {
+            if (!photo.image_url) {
+              return photo;
+            }
+
+            const cachedUrl =
+              await getCachedMediaUrl(photo.image_url);
+
+            return {
+              ...photo,
+              image_url: cachedUrl,
+            };
+          })
+        );
+
+        setPhotos(restoredPhotos);
+      }
+    } catch (error) {
+      console.log("Cached photos restore failed:", error);
+    }
+
+    return;
+  }
+
+  // Online: load the latest photos from Supabase
   const { data, error } = await supabase
     .from("photos")
     .select("*")
@@ -203,6 +332,23 @@ async function loadPhotos() {
 
   if (data) {
     setPhotos(data);
+
+    // Save photo information locally
+    try {
+      localStorage.setItem(
+        PHOTOS_CACHE_KEY,
+        JSON.stringify(data)
+      );
+    } catch (error) {
+      console.log("Photos cache save failed:", error);
+    }
+
+    // Save the actual photo files locally
+    await Promise.all(
+  data
+    .filter((photo) => photo.image_url)
+    .map((photo) => cacheMedia(photo.image_url))
+);
   }
 
   if (error) {
@@ -213,6 +359,41 @@ async function loadPhotos() {
 async function loadVideos() {
   const supabase = createClient();
 
+  // Offline: restore cached videos
+  if (!navigator.onLine) {
+    try {
+      const cachedVideos =
+        localStorage.getItem(VIDEOS_CACHE_KEY);
+
+      if (cachedVideos) {
+        const parsedVideos = JSON.parse(cachedVideos);
+
+        const restoredVideos = await Promise.all(
+          parsedVideos.map(async (video: any) => {
+            if (!video.thumbnail_url) {
+              return video;
+            }
+
+            const cachedThumbnail =
+              await getCachedMediaUrl(video.thumbnail_url);
+
+            return {
+              ...video,
+              thumbnail_url: cachedThumbnail,
+            };
+          })
+        );
+
+        setVideos(restoredVideos);
+      }
+    } catch (error) {
+      console.log("Cached videos restore failed:", error);
+    }
+
+    return;
+  }
+
+  // Online: load the latest videos from Supabase
   const { data, error } = await supabase
     .from("videos")
     .select("*")
@@ -220,6 +401,24 @@ async function loadVideos() {
 
   if (data) {
     setVideos(data);
+
+    // Save video information locally
+    try {
+      localStorage.setItem(
+        VIDEOS_CACHE_KEY,
+        JSON.stringify(data)
+      );
+    } catch (error) {
+      console.log("Videos cache save failed:", error);
+    }
+
+    // Save the actual video thumbnails locally
+    await Promise.all(
+  data
+    .filter((video) => video.thumbnail_url)
+    .map((video) => cacheMedia(video.thumbnail_url))
+);
+
   }
 
   if (error) {
@@ -360,86 +559,6 @@ async function openChat() {
   router.push("/chat");
 }
 
-
-if (isOffline) {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100%",
-        background: "#ffffff",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "30px 20px",
-        boxSizing: "border-box",
-        fontFamily: "Arial, sans-serif",
-        textAlign: "center",
-      }}
-    >
-      <div
-        style={{
-          width: "90px",
-          height: "90px",
-          borderRadius: "24px",
-          background: "#f3f4f6",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "28px",
-        }}
-      >
-        <img
-          src="/mspace-icon.png"
-          alt="MSpace"
-          style={{
-            width: "65px",
-            height: "65px",
-            objectFit: "contain",
-            opacity: 0.75,
-          }}
-        />
-      </div>
-
-      <h1
-        style={{
-          margin: "0 0 10px",
-          fontSize: "26px",
-          fontWeight: "700",
-          color: "#202124",
-        }}
-      >
-        You're offline
-      </h1>
-
-      <p
-        style={{
-          margin: 0,
-          maxWidth: "420px",
-          fontSize: "16px",
-          lineHeight: "1.6",
-          color: "#5f6368",
-        }}
-      >
-        No internet connection is available.
-        <br />
-        Check your network connection and try again.
-      </p>
-
-      <div
-        style={{
-          marginTop: "30px",
-          fontSize: "14px",
-          color: "#9ca3af",
-        }}
-      >
-        MSpace
-      </div>
-    </div>
-  );
-}
-
 async function loadUnreadCount() {
   const memberId = localStorage.getItem("mspace_member_id");
 
@@ -484,6 +603,40 @@ async function loadUnreadCount() {
     margin: 0,
   }}
 >
+
+  {isOffline && (
+  <div
+    style={{
+      width: "100%",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+      padding: "0 14px",
+      boxSizing: "border-box",
+      background: "#fff1f2",
+      borderBottom: "1px solid #fecdd3",
+      color: "#4b5563",
+      fontSize: "14px",
+      fontWeight: 500,
+    }}
+  >
+    <WifiOff
+      size={18}
+      strokeWidth={2.4}
+      style={{
+        color: "#ef4444",
+        flexShrink: 0,
+      }}
+    />
+
+    <span>{t.offline}</span>
+  </div>
+)}
+
+
+
  {/* HEADER */}
 
  <NotificationButton />
@@ -546,6 +699,23 @@ async function loadUnreadCount() {
     "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
   }
   alt="Donald Lee"
+  onError={async (e) => {
+    const image = e.currentTarget;
+
+    if (image.dataset.fallbackApplied === "true") {
+      return;
+    }
+
+    image.dataset.fallbackApplied = "true";
+
+    if (profilePhoto) {
+      const cachedUrl = await getCachedMediaUrl(profilePhoto);
+
+      if (cachedUrl !== profilePhoto) {
+        image.src = cachedUrl;
+      }
+    }
+  }}
   style={{
   width: isMobile ? "90px" : "160px",
   height: isMobile ? "90px" : "160px",
@@ -765,9 +935,26 @@ async function loadUnreadCount() {
 >
   {photos.map((photo, index) => (
   <img
-    key={photo.id}
-    src={photo.image_url}
-    alt="Photo"
+  key={photo.id}
+  src={photo.image_url}
+  alt="Photo"
+  onError={async (e) => {
+    const image = e.currentTarget;
+
+    if (image.dataset.fallbackApplied === "true") {
+      return;
+    }
+
+    image.dataset.fallbackApplied = "true";
+
+    const cachedUrl = await getCachedMediaUrl(
+      photo.image_url
+    );
+
+    if (cachedUrl !== photo.image_url) {
+      image.src = cachedUrl;
+    }
+  }}
     onClick={() =>
   setSelectedIndex(index)
 }
@@ -842,6 +1029,25 @@ async function loadUnreadCount() {
     "https://via.placeholder.com/300x200?text=Video"
   }
   alt="Video Thumbnail"
+  onError={async (e) => {
+    const image = e.currentTarget;
+
+    if (image.dataset.fallbackApplied === "true") {
+      return;
+    }
+
+    image.dataset.fallbackApplied = "true";
+
+    if (video.thumbnail_url) {
+      const cachedUrl = await getCachedMediaUrl(
+        video.thumbnail_url
+      );
+
+      if (cachedUrl !== video.thumbnail_url) {
+        image.src = cachedUrl;
+      }
+    }
+  }}
   style={{
     width: "100%",
     height: "100%",
@@ -1196,8 +1402,9 @@ async function loadUnreadCount() {
 />
 </button>
   </div>
+
+
 )}
 </main>
 );
 }
-

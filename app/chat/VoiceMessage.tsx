@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Play,Pause, Mic } from "lucide-react";
+import { Play,Pause,LoaderCircle,Mic } from "lucide-react";
 
 type VoiceMessageProps = {
   msg?: any;
@@ -310,16 +310,28 @@ useEffect(() => {
     <span>{formatTime ? formatTime(msg.created_at) : ""}</span>
 
     {msg.sender === currentUser && (
-      <span
-        style={{
-          color: msg.is_read
-            ? "#53bdeb"
-            : "#d1d5db",
-        }}
-      >
-        {msg.is_read ? "✓✓" : "✓"}
-      </span>
-    )}
+  msg.offline ? (
+    <LoaderCircle
+      size={12}
+      strokeWidth={2.5}
+      style={{
+        color: "#ffffff",
+        animation:
+          "mspacePendingSpin 0.8s linear infinite",
+      }}
+    />
+  ) : (
+    <span
+      style={{
+        color: msg.is_read
+          ? "#53bdeb"
+          : "#d1d5db",
+      }}
+    >
+      {msg.is_read ? "✓✓" : "✓"}
+    </span>
+  )
+)}
   </div>
 </div>
 </div>

@@ -4,7 +4,7 @@ import "./home.css";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { Play } from "lucide-react";
+import { Play,WifiOff } from "lucide-react";
 import ImageIcon from "@mui/icons-material/Image";
 import VideoLibraryIcon from "@mui/icons-material/Videocam";
 import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
@@ -28,6 +28,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [showInstallButton, setShowInstallButton] =
   useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
 const [deferredPrompt, setDeferredPrompt] =
   useState<any>(null);
@@ -47,6 +48,22 @@ useEffect(() => {
   ) {
     setLanguage("zh");
   }
+}, []);
+
+useEffect(() => {
+  const updateOnlineStatus = () => {
+    setIsOffline(!navigator.onLine);
+  };
+
+  updateOnlineStatus();
+
+  window.addEventListener("online", updateOnlineStatus);
+  window.addEventListener("offline", updateOnlineStatus);
+
+  return () => {
+    window.removeEventListener("online", updateOnlineStatus);
+    window.removeEventListener("offline", updateOnlineStatus);
+  };
 }, []);
 
 const t = {
@@ -80,6 +97,7 @@ bannedAccount: "Your MSpace account has been banned.",
 error: "Error",
 copyright: "All Rights Reserved",
 appName: "MSpace",
+offline: "No internet connection",
 ownerSpace: "Huang Dingxiang's",
 
 
@@ -115,6 +133,7 @@ bannedAccount: "您的星域账户已被封禁。",
 error: "错误",
 copyright: "版权所有",
 appName: "星域",
+offline: "网络不可用，请检查网络",
 ownerSpace: "黄定襄的",
 
 
@@ -460,6 +479,37 @@ if (!mounted || restoring) {
 return (
   <>
     
+  {isOffline && (
+    <div
+      style={{
+        width: "100%",
+        minHeight: "44px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "10px",
+        padding: "0 14px",
+        boxSizing: "border-box",
+        background: "#fff1f2",
+        borderBottom: "1px solid #fecdd3",
+        color: "#4b5563",
+        fontSize: "14px",
+        fontWeight: 500,
+      }}
+    >
+      <WifiOff
+        size={18}
+        strokeWidth={2.4}
+        style={{
+          color: "#ef4444",
+          flexShrink: 0,
+        }}
+      />
+
+      <span>{t.offline}</span>
+    </div>
+  )}
+
   <div
     style={{
       display: "flex",
