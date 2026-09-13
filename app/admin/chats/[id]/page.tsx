@@ -2,7 +2,12 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { useEffect, useState, useRef } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+} from "react";
 import { flushSync } from "react-dom";
 
 import Messages from "@/app/chat/Messages";
@@ -570,7 +575,7 @@ const messageInputRef =
   }
 }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
 
   if (id) {
     const cacheKey = `mspace-messages-${id}`;

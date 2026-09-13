@@ -154,6 +154,7 @@ onCancelUpload,
 const [messageFocusOffset, setMessageFocusOffset] = useState(0);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+const longPressTriggeredRef = useRef(false);
 
 const unlockMenuAudio = () => {
   try {
@@ -204,7 +205,17 @@ const calculateMessageFocus = (
 ) => {
   const rect = messageElement.getBoundingClientRect();
 
-  const menuWidth = 190;
+console.log("MSPACE POSITION TEST:", {
+  rectTop: rect.top,
+  rectBottom: rect.bottom,
+  rectHeight: rect.height,
+  innerHeight: window.innerHeight,
+  visualHeight: window.visualViewport?.height,
+  visualOffsetTop: window.visualViewport?.offsetTop,
+  scrollY: window.scrollY,
+});
+
+const menuWidth = 190;
 
   const messageType = msg.message_type;
 
@@ -253,20 +264,181 @@ const screenPadding = 12;
 // Estimate the menu height
 
 
-const viewportHeight = window.innerHeight;
-const viewportWidth = window.innerWidth;
+const viewportHeight =
+  window.visualViewport?.height ??
+  window.innerHeight;
+
+const viewportWidth =
+  window.visualViewport?.width ??
+  window.innerWidth;
+
 
 // Try below the selected message first
-let menuTop = rect.bottom + menuGap;
+let menuTop =
+  rect.bottom +
+  (window.visualViewport?.offsetTop ?? 0) +
+  menuGap;
 
-// If the menu would go below the screen,
-// place it above the selected message.
+// Android positioning
 if (
+  isAndroid &&
+  window.visualViewport
+) {
+  const keyboardIsOpen =
+    window.visualViewport.height <
+    window.innerHeight - 150;
+
+  const isMediaMessage =
+  messageType === "location" ||
+  messageType === "image" ||
+  messageType === "video" ||
+  messageType === "sticker" ||
+  messageType === "voice" ||
+  messageType === "text";
+
+  console.log("MSPACE ANDROID MENU SPACE:", {
+  messageTop: rect.top,
+  messageBottom: rect.bottom,
+  visibleHeight: window.visualViewport?.height,
+  spaceAbove:
+    rect.top - screenPadding,
+  spaceBelow:
+    (window.visualViewport?.height ?? window.innerHeight) -
+    screenPadding -
+    rect.bottom,
+});
+
+  if (keyboardIsOpen) {
+  const visibleTop =
+  window.visualViewport.offsetTop +
+  screenPadding;
+
+const visibleBottom =
+  window.visualViewport.offsetTop +
+  window.visualViewport.height -
+  screenPadding;
+
+  const belowTop =
+    rect.bottom + menuGap;
+
+  const aboveTop =
+    rect.bottom -
+    menuHeight -
+    menuGap;
+
+  const fitsBelow =
+    belowTop + menuHeight <=
+    visibleBottom;
+
+  const fitsAbove =
+  aboveTop >= visibleTop;
+
+  if (fitsBelow) {
+    // Enough room below the message.
+    menuTop = belowTop;
+  } else if (fitsAbove) {
+    // Not enough room below, but enough above.
+    menuTop = aboveTop;
+  } else {
+    // Neither side has enough room.
+    // Allow the menu to overlap the message.
+    if (isMediaMessage) {
+      const messageMiddle =
+        rect.top + rect.height / 2;
+
+      menuTop =
+        messageMiddle -
+        menuHeight / 2;
+
+      menuTop = Math.max(
+        screenPadding,
+        Math.min(
+          menuTop,
+          visibleBottom - menuHeight
+        )
+      );
+    } else {
+      menuTop = Math.max(
+  visibleTop,
+  Math.min(
+    rect.top,
+    visibleBottom - menuHeight
+  )
+);
+    }
+  }
+}
+
+else {
+  const visibleTop =
+    window.visualViewport.offsetTop +
+    screenPadding;
+
+  const visibleBottom =
+    window.visualViewport.offsetTop +
+    window.visualViewport.height -
+    screenPadding;
+
+  const belowTop =
+    rect.bottom + menuGap;
+
+  const aboveTop =
+    rect.top -
+    menuHeight -
+    menuGap;
+
+  const fitsBelow =
+    belowTop + menuHeight <=
+    visibleBottom;
+
+  const fitsAbove =
+    aboveTop >= visibleTop;
+
+  if (fitsBelow) {
+  menuTop = belowTop;
+} else if (fitsAbove) {
+  menuTop = aboveTop;
+} else if (isMediaMessage) {
+  // Keep the menu attached to the message
+  // when there isn't enough room on either side.
+  menuTop = Math.max(
+    visibleTop,
+    Math.min(
+      rect.bottom - menuHeight - menuGap,
+      visibleBottom - menuHeight
+    )
+  );
+} 
+  else if (isMediaMessage) {
+    const messageMiddle =
+      rect.top + rect.height / 2;
+
+    menuTop =
+      messageMiddle -
+      menuHeight / 2;
+
+    menuTop = Math.max(
+      screenPadding,
+      Math.min(
+        menuTop,
+        visibleBottom - menuHeight
+      )
+    );
+  }
+}
+}
+
+// iPhone positioning — leave existing behavior
+else if (
+  !isAndroid &&
   menuTop + menuHeight >
-  viewportHeight - screenPadding
+    viewportHeight - screenPadding
 ) {
   menuTop =
-    rect.top - menuHeight - menuGap;
+    rect.top +
+    (window.visualViewport?.offsetTop ?? 0) -
+    menuHeight -
+    menuGap;
 }
 
 // Make sure it never goes above the screen.
@@ -289,6 +461,17 @@ menuLeft = Math.max(
   )
 );
 
+console.log("MSPACE MENU POSITION TEST:", {
+  messageTop: rect.top,
+  messageBottom: rect.bottom,
+  menuHeight,
+  menuTop,
+  visualHeight:
+    window.visualViewport?.height,
+  visualOffsetTop:
+    window.visualViewport?.offsetTop,
+});
+
 setMenuX(menuLeft);
 setMenuY(menuTop);
 };
@@ -308,19 +491,40 @@ const handleMessageLongPress = (
   msg: any,
   messageElement: HTMLElement
 ) => {
+
+  console.log("MSPACE LONG PRESS FOCUS TEST:", {
+  activeElement: document.activeElement?.tagName,
+  activeElementId:
+    (document.activeElement as HTMLElement | null)?.id,
+  textareaFocused:
+    document.activeElement ===
+    document.querySelector("textarea"),
+  visualViewportHeight:
+    window.visualViewport?.height,
+  innerHeight: window.innerHeight,
+});
+
   setSelectedMessage(msg);
   setMessageFocus(true);
+  if (!isAndroid) {
   setShowComposer(false);
+}
 
-  requestAnimationFrame(() => {
-    calculateMessageFocus(
-      msg,
-      messageElement
-    );
+  console.log(
+  "MSPACE KEYBOARD TEST:",
+  "innerHeight =",
+  window.innerHeight,
+  "visualViewport =",
+  window.visualViewport?.height
+);
 
-    setMessageFocus(true);
-    setShowMessageMenu(true);
-  });
+  calculateMessageFocus(
+    msg,
+    messageElement
+  );
+
+  setMessageFocus(true);
+  setShowMessageMenu(true);
 };
 
 const scrollToRepliedMessage = (msg: any) => {
@@ -368,9 +572,21 @@ const scrollToRepliedMessage = (msg: any) => {
           transform: rotate(360deg);
         }
       }
-    `}</style>
-      {messages.map((msg, index) => {
+    `}
+    
+    </style>
+      {console.log("MESSAGES PROP CHECK:", {
+  total: messages.length,
+  pendingMessages: messages
+    .filter((msg) => msg.pending === true)
+    .map((msg) => ({
+      id: msg.id,
+      content: msg.content,
+      pending: msg.pending,
+    })),
+})}
 
+{messages.map((msg, index) => {
         const displayProgress = Math.min(
   msg.progress ?? 0,
   95
@@ -387,6 +603,10 @@ const isReplyVoice =
 
 const isReplyLocation =
   msg.reply_message_type === "location";
+
+  const hasOfflineReplySnapshot =
+  !!msg.reply_to_id &&
+  !!msg.reply_preview;
 
   const previous = index > 0 ? messages[index - 1] : null;
 
@@ -407,7 +627,41 @@ const isFocused =
   messageFocus && selectedMessage?.id === msg.id;
 
   const isPending =
-  pendingMessageIds?.includes(msg.id) ?? false;
+  (pendingMessageIds?.includes(msg.id) ?? false) ||
+  msg.pending === true ||
+  msg.uploading === true ||
+  msg.offline === true;
+
+
+  if (msg.sender === currentUser && msg.message_type === "text") {
+  console.log("TEXT FINAL RENDER CHECK:", {
+    id: msg.id,
+    content: msg.content,
+    pending: msg.pending,
+    isPending,
+    pendingMessageIds,
+  });
+}
+
+  if (msg.message_type === "text" && msg.sender === currentUser) {
+  console.log("TEXT RENDER STATE:", {
+    id: msg.id,
+    pending: msg.pending,
+    isPending,
+    pendingMessageIds,
+  });
+}
+
+
+  if (msg.message_type === "sticker") {
+  console.log("STICKER DEBUG:", {
+    id: msg.id,
+    pending: msg.pending,
+    isPending,
+    pendingMessageIds,
+  });
+}
+
 
   const isOfflineUpload =
   msg.offline === true;
@@ -446,8 +700,8 @@ const locationCoordinates = isReplyLocation
   return (
   <Fragment key={msg.id}>
     {(index === 0 ||
-      new Date(previous?.created_at).toDateString() !==
-        new Date(msg.created_at).toDateString()) && (
+  new Date(previous?.created_at).toISOString().slice(0, 10) !==
+    new Date(msg.created_at).toISOString().slice(0, 10)) && (
       <div
         style={{
           display: "flex",
@@ -477,9 +731,24 @@ const locationCoordinates = isReplyLocation
     messageRefs.current[msg.id] = el;
   }}
 
+  onClick={(e) => {
+  if (longPressTriggeredRef.current) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    longPressTriggeredRef.current = false;
+  }
+}}
+
   onContextMenu={(e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isAndroid) {
+  return;
+}
+
+
 
     setSelectedMessage(msg);
     setMessageFocus(true);
@@ -625,13 +894,36 @@ marginRight:
   whiteSpace: "pre-wrap",
   wordBreak: "break-word",
 }}
+
+onPointerDownCapture={(e) => {
+  if (
+    isAndroid &&
+    document.activeElement ===
+      document.querySelector("textarea")
+  ) {
+    e.preventDefault();
+  }
+}}
      
 
 onTouchStart={(e) => {
+  longPressTriggeredRef.current = false;
+
   const messageElement =
     e.currentTarget as HTMLElement;
 
-  playMenuSound(true);
+console.log("MSPACE TOUCHSTART FOCUS:", {
+  activeElement: document.activeElement?.tagName,
+  activeElementId:
+    (document.activeElement as HTMLElement | null)?.id,
+  textareaFocused:
+    document.activeElement ===
+    document.querySelector("textarea"),
+  visualViewportHeight:
+    window.visualViewport?.height,
+});
+
+playMenuSound(true);
 
   const timer = setTimeout(() => {
   playMenuSound();
@@ -640,11 +932,46 @@ onTouchStart={(e) => {
     navigator.vibrate(15);
   }
 
+
+  console.log("MSPACE LONG PRESS FOCUS TEST:", {
+  activeElement: document.activeElement?.tagName,
+  activeElementId:
+    (document.activeElement as HTMLElement | null)?.id,
+  textareaFocused:
+    document.activeElement ===
+    document.querySelector("textarea"),
+  inputFocused:
+    document.activeElement ===
+    document.querySelector("input"),
+  visualViewportHeight:
+    window.visualViewport?.height,
+  innerHeight: window.innerHeight,
+});
+
   setSelectedMessage(msg);
   setMessageFocus(true);
+  if (!isAndroid) {
   setShowComposer(false);
+}
 
+  const viewport = window.visualViewport;
+
+if (!viewport) {
   requestAnimationFrame(() => {
+    calculateMessageFocus(
+      msg,
+      messageElement
+    );
+
+    setMessageFocus(true);
+    setShowMessageMenu(true);
+  });
+} else {
+  const keyboardIsOpen =
+    viewport.height < window.innerHeight - 150;
+
+  if (!keyboardIsOpen) {
+    requestAnimationFrame(() => {
       calculateMessageFocus(
         msg,
         messageElement
@@ -653,6 +980,18 @@ onTouchStart={(e) => {
       setMessageFocus(true);
       setShowMessageMenu(true);
     });
+  } else {
+  requestAnimationFrame(() => {
+    calculateMessageFocus(
+      msg,
+      messageElement
+    );
+
+    setMessageFocus(true);
+    setShowMessageMenu(true);
+  });
+}
+}
 
   }, 500);
 
@@ -664,6 +1003,11 @@ onTouchEnd={(e) => {
   clearTimeout(
     (e.currentTarget as any)._pressTimer
   );
+
+  if (longPressTriggeredRef.current) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 }}
 
 onTouchMove={(e) => {
@@ -1146,6 +1490,8 @@ msg.reply_preview === "🎤 Voice message" ? (
 )}
 
 {msg.message_type === "sticker" && (
+
+  
   <div
     style={{
       display: "flex",
@@ -1376,7 +1722,7 @@ msg.reply_preview === "🎤 Voice message" ? (
       <span>{formatTime(msg.created_at)}</span>
 
       {msg.sender === currentUser && (
-  isOfflineUpload ? (
+  (isOfflineUpload || msg.uploading) ? (
     <LoaderCircle
       size={12}
       strokeWidth={2.5}
@@ -1559,7 +1905,7 @@ msg.reply_preview === "🎤 Voice message" ? (
       >
         <span>{formatTime(msg.created_at)}</span>
         {msg.sender === currentUser && (
-  isOfflineUpload ? (
+  isOfflineUpload || msg.uploading ? (
     <LoaderCircle
       size={12}
       strokeWidth={2.5}

@@ -66,14 +66,92 @@ async function getCachedMediaUrl(url: string) {
   }
 }
 
-  const [photos, setPhotos] = useState<any[]>([]);
-  const [videos, setVideos] = useState<any[]>([]);
-  const [profileName, setProfileName] = useState("");
-  const [profileBio, setProfileBio] = useState("");
-  const [profilePhoto, setProfilePhoto] = useState("");
+  const [photos, setPhotos] = useState<any[]>(() => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const cached = localStorage.getItem(PHOTOS_CACHE_KEY);
+
+    if (!cached) return [];
+
+    const parsed = JSON.parse(cached);
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+});
+
+const [videos, setVideos] = useState<any[]>(() => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const cached = localStorage.getItem(VIDEOS_CACHE_KEY);
+
+    if (!cached) return [];
+
+    const parsed = JSON.parse(cached);
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+});
+
+const [profileName, setProfileName] = useState(() => {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+
+    if (!cached) return "";
+
+    const profile = JSON.parse(cached);
+
+    return profile.profile_name || "";
+  } catch {
+    return "";
+  }
+});
+
+const [profileBio, setProfileBio] = useState(() => {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+
+    if (!cached) return "";
+
+    const profile = JSON.parse(cached);
+
+    return profile.profile_bio || "";
+  } catch {
+    return "";
+  }
+});
+
+const [profilePhoto, setProfilePhoto] = useState(() => {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+
+    if (!cached) return "";
+
+    const profile = JSON.parse(cached);
+
+    return profile.profile_photo || "";
+  } catch {
+    return "";
+  }
+});
+
   const [selectedPhoto, setSelectedPhoto] = useState("");
   const [showInstallButton, setShowInstallButton] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth < 768;
+});
   const [selectedIndex, setSelectedIndex] =
   useState<number | null>(null);
   const [selectedVideoIndex, setSelectedVideoIndex] =

@@ -128,6 +128,34 @@ useEffect(() => {
 }
   }
 )
+    .on(
+  "postgres_changes",
+  {
+    event: "UPDATE",
+    schema: "public",
+    table: "conversations",
+  },
+  (payload) => {
+    console.log(
+      "Admin conversation realtime update:",
+      payload.eventType
+    );
+
+    const updatedConversation = payload.new as any;
+
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === updatedConversation.id
+          ? {
+              ...conversation,
+              member_typing:
+                updatedConversation.member_typing,
+            }
+          : conversation
+      )
+    );
+  }
+)
     .subscribe();
 
   return () => {
@@ -167,21 +195,28 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  const savedScroll = sessionStorage.getItem(
-    "mspace-conversation-list-scroll"
+  const selectedId = sessionStorage.getItem(
+    "mspace-selected-conversation-id"
   );
 
-  if (!savedScroll) return;
+  if (!selectedId) return;
 
-  const restoreScrollPosition = () => {
-    const list = conversationListRef.current;
+  const restoreSelectedConversation = () => {
+    const element = document.querySelector(
+      `[data-conversation-id="${selectedId}"]`
+    ) as HTMLElement | null;
 
-    if (!list) return;
+    if (!element) return;
 
-    list.scrollTop = Number(savedScroll);
+    element.scrollIntoView({
+      block: "center",
+      behavior: "auto",
+    });
   };
 
-  requestAnimationFrame(restoreScrollPosition);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(restoreSelectedConversation);
+  });
 }, []);
 
 useEffect(() => {
@@ -247,11 +282,11 @@ await Promise.all(
       .eq("sender", "member")
       .eq("is_read", false);
 
-    const { data: lastMessage } = await supabase
-      .from("messages")
-      .select(
-  "content, message_type, sender, created_at, file_duration, is_deleted"
-)
+   const { data: lastMessage } = await supabase
+  .from("messages")
+  .select(
+    "content, message_type, sender, created_at, file_duration, is_deleted, is_read"
+  )
       .eq("conversation_id", conversation.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -280,6 +315,22 @@ result.sort((a, b) => {
   return bTime - aTime;
 });
 setConversations(result);
+
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const savedScroll = sessionStorage.getItem(
+      "mspace-conversation-list-scroll"
+    );
+
+    if (!savedScroll) return;
+
+    const list = conversationListRef.current;
+
+    if (!list) return;
+
+    list.scrollTop = Number(savedScroll);
+  });
+});
 
 try {
   localStorage.setItem(

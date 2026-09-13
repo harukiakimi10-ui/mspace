@@ -140,6 +140,19 @@ export default function MessageInput({
       <textarea
   ref={messageInputRef}
   id="mspace-message-input"
+  onBlur={() => {
+  console.log("MSPACE TEXTAREA BLUR:", {
+    activeElement: document.activeElement?.tagName,
+    activeElementId:
+      (document.activeElement as HTMLElement | null)?.id,
+    visualViewportHeight:
+      window.visualViewport?.height,
+  });
+}}
+
+onFocus={() => {
+  console.log("MSPACE TEXTAREA FOCUS EVENT");
+}}
   value={message}
   onChange={onInput}
   onKeyDown={(e) => {

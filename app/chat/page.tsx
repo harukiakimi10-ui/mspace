@@ -3,7 +3,12 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { useEffect, useState, useRef } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+} from "react";
 import { flushSync } from "react-dom";
 
 import ImageViewer from "./ImageViewer";
@@ -190,7 +195,39 @@ console.log(
 }, [conversationId]);
 
 
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>(() => {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const cachedMessages =
+      localStorage.getItem(MESSAGE_CACHE_KEY);
+
+    if (!cachedMessages) {
+      return [];
+    }
+
+    const parsedMessages =
+      JSON.parse(cachedMessages);
+
+    if (!Array.isArray(parsedMessages)) {
+      return [];
+    }
+
+    return parsedMessages.filter(
+      (msg: any) =>
+        msg.deleted_for !== "member"
+    );
+  } catch {
+    return [];
+  }
+});
+
+console.log(
+  "MSPACE RENDER MESSAGE COUNT:",
+  messages.length
+);
   const [pendingMessageIds, setPendingMessageIds] = useState<string[]>([]);
    useEffect(() => {
   console.log("messages changed");
@@ -228,6 +265,26 @@ const [audioChunks, setAudioChunks] =
 
 const CHAT_CACHE_KEY = `mspace-chat-header-${memberId ?? "default"}`;
 const MESSAGE_CACHE_KEY = `mspace-chat-messages-${memberId ?? "default"}`;
+console.log("MSPACE MEMBER CACHE KEY:", MESSAGE_CACHE_KEY);
+console.log("MSPACE MEMBER ID:", memberId);
+console.log(
+  "MSPACE MEMBER CACHED MESSAGE COUNT:",
+  (() => {
+    try {
+      const cached = localStorage.getItem(MESSAGE_CACHE_KEY);
+
+      if (!cached) return 0;
+
+      const parsed = JSON.parse(cached);
+
+      return Array.isArray(parsed)
+        ? parsed.length
+        : 0;
+    } catch {
+      return 0;
+    }
+  })()
+);
 const OUTBOX_CACHE_KEY = `mspace-chat-outbox-${memberId ?? "default"}`;
 
 
@@ -324,6 +381,10 @@ useEffect(() => {
 }, [showMessageMenu, showStickerPanel]);
 
 const [showComposer, setShowComposer] = useState(true);
+const isAndroid =
+  typeof navigator !== "undefined" &&
+  /Android/i.test(navigator.userAgent);
+
 const composerRef = useRef<HTMLDivElement | null>(null);
 const [messageFocus, setMessageFocus] = useState(false);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
@@ -481,7 +542,9 @@ const startMessageLongPress = (message: any) => {
     longPressTriggeredRef.current = true;
 
     setSelectedMessage(message);
-    setShowComposer(false);
+    if (!isAndroid) {
+  setShowComposer(false);
+}
     setShowMessageMenu(true);
   }, 1000);
 };
@@ -507,65 +570,65 @@ const closeMessageMenu = () => {
 
 
 async function bootstrapChat() {
+  // Restore cached header information immediately
+  const cachedHeader =
+    localStorage.getItem(CHAT_CACHE_KEY);
+
+  if (cachedHeader) {
+    try {
+      const header = JSON.parse(cachedHeader);
+
+      if (header.profileName) {
+        setProfileName(header.profileName);
+      }
+
+      if (header.profilePhoto) {
+        setProfilePhoto(header.profilePhoto);
+      }
+
+      if (header.admin) {
+        setAdmin(header.admin);
+      }
+
+      if (header.conversation) {
+        setConversation(header.conversation);
+        setConversationId(header.conversation.id);
+      }
+    } catch (error) {
+      console.error(
+        "MSpace: cached header restore failed:",
+        error
+      );
+    }
+  }
+
+  // Restore cached messages immediately
+  const cachedMessages =
+    localStorage.getItem(MESSAGE_CACHE_KEY);
+
+  if (cachedMessages) {
+    try {
+      const parsedMessages =
+        JSON.parse(cachedMessages);
+
+      if (Array.isArray(parsedMessages)) {
+        setMessages(
+          parsedMessages.filter(
+            (msg: any) =>
+              msg.deleted_for !== "member"
+          )
+        );
+      }
+    } catch (error) {
+      console.error(
+        "MSpace: cached messages restore failed:",
+        error
+      );
+    }
+  }
+
   if (!navigator.onLine) {
     console.log("MSpace: offline startup");
-
-    // Restore cached header information
-    const cachedHeader =
-      localStorage.getItem(CHAT_CACHE_KEY);
-
-    if (cachedHeader) {
-      try {
-        const header = JSON.parse(cachedHeader);
-
-        if (header.profileName) {
-          setProfileName(header.profileName);
-        }
-
-        if (header.profilePhoto) {
-          setProfilePhoto(header.profilePhoto);
-        }
-
-        if (header.admin) {
-          setAdmin(header.admin);
-        }
-
-        if (header.conversation) {
-          setConversation(header.conversation);
-          setConversationId(header.conversation.id);
-        }
-      } catch (error) {
-        console.error(
-          "MSpace: cached header restore failed:",
-          error
-        );
-      }
-    }
-
-    // Restore cached messages
-    const cachedMessages =
-      localStorage.getItem(MESSAGE_CACHE_KEY);
-
-    if (cachedMessages) {
-      try {
-        const parsedMessages =
-          JSON.parse(cachedMessages);
-
-        if (Array.isArray(parsedMessages)) {
-          setMessages(
-            parsedMessages.filter(
-              (msg: any) =>
-                msg.deleted_for !== "member"
-            )
-          );
-        }
-      } catch (error) {
-        console.error(
-          "MSpace: cached messages restore failed:",
-          error
-        );
-      }
-    }
 
     // Restore messages waiting to be sent
     const cachedOutbox =
@@ -626,7 +689,7 @@ async function bootstrapChat() {
   setStartupComplete(true);
 }
 
-useEffect(() => {
+useLayoutEffect(() => {
   if (hasBootstrappedRef.current) return;
 
   hasBootstrappedRef.current = true;
@@ -784,8 +847,6 @@ useEffect(() => {
   conversationId &&
   navigator.onLine
 ) {
-  void loadMessages(conversationId);
-
   setTimeout(() => {
     if (mounted) {
       void markMessagesAsRead(
@@ -952,9 +1013,9 @@ useEffect(() => {
         async (payload) => {
   console.log("NEW MESSAGE:", payload);
 
-  if (pendingUploads.length === 0) {
-    await loadMessages(conversationId);
-  }
+  if (payload.new?.sender === "admin") {
+  await loadMessages(conversationId);
+}
 
   // If the member is currently at the bottom,
   // the new message is considered seen immediately.
@@ -977,14 +1038,15 @@ useEffect(() => {
 }
 
   if (
-    document.visibilityState === "visible" &&
-    document.hasFocus() &&
-    isNearBottom
-  ) {
-    setTimeout(async () => {
-      await markMessagesAsRead(conversationId);
-    }, 200);
-  }
+  payload.new?.sender === "admin" &&
+  document.visibilityState === "visible" &&
+  document.hasFocus() &&
+  isNearBottom
+) {
+  setTimeout(async () => {
+    await markMessagesAsRead(conversationId);
+  }, 200);
+}
 }
       )
 .on(
@@ -995,9 +1057,10 @@ useEffect(() => {
     table: "messages",
     filter: `conversation_id=eq.${conversationId}`,
   },
-  async () => {
-    await loadMessages(conversationId);
-  }
+  async (payload) => {
+  console.log("MESSAGE UPDATE REALTIME:", payload);
+  await loadMessages(conversationId);
+}
 )
 .subscribe();
 
@@ -1084,8 +1147,29 @@ console.log(">>> CREATED:", conversation.id);
 }
 
   setConversationId(conversation.id);
-  setConversation(conversation);
-  console.log("Conversation state:", conversation);
+setConversation(conversation);
+
+const existingHeader =
+  localStorage.getItem(CHAT_CACHE_KEY);
+
+let header: any = {};
+
+if (existingHeader) {
+  try {
+    header = JSON.parse(existingHeader);
+  } catch {
+    header = {};
+  }
+}
+
+header.conversation = conversation;
+
+localStorage.setItem(
+  CHAT_CACHE_KEY,
+  JSON.stringify(header)
+);
+
+console.log("Conversation state:", conversation);
  
   setInitialLoad(true);
 
@@ -1237,6 +1321,7 @@ async function handleMessageInput(
 
 
 async function loadMessages(id: string) {
+  console.trace("LOAD MESSAGES CALLED");
   if (!navigator.onLine) {
   console.log(
     "MSpace: offline — using cached/local messages."
@@ -1249,10 +1334,53 @@ async function loadMessages(id: string) {
   (msg) => msg.deleted_for !== "member"
 );
 
+
 console.log("Before setMessages:", messages.length);
 console.log("Incoming messages:", filteredMessages.length);
 
-setMessages(filteredMessages);
+setMessages((prev) => {
+  const serverMessagesById = new Map(
+    filteredMessages.map((msg) => [msg.id, msg])
+  );
+
+  const mergedMessages = prev.map((msg) => {
+    const serverMessage = serverMessagesById.get(msg.id);
+
+    if (!serverMessage) {
+      return msg;
+    }
+
+    return serverMessage;
+  });
+
+  const existingIds = new Set(
+    mergedMessages.map((msg) => msg.id)
+  );
+
+  const newServerMessages = filteredMessages.filter(
+    (msg) => !existingIds.has(msg.id)
+  );
+
+  const nextMessages = [
+    ...mergedMessages,
+    ...newServerMessages,
+  ];
+
+  // If nothing actually changed, keep the existing
+  // messages array so Messages.tsx does not re-render.
+  if (
+    prev.length === nextMessages.length &&
+    prev.every(
+      (msg, index) =>
+        JSON.stringify(msg) ===
+        JSON.stringify(nextMessages[index])
+    )
+  ) {
+    return prev;
+  }
+
+  return nextMessages;
+});
 
 localStorage.setItem(
   MESSAGE_CACHE_KEY,
@@ -1383,6 +1511,8 @@ async function sendMessage() {
 
 const messageContent = message;
 
+const pendingStartedAt = Date.now();
+
 setPendingMessageIds((prev) => [
   ...prev,
   messageId,
@@ -1397,12 +1527,65 @@ const temporaryMessage = {
   created_at: new Date().toISOString(),
   is_read: false,
   pending: true,
+
+  reply_to_id: replyMessage?.id ?? null,
+
+  reply_file_duration:
+    replyMessage?.message_type === "voice"
+      ? replyMessage.file_duration ?? null
+      : null,
+
+  reply_preview:
+    replyMessage?.message_type === "text"
+      ? replyMessage.content
+      : replyMessage?.message_type === "image"
+      ? "📷 Photo"
+      : replyMessage?.message_type === "video"
+      ? "🎥 Video"
+      : replyMessage?.message_type === "voice"
+      ? "🎤 Voice"
+      : replyMessage?.message_type === "sticker"
+      ? "🏷️ Sticker"
+      : replyMessage?.message_type === "location"
+      ? "📍 Location"
+      : null,
+
+  reply_file_url:
+    replyMessage?.message_type === "image" ||
+    replyMessage?.message_type === "video" ||
+    replyMessage?.message_type === "sticker" ||
+    replyMessage?.message_type === "voice"
+      ? replyMessage.file_url
+      : replyMessage?.message_type === "location"
+      ? replyMessage.content
+      : null,
+
+  reply_thumbnail_url:
+    replyMessage?.message_type === "video"
+      ? (
+          replyMessage.reply_thumbnail_url ??
+          replyMessage.thumbnail_url ??
+          replyMessage.file_url
+        )
+      : null,
+
+  reply_message_type:
+    replyMessage?.message_type ?? null,
+
+  reply_sender:
+    replyMessage?.sender ?? null,
 };
 
 setMessages((prev) => [
   ...prev,
   temporaryMessage,
 ]);
+
+console.log("TEXT TEMP MESSAGE CREATED:", temporaryMessage);
+
+await new Promise<void>((resolve) =>
+  requestAnimationFrame(() => resolve())
+);
 
 const existingOutbox =
   localStorage.getItem(OUTBOX_CACHE_KEY);
@@ -1461,6 +1644,22 @@ try {
 
 if (!data) return;
 
+const elapsed = Date.now() - pendingStartedAt;
+
+
+const remaining = Math.max(0, 350 - elapsed);
+
+if (remaining > 0) {
+  await new Promise((resolve) =>
+    setTimeout(resolve, remaining)
+  );
+}
+
+setMessages((prev) => [
+  ...prev.filter((msg) => msg.id !== messageId),
+  data,
+]);
+
 setPendingMessageIds((prev) =>
   prev.filter((id) => id !== messageId)
 );
@@ -1494,7 +1693,6 @@ const stickerPanelIsOpen =
   );
 
 resetComposer();
-await loadMessages(conversationId);
 
 if (!(isAndroid && stickerPanelIsOpen)) {
   requestAnimationFrame(() => {
@@ -1627,15 +1825,22 @@ try {
 
       if (!data) continue;
 
-      setPendingMessageIds((prev) =>
-        prev.filter(
-          (id) => id !== pendingMessage.id
-        )
-      );
+setMessages((prev) => [
+  ...prev.filter(
+    (message) => message.id !== pendingMessage.id
+  ),
+  data,
+]);
 
-      outbox = outbox.filter(
-        (item) => item.id !== pendingMessage.id
-      );
+setPendingMessageIds((prev) =>
+  prev.filter(
+    (id) => id !== pendingMessage.id
+  )
+);
+
+outbox = outbox.filter(
+  (item) => item.id !== pendingMessage.id
+);
 
       localStorage.setItem(
         OUTBOX_CACHE_KEY,
@@ -1731,20 +1936,24 @@ syncingUploadsRef.current = true;
 
         // Add the real Supabase message to the chat.
         setMessages((prev) => {
-          const alreadyExists = prev.some(
-            (message) =>
-              message.id === insertedMessage.id
-          );
+  const alreadyExists = prev.some(
+    (message) =>
+      message.id === insertedMessage.id
+  );
 
-          if (alreadyExists) {
-            return prev;
-          }
+  if (alreadyExists) {
+    return prev;
+  }
 
-          return [
-            ...prev,
-            insertedMessage,
-          ];
-        });
+  return [
+    ...prev.filter(
+      (message) =>
+        message.upload_id !==
+        pendingUpload.upload_id
+    ),
+    insertedMessage,
+  ];
+});
 
         // Remove the temporary uploading message.
         setPendingUploads((prev) =>
@@ -2031,18 +2240,68 @@ async function sendSticker(sticker: string) {
     .toString(36)
     .slice(2)}`;
 
-  const temporarySticker = {
-    id: messageId,
-    conversation_id: conversationId,
-    sender: "member",
-    message_type: "sticker",
-    content: "[sticker]",
-    file_url: sticker,
-    created_at: new Date().toISOString(),
-    is_read: false,
-    pending: true,
-  };
+    const pendingStartedAt = Date.now();
 
+  const temporarySticker = {
+  id: messageId,
+  conversation_id: conversationId,
+  sender: "member",
+  message_type: "sticker",
+  content: "[sticker]",
+  file_url: sticker,
+  created_at: new Date().toISOString(),
+  is_read: false,
+  pending: true,
+
+  reply_to_id: replyMessage?.id ?? null,
+
+  reply_file_duration:
+    replyMessage?.message_type === "voice"
+      ? replyMessage.file_duration ?? null
+      : null,
+
+  reply_preview:
+    replyMessage?.message_type === "text"
+      ? replyMessage.content
+      : replyMessage?.message_type === "image"
+      ? "📷 Photo"
+      : replyMessage?.message_type === "video"
+      ? "🎥 Video"
+      : replyMessage?.message_type === "voice"
+      ? "🎤 Voice"
+      : replyMessage?.message_type === "sticker"
+      ? "🏷️ Sticker"
+      : replyMessage?.message_type === "location"
+      ? "📍 Location"
+      : null,
+
+  reply_file_url:
+    replyMessage?.message_type === "image" ||
+    replyMessage?.message_type === "video" ||
+    replyMessage?.message_type === "sticker" ||
+    replyMessage?.message_type === "voice"
+      ? replyMessage.file_url
+      : replyMessage?.message_type === "location"
+      ? replyMessage.content
+      : null,
+
+  reply_thumbnail_url:
+    replyMessage?.message_type === "video"
+      ? (
+          replyMessage.reply_thumbnail_url ??
+          replyMessage.thumbnail_url ??
+          replyMessage.file_url
+        )
+      : null,
+
+  reply_message_type:
+    replyMessage?.message_type ?? null,
+
+  reply_sender:
+    replyMessage?.sender ?? null,
+};
+
+ 
   setPendingMessageIds((prev) => [
     ...prev,
     messageId,
@@ -2113,6 +2372,20 @@ try {
 
 if (!data) return;
 
+const elapsed = Date.now() - pendingStartedAt;
+const remaining = Math.max(0, 2000 - elapsed);
+
+if (remaining > 0) {
+  await new Promise((resolve) =>
+    setTimeout(resolve, remaining)
+  );
+}
+
+setMessages((prev) => [
+  ...prev.filter((message) => message.id !== messageId),
+  data,
+]);
+
 setPendingMessageIds((prev) =>
   prev.filter((id) => id !== messageId)
 );
@@ -2141,13 +2414,12 @@ if (currentOutbox) {
 setReplyMessage(null);
 setReplyPreview("");
 
-await loadMessages(conversationId);
-  setTimeout(() => {
-    messagesRef.current?.scrollTo({
-      top: messagesRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, 50);
+setTimeout(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
 }
 
 
@@ -2682,6 +2954,45 @@ if (uploadFile.type.startsWith("video/")) {
 
       reply_thumbnail_url: thumbnailUrl,
 
+      reply_to_id:
+  voiceReplyMessage?.id ?? null,
+
+reply_file_duration:
+  voiceReplyMessage?.message_type === "voice"
+    ? voiceReplyMessage.file_duration ?? null
+    : null,
+
+reply_preview:
+  voiceReplyMessage?.message_type === "text"
+    ? voiceReplyMessage.content
+    : voiceReplyMessage?.message_type === "image"
+    ? "📷 Photo"
+    : voiceReplyMessage?.message_type === "video"
+    ? "🎥 Video"
+    : voiceReplyMessage?.message_type === "voice"
+    ? "🎤 Voice"
+    : voiceReplyMessage?.message_type === "sticker"
+    ? "🏷️ Sticker"
+    : voiceReplyMessage?.message_type === "location"
+    ? "📍 Location"
+    : null,
+
+reply_file_url:
+  voiceReplyMessage?.message_type === "image" ||
+  voiceReplyMessage?.message_type === "video" ||
+  voiceReplyMessage?.message_type === "sticker" ||
+  voiceReplyMessage?.message_type === "voice"
+    ? voiceReplyMessage.file_url
+    : voiceReplyMessage?.message_type === "location"
+    ? voiceReplyMessage.content
+    : null,
+
+reply_message_type:
+  voiceReplyMessage?.message_type ?? null,
+
+reply_sender:
+  voiceReplyMessage?.sender ?? null,
+
       file_name: uploadFile.name,
       file_size: uploadFile.size,
 mime_type: uploadFile.type,
@@ -2734,11 +3045,13 @@ try {
 
       body: JSON.stringify({
         body:
-          uploadFile.type.startsWith("image/")
-            ? "📷Photo"
-            : uploadFile.type.startsWith("video/")
-            ? "🎥Video"
-            : "📎File",
+  voiceDuration !== undefined
+    ? "🎤 Voice message"
+    : uploadFile.type.startsWith("image/")
+    ? "📷Photo"
+    : uploadFile.type.startsWith("video/")
+    ? "🎥Video"
+    : "📎File",
 
         conversationId: activeConversationId,
 
@@ -2876,12 +3189,71 @@ const temporaryVoiceMessage = {
   uploading: true,
   offline: true,
   upload_id: voiceUploadId,
+
+
+  reply_to_id: replyMessage?.id ?? null,
+
+reply_file_duration:
+  replyMessage?.message_type === "voice"
+    ? replyMessage.file_duration ?? null
+    : null,
+
+reply_preview:
+  replyMessage?.message_type === "text"
+    ? replyMessage.content
+    : replyMessage?.message_type === "image"
+    ? "📷 Photo"
+    : replyMessage?.message_type === "video"
+    ? "🎥 Video"
+    : replyMessage?.message_type === "voice"
+    ? "🎤 Voice"
+    : replyMessage?.message_type === "sticker"
+    ? "🏷️ Sticker"
+    : replyMessage?.message_type === "location"
+    ? "📍 Location"
+    : null,
+
+reply_file_url:
+  replyMessage?.message_type === "image" ||
+  replyMessage?.message_type === "video" ||
+  replyMessage?.message_type === "sticker" ||
+  replyMessage?.message_type === "voice"
+    ? replyMessage.file_url
+    : replyMessage?.message_type === "location"
+    ? replyMessage.content
+    : null,
+
+reply_thumbnail_url:
+  replyMessage?.message_type === "video"
+    ? (
+        replyMessage.reply_thumbnail_url ??
+        replyMessage.thumbnail_url ??
+        replyMessage.file_url
+      )
+    : null,
+
+reply_message_type:
+  replyMessage?.message_type ?? null,
+
+reply_sender:
+  replyMessage?.sender ?? null,
 };
 
 setMessages((prev) => [
   ...prev,
   temporaryVoiceMessage,
 ]);
+
+deleteRecording();
+
+recordedAudioRef.current = null;
+
+requestAnimationFrame(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+});
 
 await saveOfflineUpload({
   id: voiceUploadId,
@@ -2892,10 +3264,6 @@ await saveOfflineUpload({
   message_type: "voice",
   file_duration: duration,
 });
-
-deleteRecording();
-
-recordedAudioRef.current = null;
 
 if (!navigator.onLine) {
   console.log(
@@ -2916,185 +3284,52 @@ if (!navigator.onLine) {
   return;
 }
 
-const filePath =
-  `${conversationId}/${file.name}`;
+const insertedMessage = await uploadFile(
+  file,
+  voiceUploadId,
+  activeConversationId,
+  duration,
+  replyMessage
+);
 
-  if (!navigator.onLine) {
-  console.log(
-    "MSpace: voice message queued because device is offline."
+if (!insertedMessage?.file_url) {
+  throw new Error(
+    "Voice upload did not return a file URL."
   );
-
-  const uploadId = `voice-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}`;
-
-  await saveOfflineUpload({
-    id: uploadId,
-    conversation_id: activeConversationId,
-    upload_id: uploadId,
-    file,
-    file_duration: duration,
-    replyMessage: replyMessage ?? null,
-  });
-
-  return;
 }
 
-  const { error: uploadError } = await supabase.storage
-  .from("photos")
-  .upload(filePath, file);
+setMessages((prev) => [
+  ...prev.filter(
+    (message) =>
+      message.upload_id !== voiceUploadId
+  ),
+  insertedMessage,
+]);
 
-if (uploadError) {
-  alert(uploadError.message);
-  return;
-}
-
-const { data } = supabase.storage
-  .from("photos")
-  .getPublicUrl(filePath);
-
-  const { error } = await supabase
-  .from("messages")
-  .insert({
-    conversation_id: conversationId,
-    sender: "member",
-    message_type: "voice",
-    content: "",
-    file_url: data.publicUrl,
-    file_name: file.name,
-    file_size: file.size,
-    mime_type: file.type,
-file_duration: duration,
-is_read: false,
-    
-    reply_to_id: replyMessage?.id ?? null,
-
-    reply_file_duration:
-  replyMessage?.message_type === "voice"
-    ? replyMessage.file_duration
-    : null,
-
-reply_preview:
-  replyMessage?.message_type === "text"
-    ? replyMessage.content
-    : replyMessage?.message_type === "image"
-    ? `📷 ${t.photo}`
-    : replyMessage?.message_type === "video"
-    ? `🎥 ${t.video}`
-    : replyMessage?.message_type === "voice"
-    ? `🎤 ${t.voice}`
-    : replyMessage?.message_type === "sticker"
-    ? `🏷️ ${t.sticker}`
-    : replyMessage?.message_type === "location"
-    ? `📍 ${t.location}`
-    : null,
-
-reply_file_url:
-  replyMessage?.message_type === "image" ||
-  replyMessage?.message_type === "video" ||
-  replyMessage?.message_type === "voice" ||
-  replyMessage?.message_type === "sticker"
-    ? replyMessage.file_url
-    : replyMessage?.message_type === "location"
-    ? replyMessage.content
-    : null,
-
-reply_thumbnail_url:
-  replyMessage?.message_type === "video"
-    ? (
-        replyMessage.reply_thumbnail_url ??
-        replyMessage.thumbnail_url ??
-        replyMessage.file_url
-      )
-    : null,
-
-reply_message_type: replyMessage?.message_type ?? null,
-
-reply_sender: replyMessage?.sender ?? null,
-
-  });
-
-if (error) {
-  alert(error.message);
-  return;
-}
-
-/*
- * Send push notification to the admin.
- * Do NOT wait for the push request before continuing.
- */
-void fetch("/api/push/send", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    body: "🎤 voice message",
-    conversationId,
-
-    // Same admin recipient used by text/sticker notifications.
-    targetMemberId:
-      "11111111-1111-1111-1111-111111111111",
-  }),
-})
-  .then(async (pushResponse) => {
-    const pushResult = await pushResponse.text();
-
-    console.log(
-      "VOICE PUSH RESPONSE STATUS:",
-      pushResponse.status
-    );
-
-    console.log(
-      "VOICE PUSH RESPONSE BODY:",
-      pushResult
-    );
-
-    if (!pushResponse.ok) {
-      console.error(
-        "Voice push request failed:",
-        pushResponse.status,
-        pushResult
-      );
-    }
-  })
-  .catch((pushError) => {
-    console.error(
-      "Voice push notification error:",
-      pushError
-    );
-  });
-
-await loadMessages(activeConversationId);
-
-deleteRecording();
-
-recordedAudioRef.current = null;
+await deleteOfflineUpload(voiceUploadId);
 
 requestAnimationFrame(() => {
   messageInputRef.current?.focus();
 });
 
-setTimeout(() => {
-  const el = messagesRef.current;
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const el = messagesRef.current;
 
-  if (!el) return;
+    if (!el) return;
 
-  el.scrollTo({
-    top: el.scrollHeight,
-    behavior: "smooth",
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth",
+    });
   });
-}, 50);
+});
 
 } finally {
   setUploading(false);
 }
 
-
-
 }
-
-
 
 
 function formatTime(date: string) {
@@ -3487,22 +3722,63 @@ onDeleteForEveryone={async () => {
   }
 
   try {
-    await sendLocationMessage(
-      conversationId!,
-      latitude,
-      longitude
-    );
+  const pendingStartedAt = Date.now();
 
-    setShowLocationPreview(false);
-    setLocationPreview(null);
-   await loadMessages(conversationId!);
+const data = await sendLocationMessage(
+  conversationId!,
+  latitude,
+  longitude
+);
 
-setTimeout(() => {
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "smooth",
-  });
-}, 50);
+if (!data) return;
+
+const elapsed = Date.now() - pendingStartedAt;
+const remaining = Math.max(0, 2000 - elapsed);
+
+if (remaining > 0) {
+  await new Promise(resolve =>
+    setTimeout(resolve, remaining)
+  );
+}
+
+setMessages(prev => [
+  ...prev.filter(message => message.id !== messageId),
+  data,
+]);
+
+  setPendingMessageIds((prev) =>
+    prev.filter((id) => id !== messageId)
+  );
+
+  setShowLocationPreview(false);
+  setLocationPreview(null);
+
+  const currentOutbox =
+    localStorage.getItem(OUTBOX_CACHE_KEY);
+
+  if (currentOutbox) {
+    try {
+      const outbox = JSON.parse(currentOutbox);
+
+      const updatedOutbox = outbox.filter(
+        (item: any) => item.id !== messageId
+      );
+
+      localStorage.setItem(
+        OUTBOX_CACHE_KEY,
+        JSON.stringify(updatedOutbox)
+      );
+    } catch {
+      localStorage.removeItem(OUTBOX_CACHE_KEY);
+    }
+  }
+
+  setTimeout(() => {
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, 50);
 
   } catch (error) {
     console.error(
@@ -4024,7 +4300,7 @@ setMessageFocus={setMessageFocus}
 
       {/* Input */}
 
-      {showComposer && (
+      {(isAndroid || showComposer) && (
   <ChatComposer
   composerRef={composerRef}
   placeholder={language === "zh" ? "输入消息..." : "Type a message..."}

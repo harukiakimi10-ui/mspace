@@ -46,7 +46,10 @@ const cancelLongPress = () => {
   
 
   const isMine = msg.sender === currentUser;
-  const isPending = msg.pending === true;
+  const isPending =
+  msg.pending === true ||
+  msg.offline === true ||
+  msg.uploading === true;
 
   // Get latitude and longitude from the saved Google Maps URL
   const getCoordinates = () => {

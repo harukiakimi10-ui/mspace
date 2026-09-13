@@ -15,6 +15,7 @@ import {
 type Conversation = {
   id: string;
   updated_at: string;
+  member_typing?: boolean;
   has_unread?: boolean;
   unreadCount?: number;
 
@@ -32,6 +33,7 @@ type Conversation = {
   created_at: string;
   file_duration?: number | null;
   is_deleted?: boolean;
+  is_read?: boolean;
 };
 };
 
@@ -87,18 +89,66 @@ function formatVoiceDuration(duration?: number | null) {
     .padStart(2, "0")}`;
 }
 
+function MessageReadReceipt({
+  message,
+}: {
+  message?: Conversation["lastMessage"];
+}) {
+  if (!message || message.sender !== "admin") {
+    return null;
+  }
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        flexShrink: 0,
+        fontSize: 13,
+        fontWeight: 600,
+        letterSpacing: "-2px",
+        color: message.is_read
+          ? "#2196F3"
+          : "#777",
+      }}
+    >
+      {message.is_read ? "✓✓" : "✓"}
+    </span>
+  );
+}
+
   return (
     <div
-      style={{
-  width: "100%",
-  overflowY: "auto",
-}}
-    >
+  data-mspace-conversation-list="true"
+  style={{
+    width: "100%",
+    overflowY: "auto",
+  }}
+>
       {mounted &&
         conversations.map((chat) => (
         <div
         key={chat.id}
-        onClick={() => router.push(`/admin/chats/${chat.id}`)}
+        data-conversation-id={chat.id}
+        onClick={() => {
+  const list = document.querySelector(
+    '[data-mspace-conversation-list="true"]'
+  ) as HTMLElement | null;
+
+  if (list) {
+    sessionStorage.setItem(
+      "mspace-conversation-list-scroll",
+      String(list.scrollTop)
+    );
+  }
+
+  sessionStorage.setItem(
+    "mspace-selected-conversation-id",
+    chat.id
+  );
+
+  router.push(`/admin/chats/${chat.id}`);
+}}
           style={{
   display: "flex",
   alignItems: "center",
@@ -234,15 +284,33 @@ function formatVoiceDuration(duration?: number | null) {
   >
     <span
       style={{
-        color: "#777",
-        fontSize: 13,
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        textOverflow: "ellipsis",
-        maxWidth: "85%",
-      }}
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  color: "#777",
+  fontSize: 13,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+  textOverflow: "ellipsis",
+  maxWidth: "85%",
+}}
     >
-      {chat.lastMessage ? (
+
+{!chat.member_typing && (
+  <MessageReadReceipt
+    message={chat.lastMessage}
+  />
+)}
+
+      {chat.member_typing ? (
+  <span
+    style={{
+      fontStyle: "italic",
+    }}
+  >
+    Typing...
+  </span>
+) : chat.lastMessage ? (
   chat.lastMessage.is_deleted ? (
     <span
       style={{
@@ -351,8 +419,18 @@ function formatVoiceDuration(duration?: number | null) {
     </span>
 
   ) : (
-    chat.lastMessage.content
-  )
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+    }}
+  >
+    <span>
+      {chat.lastMessage.content}
+    </span>
+  </span>
+)
 ) : (
   ""
 )}
