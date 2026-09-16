@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { LoaderCircle } from "lucide-react";
+import LocationViewer from "./LocationViewer";
 import "leaflet/dist/leaflet.css";
 
 type LocationMessageProps = {
@@ -22,6 +24,7 @@ export default function LocationMessage({
 }: LocationMessageProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
+  const [showLocationViewer, setShowLocationViewer] = useState(false);
 
  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const longPressTriggeredRef = useRef(false);
@@ -155,18 +158,6 @@ attribution.setPosition("bottomleft");
         }
       ).addTo(map);
 
-      // Open the location in Maps when the map is tapped
-      map.on("click", () => {
-        const googleMapsUrl =
-          `https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}`;
-
-        window.open(
-          googleMapsUrl,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      });
-
       // Make sure Leaflet calculates the correct size
       setTimeout(() => {
         if (!cancelled) {
@@ -189,6 +180,13 @@ attribution.setPosition("bottomleft");
 
  return (
   <div
+  onClick={() => {
+  const coordinates = getCoordinates();
+
+  if (!coordinates) return;
+
+  setShowLocationViewer(true);
+}}
     onPointerDownCapture={(e) => {
   if (e.pointerType === "touch") {
     startLongPress(e.currentTarget);
@@ -275,6 +273,23 @@ onPointerCancelCapture={() => {
   )
 )}
       </div>
+
+      {showLocationViewer &&
+  typeof document !== "undefined" &&
+  (() => {
+    const coordinates = getCoordinates();
+
+    if (!coordinates) return null;
+
+    return createPortal(
+      <LocationViewer
+        latitude={coordinates.latitude}
+        longitude={coordinates.longitude}
+        onClose={() => setShowLocationViewer(false)}
+      />,
+      document.body
+    );
+  })()}
     </div>
   );
 }

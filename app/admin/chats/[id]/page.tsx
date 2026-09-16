@@ -29,8 +29,14 @@ import StickerPanel from "@/app/chat/StickerPanel";
 import AttachmentMenu from "@/app/chat/AttachmentMenu";
 
 import { compressVideo } from "@/app/chat/videoCompressor";
-import { sendLocationMessage } from "@/app/chat/services/messageService";
+import {
+  sendLocationMessage,
+  pinMessage,
+  unpinMessage,
+} from "@/app/chat/services/messageService";
+import ForwardLocationDialog from "@/app/admin/chats/components/ForwardLocationDialog";
 import LocationPreview from "@/app/chat/LocationPreview";
+import MSpaceBrowser from "@/components/MSpaceBrowser";
 
 
 export default function ChatPage() {
@@ -68,16 +74,32 @@ export default function ChatPage() {
   const [conversation, setConversation] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
+  const [showMSpaceBrowser, setShowMSpaceBrowser] = useState(false);
+  const [mspaceBrowserUrl, setMSpaceBrowserUrl] = useState("");
+
   const [reply, setReply] = useState("");
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
 
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [showForwardLocationDialog, setShowForwardLocationDialog] =
+  useState(false);
+  const [forwardLocationMessage, setForwardLocationMessage] =
+  useState<any>(null);
   const [showStickerPanel, setShowStickerPanel] =
   useState(false);
 
 const [showMessageMenu, setShowMessageMenu] = useState(false);
+
+const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null);
+const [pinnedMessage, setPinnedMessage] = useState<any | null>(null);
+useEffect(() => {
+  console.log(
+    "ADMIN PIN STATE RENDER:",
+    pinnedMessage
+  );
+}, [pinnedMessage]);
 
 useEffect(() => {
   if (showMessageMenu && showStickerPanel) {
@@ -643,8 +665,9 @@ const messageInputRef =
   loadUnreadConversationCount();
 
   (async () => {
-    await loadMessages();
-  })();
+  await loadMessages();
+  await loadPinnedMessage();
+})();
 
 const handleVisibility = async () => {
   const active =
@@ -1683,6 +1706,75 @@ requestAnimationFrame(() => {
  
   }
 
+  async function loadPinnedMessage() {
+  console.log(
+    "ADMIN LOAD PIN: conversation id =",
+    id
+  );
+
+  if (!id) return;
+
+  const { data: pin, error: pinError } =
+    await supabase
+      .from("pinned_messages")
+      .select("id, message_id, conversation_id, pinned_at")
+      .eq("conversation_id", id)
+      .maybeSingle();
+
+  console.log(
+    "ADMIN PIN QUERY RESULT:",
+    JSON.stringify({ pin, pinError }, null, 2)
+  );
+
+  if (pinError) {
+    console.error("LOAD PIN ERROR:", pinError);
+    return;
+  }
+
+  if (!pin) {
+    console.log("ADMIN: NO PIN FOUND");
+    setPinnedMessageId(null);
+    setPinnedMessage(null);
+    return;
+  }
+
+  console.log(
+    "ADMIN PIN MESSAGE ID:",
+    pin.message_id
+  );
+
+  const { data: message, error: messageError } =
+    await supabase
+      .from("messages")
+      .select("*")
+      .eq("id", pin.message_id)
+      .maybeSingle();
+
+  console.log(
+    "ADMIN PINNED MESSAGE RESULT:",
+    JSON.stringify(
+      { message, messageError },
+      null,
+      2
+    )
+  );
+
+  if (messageError) {
+    console.error(
+      "LOAD PINNED MESSAGE ERROR:",
+      messageError
+    );
+    return;
+  }
+
+  setPinnedMessageId(pin.message_id);
+  setPinnedMessage(message || null);
+
+  console.log(
+    "ADMIN PIN STATE SET:",
+    message
+  );
+}
 
 
 async function markMessagesAsRead() {
@@ -2595,6 +2687,74 @@ try {
 setUnreadCount(count);
 }
 
+const handleForwardLocation = async (
+  conversationIds: string[]
+) => {
+  if (!selectedMessage) return;
+
+  if (selectedMessage.message_type !== "location") {
+    return;
+  }
+
+  const locationContent = selectedMessage.content;
+
+  if (!locationContent) {
+    throw new Error("Location message has no location URL.");
+  }
+
+  try {
+    const url = new URL(locationContent);
+    const query = url.searchParams.get("q");
+
+    if (!query) {
+      throw new Error("Could not find location coordinates.");
+    }
+
+    const [latitudeString, longitudeString] =
+      query.split(",");
+
+    const latitude = Number(latitudeString);
+    const longitude = Number(longitudeString);
+
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      throw new Error("Invalid location coordinates.");
+    }
+
+    console.log("FORWARDING LOCATION:", {
+      latitude,
+      longitude,
+      conversationIds,
+    });
+
+    await Promise.all(
+      conversationIds.map((conversationId) =>
+        sendLocationMessage(
+          conversationId,
+          latitude,
+          longitude,
+          "admin"
+        )
+      )
+    );
+
+    setShowForwardLocationDialog(false);
+    setShowMessageMenu(false);
+    setSelectedMessage(null);
+
+    await loadMessages();
+  } catch (error) {
+    console.error(
+      "Forward location error:",
+      error
+    );
+
+    throw error;
+  }
+};
+
   return (
     <>
 
@@ -3054,8 +3214,10 @@ setTimeout(() => {
     overflowX: "hidden",
     WebkitOverflowScrolling: "touch",
     
-    padding: 20,
-    paddingBottom: showStickerPanel
+    paddingTop: 0,
+paddingLeft: 15,
+paddingRight: 15,
+paddingBottom: showStickerPanel
   ? `calc(38vh + ${composerHeight + 20}px)`
   : composerHeight + 20,
     boxSizing: "border-box",
@@ -3101,6 +3263,7 @@ setTimeout(() => {
   ),
   ...pendingUploads,
 ]}
+  pinnedMessage={pinnedMessage}
   currentUser="admin"
   pendingMessageIds={pendingMessageIds}
   profileName={member?.name || "Member"}
@@ -3122,6 +3285,11 @@ setTimeout(() => {
   setShowComposer={setShowComposer}
   messageFocus={messageFocus}
 setMessageFocus={setMessageFocus}
+
+  onOpenLink={(url) => {
+    setMSpaceBrowserUrl(url);
+    setShowMSpaceBrowser(true);
+  }}
 />
   </div>
   </div>
@@ -3324,25 +3492,38 @@ onCloseStickerPanel={() => {
 
   // Tell the member that admin is typing
   supabase
-    .from("conversations")
-    .update({
+  .from("conversations")
+  .update({
+    admin_typing: true,
+  })
+  .eq("id", id)
+  .then(({ error }) => {
+    console.log("ADMIN TYPING UPDATE:", {
+      conversationId: id,
       admin_typing: true,
-    })
-    .eq("id", id);
+      error,
+    });
+  });
 
   // Reset the typing timer
   if (typingTimeout.current) {
     clearTimeout(typingTimeout.current);
   }
 
-  typingTimeout.current = setTimeout(() => {
-    supabase
-      .from("conversations")
-      .update({
-        admin_typing: false,
-      })
-      .eq("id", id);
-  }, 1000);
+  typingTimeout.current = setTimeout(async () => {
+  const { error } = await supabase
+    .from("conversations")
+    .update({
+      admin_typing: false,
+    })
+    .eq("id", id);
+
+  console.log("ADMIN TYPING STOP UPDATE:", {
+    conversationId: id,
+    admin_typing: false,
+    error,
+  });
+}, 1000);
 }}
 
   onKeyDown={() => {}}
@@ -3556,6 +3737,106 @@ setPendingUploads((prev) =>
   y={menuY}
   selectedMessage={selectedMessage}
   currentUser="admin"
+  isPinned={pinnedMessageId === selectedMessage?.id}
+
+  onPin={async () => {
+  if (!selectedMessage?.id) return;
+
+  // Check the current pinned message for this conversation
+  const { data: existingPin, error: checkError } =
+    await supabase
+      .from("pinned_messages")
+      .select("id, message_id")
+      .eq("conversation_id", id)
+      .maybeSingle();
+
+  if (checkError) {
+    console.error("CHECK PIN ERROR:", checkError);
+    alert(`Could not check pin:\n${checkError.message}`);
+    return;
+  }
+
+  // --------------------------------
+  // THIS MESSAGE IS ALREADY PINNED
+  // → UNPIN IT
+  // --------------------------------
+  if (existingPin?.message_id === selectedMessage.id) {
+    const { error: deleteError } =
+      await supabase
+        .from("pinned_messages")
+        .delete()
+        .eq("conversation_id", id)
+        .eq("message_id", selectedMessage.id);
+
+    if (deleteError) {
+      console.error("UNPIN ERROR:", deleteError);
+      alert(`Could not unpin message:\n${deleteError.message}`);
+      return;
+    }
+
+    setPinnedMessageId(null);
+setPinnedMessage(null);
+console.log("MESSAGE UNPINNED:", selectedMessage.id);
+
+    return;
+  }
+
+  // --------------------------------
+  // ANOTHER MESSAGE IS CURRENTLY PINNED
+  // → REMOVE IT FIRST
+  // --------------------------------
+  if (existingPin?.message_id) {
+    const { error: deletePreviousError } =
+      await supabase
+        .from("pinned_messages")
+        .delete()
+        .eq("conversation_id", id);
+
+    if (deletePreviousError) {
+      console.error(
+        "REMOVE PREVIOUS PIN ERROR:",
+        deletePreviousError
+      );
+      alert(
+        `Could not remove the previous pinned link:\n${deletePreviousError.message}`
+      );
+      return;
+    }
+  }
+
+  // --------------------------------
+  // PIN THE NEW MESSAGE
+  // --------------------------------
+  const { error: insertError } =
+    await supabase
+      .from("pinned_messages")
+      .insert({
+        message_id: selectedMessage.id,
+        conversation_id: id,
+      });
+
+  if (insertError) {
+    console.error("PIN ERROR:", insertError);
+    alert(`Could not pin message:\n${insertError.message}`);
+    return;
+  }
+
+  setPinnedMessageId(selectedMessage.id);
+setPinnedMessage(selectedMessage);
+console.log("MESSAGE PINNED:", selectedMessage.id);
+}}
+
+  onForward={() => {
+  console.log("ADMIN FORWARD CLICKED");
+  console.log(
+    "SELECTED MESSAGE BEFORE DIALOG:",
+    selectedMessage
+  );
+
+  setForwardLocationMessage(selectedMessage);
+  setShowMessageMenu(false);
+  setShowForwardLocationDialog(true);
+}}
   onClose={() => {
   clearMessageFocus();
   setShowComposer(true);
@@ -3659,12 +3940,63 @@ onSave={async () => {
 }}
 />
 
+<ForwardLocationDialog
+  open={showForwardLocationDialog}
+  onClose={() => {
+  setShowForwardLocationDialog(false);
+  setForwardLocationMessage(null);
+}}
+  onForward={async (conversationIds) => {
+  if (!forwardLocationMessage) return;
+
+  const locationUrl =
+    forwardLocationMessage.content || "";
+
+    const match = locationUrl.match(
+      /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/
+    );
+
+    if (!match) {
+      console.error(
+        "Could not extract location coordinates:",
+        locationUrl
+      );
+      return;
+    }
+
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+
+    for (const conversationId of conversationIds) {
+      await sendLocationMessage(
+        conversationId,
+        latitude,
+        longitude,
+        "admin"
+      );
+    }
+
+    setShowForwardLocationDialog(false);
+  }}
+/>
+
 <DeleteConversationDialog
   open={showDeleteDialog}
   onCancel={() => setShowDeleteDialog(false)}
   onConfirm={deleteConversation}
 />
   </div>
+
+  {showMSpaceBrowser && (
+  <MSpaceBrowser
+    url={mspaceBrowserUrl}
+    onClose={() => {
+      setShowMSpaceBrowser(false);
+      setMSpaceBrowserUrl("");
+    }}
+  />
+)}
+
   </>
 );
 }

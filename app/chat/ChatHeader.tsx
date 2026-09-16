@@ -57,7 +57,7 @@ useEffect(() => {
   return (
   <div
     style={{
-      position: "fixed",
+      position: "relative",
       top: 0,
       left: 0,
       right: 0,

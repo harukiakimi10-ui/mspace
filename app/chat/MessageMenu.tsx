@@ -4,6 +4,8 @@ import {
   Download,
   Trash2,
   Trash,
+  Forward,
+  Pin,
 } from "lucide-react";
 
 const language =
@@ -14,20 +16,26 @@ const language =
 
 const t = {
   en: {
-    reply: "Reply",
-    copy: "Copy",
-    save: "Save",
-    deleteForMe: "Delete for me",
-    deleteForEveryone: "Delete for everyone",
-  },
+  reply: "Reply",
+  copy: "Copy",
+  save: "Save",
+  deleteForMe: "Delete for me",
+  deleteForEveryone: "Delete for everyone",
+  forward: "Forward",
+  pin: "Pin",
+  unpin: "Unpin",
+},
 
   zh: {
-    reply: "回复",
-    copy: "复制",
-    save: "保存",
-    deleteForMe: "删除此消息",
-    deleteForEveryone: "删除所有人",
-  },
+  reply: "回复",
+  copy: "复制",
+  save: "保存",
+  deleteForMe: "删除此消息",
+  deleteForEveryone: "删除所有人",
+  forward: "转发",
+  pin: "置顶",
+  unpin: "取消置顶",
+},
 }[language];
 
 type MessageMenuProps = {
@@ -39,6 +47,9 @@ type MessageMenuProps = {
   onClose: () => void;
   onReply: () => void;
   onCopy: () => void;
+  onForward?: () => void;
+  onPin?: () => void;
+  isPinned?: boolean;
   onSave: () => void;
   onDeleteForMe: () => void;
   onDeleteForEveryone: () => void;
@@ -53,6 +64,9 @@ export default function MessageMenu({
   onClose,
   onReply,
   onCopy,
+  onForward,
+  onPin,
+  isPinned,
   onSave,
   onDeleteForMe,
   onDeleteForEveryone,
@@ -63,6 +77,14 @@ export default function MessageMenu({
   const messageType = selectedMessage?.message_type;
 
   const isText = messageType === "text";
+
+  const hasLink =
+  isText &&
+  /(?:https?:\/\/|www\.|(?:[a-z0-9-]+\.)+[a-z]{2,})(?:[/?#][^\s]*)?/i.test(
+    selectedMessage?.content || ""
+  );
+
+  const isLocation = messageType === "location";
 
   const isSaveable =
     messageType === "image" ||
@@ -100,10 +122,12 @@ export default function MessageMenu({
   */
 
   const itemCount =
-    2 + // Reply + Delete for me
-    (isText ? 1 : 0) +
-    (isSaveable ? 1 : 0) +
-    (isMine ? 1 : 0);
+  2 +
+  (isText ? 1 : 0) +
+  (isSaveable ? 1 : 0) +
+  (isLocation ? 1 : 0) +
+  (currentUser === "admin" && hasLink && onPin ? 1 : 0) +
+  (isMine ? 1 : 0);
 
   const menuWidth = 190;
   const menuHeight = itemCount * 56 + 16;
@@ -247,6 +271,50 @@ export default function MessageMenu({
           </div>
         )}
 
+        {/* PIN — ADMIN ONLY, LINK TEXT ONLY */}
+{currentUser === "admin" && hasLink && onPin && (
+  <div
+    onClick={() => {
+      onPin();
+      onClose();
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.background = "#f5f3ff";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.background = "transparent";
+    }}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      padding: "13px 14px",
+      borderRadius: "12px",
+      cursor: "pointer",
+      transition: "0.2s",
+      fontWeight: 400,
+      fontSize: "14px",
+    }}
+  >
+    <div
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: "50%",
+        background: "#f8f8f8",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <Pin size={15} color="#555" />
+    </div>
+
+    {isPinned ? t.unpin : t.pin}
+  </div>
+)}
+
 
         {/* SAVE — PHOTO / VIDEO ONLY */}
         {isSaveable && (
@@ -291,6 +359,50 @@ export default function MessageMenu({
             {t.save}
           </div>
         )}
+
+        {/* FORWARD — LOCATION ONLY */}
+{isLocation && currentUser === "admin" && onForward && (
+  <div
+    onClick={() => {
+      onForward();
+      onClose();
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.background = "#f5f3ff";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.background = "transparent";
+    }}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      padding: "13px 14px",
+      borderRadius: "12px",
+      cursor: "pointer",
+      transition: "0.2s",
+      fontWeight: 400,
+      fontSize: "14px",
+    }}
+  >
+    <div
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: "50%",
+        background: "#f8f8f8",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <Forward size={15} color="#555" />
+    </div>
+
+    {t.forward}
+  </div>
+)}
 
 
         {/* DELETE FOR ME — EVERY MESSAGE TYPE */}

@@ -10,6 +10,7 @@ import {
   useRef,
 } from "react";
 import { flushSync } from "react-dom";
+import { Pin } from "lucide-react";
 
 import ImageViewer from "./ImageViewer";
 import VideoViewer from "./VideoViewer";
@@ -26,6 +27,7 @@ import StickerPanel from "./StickerPanel";
 import { createId } from "@/lib/createId";
 import { compressVideo } from "./videoCompressor";
 import LocationPreview from "./LocationPreview";
+import MSpaceBrowser from "@/components/MSpaceBrowser";
 
 import * as tus from "tus-js-client";
 
@@ -194,7 +196,7 @@ console.log(
   };
 }, [conversationId]);
 
-
+  const [pinnedMessage, setPinnedMessage] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>(() => {
   if (typeof window === "undefined") {
     return [];
@@ -265,6 +267,7 @@ const [audioChunks, setAudioChunks] =
 
 const CHAT_CACHE_KEY = `mspace-chat-header-${memberId ?? "default"}`;
 const MESSAGE_CACHE_KEY = `mspace-chat-messages-${memberId ?? "default"}`;
+const PIN_CACHE_KEY = `mspace-pinned-message-${memberId ?? "default"}`;
 console.log("MSPACE MEMBER CACHE KEY:", MESSAGE_CACHE_KEY);
 console.log("MSPACE MEMBER ID:", memberId);
 console.log(
@@ -302,6 +305,8 @@ const [admin, setAdmin] = useState<any>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showStickerPanel, setShowStickerPanel] =
   useState(false);
+  const [showMSpaceBrowser, setShowMSpaceBrowser] = useState(false);
+  const [mspaceBrowserUrl, setMSpaceBrowserUrl] = useState("");
   const [isChatActive, setIsChatActive] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   
@@ -336,6 +341,7 @@ const longPressTriggeredRef =
 const fileInputRef = useRef<HTMLInputElement>(null);
 const cameraInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+const typingActiveRef = useRef(false);
 const hasAutoScrolled = useRef(false);
 const loadingConversationRef = useRef(false);
 const showScrollButtonRef = useRef(false);
@@ -594,6 +600,26 @@ async function bootstrapChat() {
         setConversation(header.conversation);
         setConversationId(header.conversation.id);
       }
+
+      // Restore the last known pinned message immediately
+const cachedPinnedMessage =
+  localStorage.getItem(PIN_CACHE_KEY);
+
+if (cachedPinnedMessage) {
+  try {
+    const parsedPinnedMessage =
+      JSON.parse(cachedPinnedMessage);
+
+    if (
+      parsedPinnedMessage?.conversation_id ===
+      header.conversation?.id
+    ) {
+      setPinnedMessage(parsedPinnedMessage);
+    }
+  } catch {
+    localStorage.removeItem(PIN_CACHE_KEY);
+  }
+}
     } catch (error) {
       console.error(
         "MSpace: cached header restore failed:",
@@ -696,6 +722,37 @@ useLayoutEffect(() => {
 
   void bootstrapChat();
 }, []);
+
+useEffect(() => {
+  if (!conversationId) return;
+
+  void loadPinnedMessage();
+}, [conversationId]);
+
+useEffect(() => {
+  if (!conversationId) return;
+
+  const channel = supabase
+    .channel(`pinned-message-${conversationId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "pinned_messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      () => {
+        console.log("PINNED MESSAGE CHANGED — RELOADING");
+        void loadPinnedMessage();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}, [conversationId]);
 
 useEffect(() => {
   let cancelled = false;
@@ -983,12 +1040,20 @@ useEffect(() => {
     filter: `id=eq.${conversationId}`,
   },
   async (payload) => {
-    console.log("CONVERSATION UPDATE:", payload);
+  console.log(
+    "CONVERSATION UPDATE ADMIN TYPING:",
+    payload.new?.admin_typing
+  );
 
-    setConversation(payload.new);
-  }
+  setConversation((prev: any) => ({
+    ...prev,
+    ...payload.new,
+  }));
+}
 )
-    .subscribe();
+    .subscribe((status) => {
+  console.log("MEMBER CONVERSATION CHANNEL STATUS:", status);
+});
 
   return () => {
     supabase.removeChannel(adminChannel);
@@ -997,6 +1062,8 @@ useEffect(() => {
 
   useEffect(() => {
     if (!conversationId) return;
+
+    console.log("SETTING UP MEMBER CONVERSATION CHANNEL:", conversationId);
 
     const channel = supabase
       .channel(`member-chat-${conversationId}`)
@@ -1061,6 +1128,27 @@ useEffect(() => {
   console.log("MESSAGE UPDATE REALTIME:", payload);
   await loadMessages(conversationId);
 }
+)
+
+.on(
+  "postgres_changes",
+  {
+    event: "UPDATE",
+    schema: "public",
+    table: "conversations",
+    filter: `id=eq.${conversationId}`,
+  },
+  (payload) => {
+    console.log("MEMBER CONVERSATION UPDATE REALTIME:", {
+  conversationId: payload.new?.id,
+  admin_typing: payload.new?.admin_typing,
+});
+
+setConversation((prev: any) => ({
+  ...prev,
+  ...payload.new,
+}));
+  }
 )
 .subscribe();
 
@@ -1271,7 +1359,7 @@ if (!data) return;
   );
 }
 
-async function handleMessageInput(
+function handleMessageInput(
   e: React.ChangeEvent<HTMLTextAreaElement>
 ) {
   setMessage(e.target.value);
@@ -1284,38 +1372,48 @@ async function handleMessageInput(
 
   if (!conversationId) return;
 
-  const { data, error } = await supabase
-    .from("conversations")
-    .update({
-      member_typing: true,
-    })
-    .eq("id", conversationId)
-    .select();
-
-  console.log("MEMBER TYPING UPDATE:", {
-    conversationId,
-    data,
-    error,
-  });
-
+  // Clear the previous "stop typing" timer immediately.
   if (typingTimeout.current) {
     clearTimeout(typingTimeout.current);
   }
 
-  typingTimeout.current = setTimeout(async () => {
-    const { data, error } = await supabase
+  // Only send "typing = true" once.
+  // Do NOT send a database update for every character.
+  if (!typingActiveRef.current) {
+    typingActiveRef.current = true;
+
+    void supabase
+      .from("conversations")
+      .update({
+        member_typing: true,
+      })
+      .eq("id", conversationId)
+      .then(({ data, error }) => {
+        console.log("MEMBER TYPING UPDATE:", {
+          conversationId,
+          data,
+          error,
+        });
+      });
+  }
+
+  // After 1 second without typing, mark the member as not typing.
+  typingTimeout.current = setTimeout(() => {
+    typingActiveRef.current = false;
+
+    void supabase
       .from("conversations")
       .update({
         member_typing: false,
       })
       .eq("id", conversationId)
-      .select();
-
-    console.log("MEMBER TYPING STOP:", {
-      conversationId,
-      data,
-      error,
-    });
+      .then(({ data, error }) => {
+        console.log("MEMBER TYPING STOP:", {
+          conversationId,
+          data,
+          error,
+        });
+      });
   }, 1000);
 }
 
@@ -1403,6 +1501,61 @@ setTimeout(() => {
     el.scrollTop = el.scrollHeight;
   }
 }, 0);
+}
+
+async function loadPinnedMessage() {
+  console.log(
+    "MEMBER LOAD PIN: conversationId =",
+    conversationId
+  );
+
+  if (!conversationId) return;
+
+  const { data: pin, error: pinError } = await supabase
+    .from("pinned_messages")
+    .select("message_id")
+    .eq("conversation_id", conversationId)
+    .maybeSingle();
+
+    console.log(
+  "MEMBER PIN QUERY RESULT:",
+  { pin, pinError }
+);
+
+  if (pinError) {
+    console.error("LOAD MEMBER PIN ERROR:", pinError);
+    return;
+  }
+
+  if (!pin) {
+  setPinnedMessage(null);
+  localStorage.removeItem(PIN_CACHE_KEY);
+  return;
+}
+
+  const { data: message, error: messageError } =
+    await supabase
+      .from("messages")
+      .select("*")
+      .eq("id", pin.message_id)
+      .maybeSingle();
+
+  if (messageError) {
+    console.error(
+      "LOAD MEMBER PINNED MESSAGE ERROR:",
+      messageError
+    );
+    return;
+  }
+
+  setPinnedMessage(message || null);
+
+if (message) {
+  localStorage.setItem(
+    PIN_CACHE_KEY,
+    JSON.stringify(message)
+  );
+}
 }
 
 async function markMessagesAsRead(id: string) {
@@ -4038,7 +4191,70 @@ setPendingUploads((prev) =>
   />
 </div>
 
-      {/* Messages */}
+      {pinnedMessage?.content && (
+  <div
+    style={{
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      width: "100%",
+      boxSizing: "border-box",
+      padding: "10px 12px",
+      background: "#ffffff",
+      borderBottom: "1px solid #eee",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+      zIndex: 10,
+    }}
+  >
+    <Pin
+      size={17}
+      strokeWidth={2.2}
+      color="#6d28d9"
+      style={{
+        flexShrink: 0,
+      }}
+    />
+
+    <div
+      style={{
+        minWidth: 0,
+        flex: 1,
+        fontSize: 14,
+        lineHeight: 1.4,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "break-word",
+      }}
+    >
+      <a
+  href={pinnedMessage.content}
+  onClick={(e) => {
+  e.preventDefault();
+
+  const rawUrl = pinnedMessage.content.trim();
+
+  const normalizedUrl =
+    /^https?:\/\//i.test(rawUrl)
+      ? rawUrl
+      : `https://${rawUrl}`;
+
+  setMSpaceBrowserUrl(normalizedUrl);
+  setShowMSpaceBrowser(true);
+}}
+  style={{
+    color: "#4ade80",
+    textDecoration: "underline",
+    cursor: "pointer",
+  }}
+>
+  {pinnedMessage.content}
+</a>
+    </div>
+  </div>
+)}
+
+{/* Messages */}
 
 <div
   style={{
@@ -4052,7 +4268,7 @@ setPendingUploads((prev) =>
 
   overflow: "hidden",
 
-  marginTop: "60px",
+  marginTop: "0px",
   marginBottom: "0px",
 }}
 >
@@ -4101,9 +4317,12 @@ setPendingUploads((prev) =>
 
   WebkitOverflowScrolling: "touch",
 
-  padding: showStickerPanel
-  ? "20px 10px calc(38vh + 80px)"
-  : "20px 10px 80px",
+  paddingTop: 0,
+paddingLeft: 10,
+paddingRight: 10,
+paddingBottom: showStickerPanel
+  ? "calc(38vh + 80px)"
+  : 80,
 
   overscrollBehavior: "contain",
 }}
@@ -4166,6 +4385,11 @@ setPendingUploads((prev) =>
   ),
   ...pendingUploads,
 ]}
+pinnedMessage={null}
+onOpenLink={(url) => {
+  setMSpaceBrowserUrl(url);
+  setShowMSpaceBrowser(true);
+}}
   currentUser="member"
   pendingMessageIds={pendingMessageIds}
   profileName={profileName}
@@ -4401,6 +4625,17 @@ setMessageFocus={setMessageFocus}
 />
 )}
    </main>
+
+{showMSpaceBrowser && (
+  <MSpaceBrowser
+    url={mspaceBrowserUrl}
+    onClose={() => {
+      setShowMSpaceBrowser(false);
+      setMSpaceBrowserUrl("");
+    }}
+  />
+)}
+
 </>
 );
 }

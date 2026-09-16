@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useState, useEffect, useRef } from "react";
 import LocationMessage from "./LocationMessage";
+import LocationViewer from "./LocationViewer";
 import {
   Video,
   Camera,
@@ -8,7 +9,8 @@ import {
   Pause,
   Mic,
   MapPin,
-  LoaderCircle
+  LoaderCircle,
+  Pin
 } from "lucide-react";
 import VoiceMessage from "./VoiceMessage";
 import VideoMessage from "./VideoMessage";
@@ -19,6 +21,10 @@ import LocationThumbnail from "./LocationThumbnail";
 
 type MessagesProps = {
   messages: any[];
+
+  pinnedMessage?: any | null;
+
+  onOpenLink: (url: string) => void;
 
   currentUser: "member" | "admin";
   pendingMessageIds: string[];
@@ -51,6 +57,66 @@ setMessageFocus: (open: boolean) => void;
 
 onCancelUpload: (uploadId: string) => void;
 };
+
+function renderTextWithLinks(
+  text: string,
+  onOpenLink: (url: string) => void
+) {
+  const parts = text.split(
+    /((?:https?:\/\/|www\.)[^\s<]+|(?:[a-z0-9-]+\.)+[a-z0-9-]{2,}(?::\d+)?(?:\/[^\s<]*)?)/gi
+  );
+
+  return parts.map((part, index) => {
+    const isFullUrl = /^https?:\/\//i.test(part);
+    const isWwwUrl = /^www\./i.test(part);
+
+    const isDomainLink =
+      /^(?:[a-z0-9-]+\.)+[a-z0-9-]{2,}(?::\d+)?(?:\/[^\s<]*)?$/i.test(
+        part
+      );
+
+    if (!isFullUrl && !isWwwUrl && !isDomainLink) {
+      return <Fragment key={index}>{part}</Fragment>;
+    }
+
+    // Keep punctuation outside the clickable link.
+    const match = part.match(/^(.*?)([.,!?;:)\]}]*)$/);
+
+    const rawLink = match?.[1] || part;
+    const trailing = match?.[2] || "";
+
+    const href =
+      /^https?:\/\//i.test(rawLink)
+        ? rawLink
+        : `https://${rawLink}`;
+
+    return (
+      <Fragment key={index}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenLink(href);
+          }}
+          style={{
+  color: "#22c55e",
+  textDecoration: "underline",
+  textDecorationThickness: "1px",
+  textUnderlineOffset: "2px",
+  cursor: "pointer",
+}}
+        >
+          {rawLink}
+        </a>
+
+        {trailing}
+      </Fragment>
+    );
+  });
+}
 
 function getEmojiCount(text: string) {
   const trimmed = text.trim();
@@ -118,6 +184,8 @@ const language =
 
 export default function Messages({
   messages,
+  pinnedMessage,
+  onOpenLink,
   currentUser,
   pendingMessageIds,
   profileName,
@@ -142,6 +210,10 @@ setMessageFocus,
 
 onCancelUpload,
 }: MessagesProps) {
+  console.log(
+  "MESSAGES RECEIVED PIN:",
+  pinnedMessage
+);
 
   const isAndroid =
   typeof navigator !== "undefined" &&
@@ -150,6 +222,11 @@ onCancelUpload,
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(
   new Set()
 );
+
+const [locationViewer, setLocationViewer] = useState<{
+  latitude: number;
+  longitude: number;
+} | null>(null);
 
 const [messageFocusOffset, setMessageFocusOffset] = useState(0);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
@@ -575,16 +652,56 @@ const scrollToRepliedMessage = (msg: any) => {
     `}
     
     </style>
-      {console.log("MESSAGES PROP CHECK:", {
-  total: messages.length,
-  pendingMessages: messages
-    .filter((msg) => msg.pending === true)
-    .map((msg) => ({
-      id: msg.id,
-      content: msg.content,
-      pending: msg.pending,
-    })),
-})}
+
+    {pinnedMessage?.content && (
+  <div
+  style={{
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  width: "calc(100% + 40px)",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  marginTop: "-20px",
+  marginLeft: "-20px",
+  marginRight: "-20px",
+  marginBottom: "8px",
+  background: "#ffffff",
+  borderBottom: "1px solid #eee",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+}}
+>
+    <Pin
+      size={17}
+      strokeWidth={2.2}
+      color="#6d28d9"
+      style={{
+        flexShrink: 0,
+      }}
+    />
+
+    <div
+      style={{
+        minWidth: 0,
+        flex: 1,
+        fontSize: "14px",
+        lineHeight: 1.4,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "break-word",
+      }}
+    >
+      {renderTextWithLinks(
+        pinnedMessage.content,
+        onOpenLink
+      )}
+    </div>
+  </div>
+)}
 
 {messages.map((msg, index) => {
         const displayProgress = Math.min(
@@ -631,36 +748,6 @@ const isFocused =
   msg.pending === true ||
   msg.uploading === true ||
   msg.offline === true;
-
-
-  if (msg.sender === currentUser && msg.message_type === "text") {
-  console.log("TEXT FINAL RENDER CHECK:", {
-    id: msg.id,
-    content: msg.content,
-    pending: msg.pending,
-    isPending,
-    pendingMessageIds,
-  });
-}
-
-  if (msg.message_type === "text" && msg.sender === currentUser) {
-  console.log("TEXT RENDER STATE:", {
-    id: msg.id,
-    pending: msg.pending,
-    isPending,
-    pendingMessageIds,
-  });
-}
-
-
-  if (msg.message_type === "sticker") {
-  console.log("STICKER DEBUG:", {
-    id: msg.id,
-    pending: msg.pending,
-    isPending,
-    pendingMessageIds,
-  });
-}
 
 
   const isOfflineUpload =
@@ -1344,9 +1431,12 @@ msg.reply_preview === "🎤 Voice message" ? (
       display: "inline",
     }}
   >
-    {isLongMessage && !isExpanded
-      ? `${msg.content.slice(0, 500)}…`
-      : msg.content}
+    {renderTextWithLinks(
+  isLongMessage && !isExpanded
+    ? `${msg.content.slice(0, 500)}…`
+    : msg.content,
+  onOpenLink
+)}
   </span>
 )}
 

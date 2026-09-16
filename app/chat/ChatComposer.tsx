@@ -130,10 +130,7 @@ voiceState,
 }: ChatComposerProps) {
 
 const cameraInputRef = useRef<HTMLInputElement | null>(null);
-  console.log("recording =", recording);
-console.log("startRecording =", startRecording);
-console.log("stopRecording =", stopRecording);
-console.log("Passing onMicClick:", recording ? stopRecording : startRecording);
+  
 
 if (!showComposer) {
   return null;

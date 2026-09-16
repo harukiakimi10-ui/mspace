@@ -381,3 +381,33 @@ if (targetMemberId) {
 
 return data;
 }
+
+export async function pinMessage(messageId: string) {
+  const { data, error } = await supabase
+    .from("pinned_messages")
+    .insert({
+      message_id: messageId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Pin message error:", error);
+    throw error;
+  }
+
+  return data;
+}
+
+
+export async function unpinMessage(messageId: string) {
+  const { error } = await supabase
+    .from("pinned_messages")
+    .delete()
+    .eq("message_id", messageId);
+
+  if (error) {
+    console.error("Unpin message error:", error);
+    throw error;
+  }
+}
