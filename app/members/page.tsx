@@ -66,92 +66,22 @@ async function getCachedMediaUrl(url: string) {
   }
 }
 
-  const [photos, setPhotos] = useState<any[]>(() => {
-  if (typeof window === "undefined") return [];
+  const [photos, setPhotos] = useState<any[]>([]);
 
-  try {
-    const cached = localStorage.getItem(PHOTOS_CACHE_KEY);
+const [videos, setVideos] = useState<any[]>([]);
 
-    if (!cached) return [];
+const [profileName, setProfileName] = useState("");
+const [profileBio, setProfileBio] = useState("");
 
-    const parsed = JSON.parse(cached);
+const [profilePhoto, setProfilePhoto] = useState("");
+const [cacheReady, setCacheReady] = useState(false);
 
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-});
-
-const [videos, setVideos] = useState<any[]>(() => {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const cached = localStorage.getItem(VIDEOS_CACHE_KEY);
-
-    if (!cached) return [];
-
-    const parsed = JSON.parse(cached);
-
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-});
-
-const [profileName, setProfileName] = useState(() => {
-  if (typeof window === "undefined") return "";
-
-  try {
-    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
-
-    if (!cached) return "";
-
-    const profile = JSON.parse(cached);
-
-    return profile.profile_name || "";
-  } catch {
-    return "";
-  }
-});
-
-const [profileBio, setProfileBio] = useState(() => {
-  if (typeof window === "undefined") return "";
-
-  try {
-    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
-
-    if (!cached) return "";
-
-    const profile = JSON.parse(cached);
-
-    return profile.profile_bio || "";
-  } catch {
-    return "";
-  }
-});
-
-const [profilePhoto, setProfilePhoto] = useState(() => {
-  if (typeof window === "undefined") return "";
-
-  try {
-    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
-
-    if (!cached) return "";
-
-    const profile = JSON.parse(cached);
-
-    return profile.profile_photo || "";
-  } catch {
-    return "";
-  }
-});
-
+  const [memberName, setMemberName] = useState("");
+const [memberPhoto, setMemberPhoto] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState("");
   const [showInstallButton, setShowInstallButton] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => {
-  if (typeof window === "undefined") return false;
-  return window.innerWidth < 768;
-});
+  const [isMobile, setIsMobile] = useState(false);
+
   const [selectedIndex, setSelectedIndex] =
   useState<number | null>(null);
   const [selectedVideoIndex, setSelectedVideoIndex] =
@@ -175,6 +105,66 @@ const [profilePhoto, setProfilePhoto] = useState(() => {
     window.removeEventListener("online", updateNetworkStatus);
     window.removeEventListener("offline", updateNetworkStatus);
   };
+}, []);
+
+useEffect(() => {
+  async function restoreCachedData() {
+    // CACHED ADMIN PROFILE
+    try {
+      const cachedProfile =
+        localStorage.getItem(PROFILE_CACHE_KEY);
+
+      if (cachedProfile) {
+        const profile = JSON.parse(cachedProfile);
+
+        setProfileName(profile.profile_name || "");
+        setProfileBio(profile.profile_bio || "");
+        setProfilePhoto(profile.profile_photo || "");
+      }
+    } catch (error) {
+      console.log(
+        "Cached profile restore failed:",
+        error
+      );
+    }
+
+    // CACHED PHOTOS
+try {
+  const cachedPhotos =
+    localStorage.getItem(PHOTOS_CACHE_KEY);
+
+  if (cachedPhotos) {
+    const parsedPhotos = JSON.parse(cachedPhotos);
+
+    setPhotos(parsedPhotos);
+  }
+} catch (error) {
+  console.log(
+    "Cached photos restore failed:",
+    error
+  );
+}
+
+    // CACHED VIDEOS
+try {
+  const cachedVideos =
+    localStorage.getItem(VIDEOS_CACHE_KEY);
+
+  if (cachedVideos) {
+    const parsedVideos = JSON.parse(cachedVideos);
+
+    setVideos(parsedVideos);
+  }
+} catch (error) {
+  console.log(
+    "Cached videos restore failed:",
+    error
+  );
+}
+setCacheReady(true);
+  }
+
+  restoreCachedData();
 }, []);
  
    
@@ -284,6 +274,38 @@ useEffect(() => {
 
   return () => {
     supabase.removeChannel(channel);
+  };
+}, []);
+
+useEffect(() => {
+  const html = document.documentElement;
+  const body = document.body;
+
+  const previousHtmlOverflow = html.style.overflow;
+  const previousBodyOverflow = body.style.overflow;
+  const previousHtmlHeight = html.style.height;
+  const previousBodyHeight = body.style.height;
+  const previousHtmlOverscroll = html.style.overscrollBehavior;
+  const previousBodyOverscroll = body.style.overscrollBehavior;
+
+  html.style.overflow = "hidden";
+  body.style.overflow = "hidden";
+
+  html.style.height = "100%";
+  body.style.height = "100%";
+
+  html.style.overscrollBehavior = "none";
+  body.style.overscrollBehavior = "none";
+
+  return () => {
+    html.style.overflow = previousHtmlOverflow;
+    body.style.overflow = previousBodyOverflow;
+
+    html.style.height = previousHtmlHeight;
+    body.style.height = previousBodyHeight;
+
+    html.style.overscrollBehavior = previousHtmlOverscroll;
+    body.style.overscrollBehavior = previousBodyOverscroll;
   };
 }, []);
 
@@ -505,6 +527,19 @@ async function loadVideos() {
 }
 
 async function checkBanStatus() {
+  const cachedName =
+    localStorage.getItem("mspace-member-name") || "";
+
+  const cachedPhoto =
+    localStorage.getItem("mspace-member-photo") || "";
+
+  if (cachedName) {
+    setMemberName(cachedName);
+  }
+
+  if (cachedPhoto) {
+    setMemberPhoto(cachedPhoto);
+  }
   const memberId =
     localStorage.getItem("mspace_member_id");
 
@@ -520,6 +555,24 @@ async function checkBanStatus() {
     .select("*")
     .eq("member_id", memberId)
     .single();
+
+    if (member) {
+  const name = member.name || "";
+  const photo = member.photo_url || "";
+
+  setMemberName(name);
+  setMemberPhoto(photo);
+
+  localStorage.setItem(
+    "mspace-member-name",
+    name
+  );
+
+  localStorage.setItem(
+    "mspace-member-photo",
+    photo
+  );
+}
 
   if (error) {
   console.log(
@@ -672,13 +725,14 @@ async function loadUnreadCount() {
   return (
   
    
-    <main
+   <main
   style={{
     fontFamily: "Arial, sans-serif",
     padding: "0px 5px",
     width: "100%",
     maxWidth: "none",
     margin: 0,
+    visibility: cacheReady ? "visible" : "hidden",
   }}
 >
 
@@ -717,7 +771,96 @@ async function loadUnreadCount() {
 
  {/* HEADER */}
 
- <NotificationButton />
+<div
+  style={{
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 10px 0",
+    boxSizing: "border-box",
+  }}
+>
+  <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    background: "#f9fafb",
+    border: "1px solid #e5e7eb",
+    borderRadius: "16px",
+    padding: "6px 10px 6px 6px",
+    boxSizing: "border-box",
+  }}
+>
+  <button
+    type="button"
+    onClick={() => router.push("/members/profile")}
+    style={{
+      border: "none",
+      background: "transparent",
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: 0,
+      cursor: "pointer",
+    }}
+  >
+    <div
+      style={{
+        width: "38px",
+        height: "38px",
+        borderRadius: "50%",
+        background:
+          "linear-gradient(135deg,#ede9fe,#ddd6fe)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        color: "#7c3aed",
+        fontSize: "16px",
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
+      {memberPhoto ? (
+        <img
+          src={memberPhoto}
+          alt={memberName || "Member"}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+      ) : (
+        memberName
+          ? memberName.charAt(0).toUpperCase()
+          : "M"
+      )}
+    </div>
+
+    <span
+      style={{
+        fontSize: "16px",
+        fontWeight: 700,
+        color: "#111827",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {memberName || "Member"}
+    </span>
+
+    <ChevronRight
+      size={18}
+      strokeWidth={2.2}
+      color="#6b7280"
+    />
+  </button>
+</div>
+
+  <NotificationButton />
+</div>
 
    <div
   style={{
