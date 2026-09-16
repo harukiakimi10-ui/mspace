@@ -126,8 +126,8 @@ useEffect(() => {
   }}
   alt={profileName || "Profile"}
   style={{
-    width: 40,
-    height: 40,
+    width: 45,
+    height: 45,
     borderRadius: "50%",
     objectFit: "cover",
     marginRight: 12,

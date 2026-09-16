@@ -297,6 +297,8 @@ const OUTBOX_CACHE_KEY = `mspace-chat-outbox-${memberId ?? "default"}`;
 
 const [profilePhoto, setProfilePhoto] = useState("");
 
+const [memberPhoto, setMemberPhoto] = useState("");
+
 const [admin, setAdmin] = useState<any>(null);
   
 
@@ -576,6 +578,13 @@ const closeMessageMenu = () => {
 
 
 async function bootstrapChat() {
+  // Restore cached member profile photo immediately
+  const cachedMemberPhoto =
+    localStorage.getItem("mspace-member-photo");
+
+  if (cachedMemberPhoto) {
+    setMemberPhoto(cachedMemberPhoto);
+  }
   // Restore cached header information immediately
   const cachedHeader =
     localStorage.getItem(CHAT_CACHE_KEY);
@@ -4426,6 +4435,8 @@ onOpenLink={(url) => {
   currentUser="member"
   pendingMessageIds={pendingMessageIds}
   profileName={profileName}
+  adminPhoto={profilePhoto}
+  memberPhoto={memberPhoto}
   playMenuSound={playMenuSound}
   formatTime={formatTime}
   formatDateLabel={formatDateLabel}

@@ -11,6 +11,7 @@ import {
 import { flushSync } from "react-dom";
 
 import Messages from "@/app/chat/Messages";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 import MessageMenu from "@/app/chat/MessageMenu";
 import ReplyPreview from "@/app/chat/ReplyPreview";
 import MediaPreview from "@/app/chat/MediaPreview";
@@ -49,6 +50,8 @@ export default function ChatPage() {
   const [pendingMessageIds, setPendingMessageIds] = useState<string[]>([]);
   const [cacheReady, setCacheReady] = useState(false);
   const [member, setMember] = useState<any>(null);
+  const [adminProfilePhoto, setAdminProfilePhoto] = useState("");
+
   function getAvatarColors(value: string) {
   const colors = [
     { background: "#E8F5E9", icon: "#2E7D32" },
@@ -630,6 +633,22 @@ const messageInputRef =
 }
 
   useLayoutEffect(() => {
+
+    // Load cached admin profile photo immediately
+  try {
+    const cachedAdminPhoto = localStorage.getItem(
+      "mspace-admin-profile-photo"
+    );
+
+    if (cachedAdminPhoto) {
+      setAdminProfilePhoto(cachedAdminPhoto);
+    }
+  } catch (error) {
+    console.error(
+      "MSpace admin profile photo cache read error:",
+      error
+    );
+  }
 
   if (id) {
     const cacheKey = `mspace-messages-${id}`;
@@ -1597,6 +1616,33 @@ async function loadConversation() {
       .select("name, photo_url, is_online, last_seen")
       .eq("member_id", data.member_id)
       .single();
+
+      const { data: adminSettings, error: adminSettingsError } =
+  await supabase
+    .from("settings")
+    .select("profile_photo")
+    .eq("id", 1)
+    .single();
+
+if (!adminSettingsError && adminSettings) {
+  const photoUrl = adminSettings.profile_photo || "";
+
+  if (photoUrl) {
+    setAdminProfilePhoto(photoUrl);
+
+    try {
+      localStorage.setItem(
+        "mspace-admin-profile-photo",
+        photoUrl
+      );
+    } catch (error) {
+      console.error(
+        "MSpace admin profile photo cache save error:",
+        error
+      );
+    }
+  }
+}
 
   if (memberError) {
     console.error("Member load error:", memberError);
@@ -3002,84 +3048,16 @@ setTimeout(() => {
 </button>
 </div>
 
-      {member?.photo_url ? (
-  <img
-    src={member.photo_url}
-    onError={(e) => {
-      e.currentTarget.style.display = "none";
-    }}
-    style={{
-      width: 45,
-      height: 45,
-      borderRadius: "50%",
-      objectFit: "cover",
-      flexShrink: 0,
-    }}
-  />
-) : (
-  <div
-    style={{
-      width: 45,
-      height: 45,
-      borderRadius: "50%",
-      background: getAvatarColors(
-        member?.member_id ||
-        member?.name ||
-        id
-      ).background,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-      position: "relative",
-      overflow: "hidden",
-    }}
-  >
-    <div
-      style={{
-        position: "relative",
-        width: 30,
-        height: 30,
-      }}
-    >
-      {/* Head */}
-      <div
-        style={{
-          position: "absolute",
-          top: 4,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: getAvatarColors(
-            member?.member_id ||
-            member?.name ||
-            id
-          ).icon,
-        }}
-      />
-
-      {/* Shoulders */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 4,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 20,
-          height: 10,
-          borderRadius: "18px 18px 6px 6px",
-          background: getAvatarColors(
-            member?.member_id ||
-            member?.name ||
-            id
-          ).icon,
-        }}
-      />
-    </div>
-  </div>
-)}
+      <ProfileAvatar
+  name={
+    member?.member_id ||
+    member?.name ||
+    id ||
+    "Member"
+  }
+  photoUrl={member?.photo_url}
+  size={45}
+/>
       <div>
   <div
   style={{
@@ -3299,6 +3277,8 @@ paddingBottom: showStickerPanel
   currentUser="admin"
   pendingMessageIds={pendingMessageIds}
   profileName={member?.name || "Member"}
+  adminPhoto={adminProfilePhoto}
+  memberPhoto={member?.photo_url || ""}
   playMenuSound={playMenuSound}
   onCancelUpload={() => {}}
   formatTime={formatTime}

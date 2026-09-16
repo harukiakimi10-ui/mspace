@@ -10,12 +10,13 @@ import {
   Mic,
   MapPin,
   LoaderCircle,
-  Pin
+  Pin,
 } from "lucide-react";
 import VoiceMessage from "./VoiceMessage";
 import VideoMessage from "./VideoMessage";
 
 import LocationThumbnail from "./LocationThumbnail";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 
 
@@ -30,8 +31,9 @@ type MessagesProps = {
   pendingMessageIds: string[];
 
   profileName: string;
+  adminPhoto: string;
+  memberPhoto: string;
   playMenuSound: (unlockOnly?: boolean) => void;
-
   formatTime: (date: string) => string;
   formatDateLabel: (date: string) => string;
   isNewDay: (current: any, previous: any) => boolean;
@@ -138,6 +140,28 @@ function getEmojiCount(text: string) {
   return emojis.length;
 }
 
+function getAvatarColors(value: string) {
+  const colors = [
+    { background: "#E8F5E9", icon: "#2E7D32" },
+    { background: "#E3F2FD", icon: "#1565C0" },
+    { background: "#FFF3E0", icon: "#EF6C00" },
+    { background: "#FCE4EC", icon: "#C2185B" },
+    { background: "#EDE7F6", icon: "#6A1B9A" },
+    { background: "#E0F7FA", icon: "#00838F" },
+    { background: "#FFF8E1", icon: "#F9A825" },
+    { background: "#F3E5F5", icon: "#8E24AA" },
+  ];
+
+  let hash = 0;
+
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
 const language =
   typeof navigator !== "undefined" &&
   navigator.language.startsWith("zh")
@@ -189,6 +213,8 @@ export default function Messages({
   currentUser,
   pendingMessageIds,
   profileName,
+  adminPhoto,
+  memberPhoto,
   playMenuSound,
   formatTime,
   formatDateLabel,
@@ -743,6 +769,11 @@ const isExpanded = expandedMessages.has(msg.id);
 const isFocused =
   messageFocus && selectedMessage?.id === msg.id;
 
+  const avatarUrl =
+  msg.sender === "admin"
+    ? adminPhoto
+    : memberPhoto;
+
   const isPending =
   (pendingMessageIds?.includes(msg.id) ?? false) ||
   msg.pending === true ||
@@ -888,6 +919,21 @@ const locationCoordinates = isReplyLocation
   transform: "translate3d(0, 0, 0)",
   }}
 >
+          {msg.sender !== currentUser && (
+  <div
+    style={{
+      marginRight: "8px",
+      flexShrink: 0,
+    }}
+  >
+    <ProfileAvatar
+      name={profileName || "Member"}
+      photoUrl={avatarUrl}
+      size={45}
+    />
+  </div>
+)}
+
           <div
     style={{
   maxWidth:
@@ -935,9 +981,7 @@ marginRight:
     ? 0
     : emojiCount === 1 && !msg.reply_preview
     ? 0
-    : msg.sender === currentUser
-    ? "18px 18px 4px 18px"
-    : "18px 18px 18px 4px",
+    : "12px",
 
   background:
   isDeleted
@@ -2057,6 +2101,49 @@ msg.reply_preview === "🎤 Voice message" ? (
 
 
           </div>
+
+          {msg.sender === currentUser && (
+            <div
+              style={{
+                width: "45px",
+height: "45px",
+borderRadius: "50%",
+overflow: "hidden",
+flexShrink: 0,
+marginLeft: "8px",
+marginTop: "0px",
+                background:
+                  msg.sender === "admin"
+                    ? "#ede9fe"
+                    : "#f3f4f6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "12px",
+                fontWeight: 700,
+                color:
+                  msg.sender === "admin"
+                    ? "#6d28d9"
+                    : "#667781",
+              }}
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                msg.sender === "admin" ? "A" : "M"
+              )}
+            </div>
+          )}
+
         </div>
       </Fragment>
     );
