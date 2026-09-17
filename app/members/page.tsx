@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { MessagesSquare } from "lucide-react";
 import NotificationButton from "../NotificationButton";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 import {
   MessageCircleMore,
@@ -278,6 +279,15 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
+  const isMobileChrome =
+    /CriOS/i.test(navigator.userAgent) ||
+    (/Android/i.test(navigator.userAgent) &&
+      /Chrome/i.test(navigator.userAgent));
+
+  if (isMobileChrome) {
+    return;
+  }
+
   const html = document.documentElement;
   const body = document.body;
 
@@ -777,7 +787,7 @@ async function loadUnreadCount() {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "8px 10px 0",
+   padding: "10px 10px 0",
     boxSizing: "border-box",
   }}
 >
@@ -805,40 +815,11 @@ async function loadUnreadCount() {
       cursor: "pointer",
     }}
   >
-    <div
-      style={{
-        width: "38px",
-        height: "38px",
-        borderRadius: "50%",
-        background:
-          "linear-gradient(135deg,#ede9fe,#ddd6fe)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        color: "#7c3aed",
-        fontSize: "16px",
-        fontWeight: 700,
-        flexShrink: 0,
-      }}
-    >
-      {memberPhoto ? (
-        <img
-          src={memberPhoto}
-          alt={memberName || "Member"}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
-        />
-      ) : (
-        memberName
-          ? memberName.charAt(0).toUpperCase()
-          : "M"
-      )}
-    </div>
+    <ProfileAvatar
+  name={memberName || "Member"}
+  photoUrl={memberPhoto}
+  size={38}
+/>
 
     <span
       style={{

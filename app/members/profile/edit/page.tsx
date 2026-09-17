@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Camera, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 export default function EditMemberProfilePage() {
   const router = useRouter();
@@ -354,42 +355,11 @@ const t = {
               display: "block",
             }}
           >
-            {displayedPhoto ? (
-              <img
-                src={displayedPhoto}
-                alt={memberName || "Member"}
-                style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  display: "block",
-                  border: "5px solid #ede9fe",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  background:
-                    "linear-gradient(135deg,#ede9fe,#ddd6fe)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#7c3aed",
-                  fontSize: "42px",
-                  fontWeight: 700,
-                  border: "5px solid #ede9fe",
-                  boxSizing: "border-box",
-                }}
-              >
-                {memberName
-                  ? memberName.charAt(0).toUpperCase()
-                  : "M"}
-              </div>
-            )}
+            <ProfileAvatar
+  name={memberName || "Member"}
+  photoUrl={displayedPhoto}
+  size={120}
+/>
 
             <div
               style={{

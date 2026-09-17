@@ -37,6 +37,8 @@ export default function ProfileAvatar({
     name || "Member"
   );
 
+  const scale = size / 45;
+
   if (photoUrl) {
     return (
       <div
@@ -78,21 +80,21 @@ export default function ProfileAvatar({
       }}
     >
       <div
-        style={{
-          position: "relative",
-          width: 30,
-          height: 30,
-        }}
-      >
+  style={{
+    position: "relative",
+    width: 30 * scale,
+    height: 30 * scale,
+  }}
+>
         {/* Head */}
         <div
           style={{
             position: "absolute",
-            top: 4,
+            top: 4 * scale,
             left: "50%",
             transform: "translateX(-50%)",
-            width: 10,
-            height: 10,
+            width: 10 * scale,
+            height: 10 * scale,
             borderRadius: "50%",
             background: avatarColors.icon,
           }}
@@ -102,11 +104,11 @@ export default function ProfileAvatar({
         <div
           style={{
             position: "absolute",
-            bottom: 4,
+            bottom: 4 * scale,
             left: "50%",
             transform: "translateX(-50%)",
-            width: 20,
-            height: 10,
+            width: 20 * scale,
+            height: 10 * scale,
             borderRadius: "18px 18px 6px 6px",
             background: avatarColors.icon,
           }}

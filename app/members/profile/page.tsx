@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Pencil } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 export default function MemberProfilePage() {
   const router = useRouter();
@@ -199,61 +200,11 @@ useEffect(() => {
           }}
         >
           {/* AVATAR */}
-          <div
-   style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  background:
-                    "linear-gradient(135deg,#ede9fe,#ddd6fe)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#7c3aed",
-                  fontSize: "42px",
-                  fontWeight: 700,
-                  border: "5px solid #ede9fe",
-                  boxSizing: "border-box",
-                }}
->
-  <div
-    style={{
-      width: "100%",
-      height: "100%",
-      borderRadius: "50%",
-      background: "#fff",
-      padding: "0px",
-      boxSizing: "border-box",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
-      color: "#7c3aed",
-      fontSize: "48px",
-      fontWeight: 700,
-    }}
-  >
-  {memberPhoto ? (
-    <img
-  src={
-    memberPhoto ||
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23ede9fe'/%3E%3C/svg%3E"
-  }
-  alt={memberName || "Member"}
-  style={{
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  }}
+          <ProfileAvatar
+  name={memberName || "Member"}
+  photoUrl={memberPhoto}
+  size={120}
 />
-  ) : (
-    memberName
-      ? memberName.charAt(0).toUpperCase()
-      : "M"
-  )}
-</div>
-</div>
 
           {/* NAME */}
           <div

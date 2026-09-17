@@ -2103,46 +2103,20 @@ msg.reply_preview === "🎤 Voice message" ? (
           </div>
 
           {msg.sender === currentUser && (
-            <div
-              style={{
-                width: "45px",
-height: "45px",
-borderRadius: "50%",
-overflow: "hidden",
-flexShrink: 0,
-marginLeft: "8px",
-marginTop: "0px",
-                background:
-                  msg.sender === "admin"
-                    ? "#ede9fe"
-                    : "#f3f4f6",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "12px",
-                fontWeight: 700,
-                color:
-                  msg.sender === "admin"
-                    ? "#6d28d9"
-                    : "#667781",
-              }}
-            >
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
-                />
-              ) : (
-                msg.sender === "admin" ? "A" : "M"
-              )}
-            </div>
-          )}
+  <div
+    style={{
+      marginLeft: "8px",
+      flexShrink: 0,
+      marginTop: "0px",
+    }}
+  >
+    <ProfileAvatar
+      name={profileName || "Member"}
+      photoUrl={avatarUrl}
+      size={45}
+    />
+  </div>
+)}
 
         </div>
       </Fragment>

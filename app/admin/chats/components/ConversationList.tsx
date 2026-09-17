@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 import {
   Camera,
@@ -158,85 +159,16 @@ function MessageReadReceipt({
   cursor: "pointer",
 }}
         >
-          {chat.member?.photo_url ? (
-  <img
-    src={chat.member.photo_url}
-    alt=""
-    onError={(e) => {
-      e.currentTarget.style.display = "none";
-    }}
-    style={{
-      width: "54px",
-      height: "54px",
-      borderRadius: "50%",
-      objectFit: "cover",
-      flexShrink: 0,
-    }}
-  />
-) : (
-  <div
-    style={{
-      width: "54px",
-      height: "54px",
-      borderRadius: "50%",
-      background: getAvatarColors(
-        chat.member?.member_id ||
-        chat.member?.name ||
-        chat.id
-      ).background,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-      position: "relative",
-      overflow: "hidden",
-    }}
-  >
-    <div
-      style={{
-        position: "relative",
-        width: 34,
-        height: 34,
-      }}
-    >
-      {/* Head */}
-      <div
-        style={{
-          position: "absolute",
-          top: 6,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: getAvatarColors(
-            chat.member?.member_id ||
-            chat.member?.name ||
-            chat.id
-          ).icon,
-        }}
-      />
-
-      {/* Shoulders */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 6,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 20,
-          height: 10,
-          borderRadius: "18px 18px 7px 7px",
-          background: getAvatarColors(
-            chat.member?.member_id ||
-            chat.member?.name ||
-            chat.id
-          ).icon,
-        }}
-      />
-    </div>
-  </div>
-)}
+          <ProfileAvatar
+  name={
+    chat.member?.member_id ||
+    chat.member?.name ||
+    chat.id ||
+    "Member"
+  }
+  photoUrl={chat.member?.photo_url}
+  size={54}
+/>
 
           <div style={{ flex: 1, minWidth: 0 }}>
 

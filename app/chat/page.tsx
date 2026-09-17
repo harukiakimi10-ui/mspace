@@ -4374,6 +4374,7 @@ paddingBottom: showStickerPanel
   style={{
     display: "flex",
     alignItems: "flex-start",
+    marginTop: "10px",
     marginBottom: "15px",
   }}
 >
