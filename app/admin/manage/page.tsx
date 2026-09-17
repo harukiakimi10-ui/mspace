@@ -2,6 +2,17 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { useState, useEffect } from "react";
+import {
+  MessageCircleMore,
+  LogOut,
+  Users,
+  UserRound,
+  Activity,
+  Image,
+  Video,
+  Eye,
+} from "lucide-react";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -575,512 +586,775 @@ function getLastSeenText(lastSeen: string | null) {
     <div
   style={{
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "20px",
-    gap: "10px",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "14px 12px",
+    margin: "-20px -20px 24px",
+    background: "#ffffff",
+    borderBottom: "1px solid #eeeeee",
+    boxShadow: "0 4px 18px rgba(0,0,0,0.05)",
+    position: "sticky",
+    top: 0,
+    zIndex: 1000,
   }}
 >
-  <h1
+  {/* MSpace branding */}
+  <div
     style={{
-      fontSize: "24px",
-      margin: 0,
+      display: "flex",
+      alignItems: "center",
+      gap: "9px",
+      minWidth: 0,
     }}
   >
-    MSpace Admin Panel
-  </h1>
-
-<div style={{ display: "flex", gap: "8px" }}>
-<button
-  onClick={() => {
-    window.location.href = "/admin/chats";
-  }}
-  style={{
-    background: "#6c757d",
-    color: "white",
-    border: "none",
-    padding: "8px 14px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    marginRight: "8px",
-  }}
->
-  ← Chats
-</button>
-
-  <button
-    onClick={() => {
-      localStorage.removeItem("mspace_admin");
-      window.location.href = "/admin/login";
-    }}
-    style={{
-      background: "#dc3545",
-      color: "#fff",
-      border: "none",
-      padding: "8px 14px",
-      borderRadius: "8px",
-      cursor: "pointer",
-      fontWeight: "bold",
-      fontSize: "14px",
-    }}
-  >
-    Logout
-  </button>
-</div>
-</div>
+    <div
+      style={{
+        width: "42px",
+        height: "42px",
+        borderRadius: "50%",
+        background:
+          "linear-gradient(135deg, #7c3aed, #9333ea)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#ffffff",
+        boxShadow:
+          "0 6px 16px rgba(124,58,237,0.25)",
+        flexShrink: 0,
+      }}
+    >
+      <MessageCircleMore size={22} />
+    </div>
 
     <div
+      style={{
+        fontSize: "22px",
+        fontWeight: 800,
+        color: "#7c3aed",
+        letterSpacing: "-0.5px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      MSpace
+    </div>
+  </div>
+
+  {/* Navigation */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+    }}
+  >
+    <button
+      onClick={() => {
+        window.location.href = "/admin/chats";
+      }}
       style={{
         display: "flex",
-        gap: "8px",
-        marginBottom: "25px",
-        flexWrap: "nowrap",
-        width: "100%",
+        alignItems: "center",
+        gap: "6px",
+        background: "#ffffff",
+        color: "#222222",
+        border: "1px solid #e5e5e5",
+        padding: "9px 12px",
+        borderRadius: "12px",
+        fontSize: "14px",
+        fontWeight: 600,
+        cursor: "pointer",
+        boxShadow:
+          "0 2px 8px rgba(0,0,0,0.04)",
       }}
     >
-      <div
-        style={{
-          flex: 1,
-          background: "#e8f5e9",
-          padding: "10px",
-          borderRadius: "8px",
-          minWidth: 0,
-        }}
-      >
-        <h3
-  style={{
-    margin: 0,
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#444",
-  }}
->
-  🟢 Online
-</h3>
+      <MessageCircleMore size={18} />
+      Chats
+    </button>
 
-        <p
-  style={{
-    margin: "6px 0 0",
-    fontSize: "22px",
-    fontWeight: "600",
-    color: "#555",
-  }}
->
-  {onlineCount}
-</p>
-      </div>
-
-      <div
-        style={{
-          flex: 1,
-          background: "#e3f2fd",
-          padding: "10px",
-          borderRadius: "8px",
-          minWidth: 0,
-        }}
-      >
-        <h3
-  style={{
-    margin: 0,
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#444",
-  }}
->
-  👥 Members
-</h3>
-
-        <p
-  style={{
-    margin: "6px 0 0",
-    fontSize: "22px",
-    fontWeight: "600",
-    color: "#555",
-  }}
->
-  {totalMembers}
-</p>
-      </div>
-
-      <div
-        style={{
-          flex: 1,
-          background: "#ffebee",
-          padding: "10px",
-          borderRadius: "8px",
-          minWidth: 0,
-        }}
-      >
-        <h3
-  style={{
-    margin: 0,
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "#444",
-  }}
->
-  🚫 Banned
-</h3>
-
-        <p
-  style={{
-    margin: "6px 0 0",
-    fontSize: "22px",
-    fontWeight: "600",
-    color: "#555",
-  }}
->
-  {bannedCount}
-</p>
-      </div>
-    </div>
-
-  
-<input
-  type="text"
-  placeholder="Profile Name"
-  value={profileName || ""}
-  onChange={(e) => setProfileName(e.target.value)}
-  style={{
-    width: "100%",
-    padding: "12px",
-    marginBottom: "15px",
-  }}
-/>
-
-<textarea
-  placeholder="Profile Bio"
-  value={profileBio || ""}
-  onChange={(e) => setProfileBio(e.target.value)}
-  style={{
-    width: "100%",
-    height: "120px",
-    padding: "12px",
-    marginBottom: "15px",
-  }}
-/>
-
-<input
-  type="file"
-  accept="image/*"
-  onChange={(e) =>
-    setProfilePhotoFile(
-      e.target.files?.[0] || null
-    )
-  }
-/>
-
-
-<button
-  onClick={saveSettings}
-  style={{
-    padding: "12px 20px",
-    background: "#2e8b57",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-  }}
->
-  Save Changes
-</button>
-
-<h2 style={{ marginTop: "40px" }}>
-  Photo Gallery
-</h2>
-
-<input
-  type="file"
-  accept="image/*"
-  onChange={(e) =>
-    setPhotoFile(
-      e.target.files?.[0] || null
-    )
-  }
-/>
-
-<br />
-<br />
-
-<button
-  onClick={uploadPhoto}
-  style={{
-    padding: "12px 20px",
-    background: "#2e8b57",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-  }}
->
-  Upload Photo
-</button>
-
-<div
-  style={{
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, 1fr)",
-    gap: "20px",
-    marginTop: "30px",
-  }}
->
-  {photos.map((photo) => (
-    <div key={photo.id}>
-      <img
-        src={photo.image_url}
-        style={{
-          width: "100%",
-          height: "200px",
-          objectFit: "cover",
-        }}
-      />
-
-      <button
-        onClick={() =>
-          deletePhoto(photo.id)
-        }
-      >
-        Delete
-      </button>
-    </div>
-  ))}
-</div>
-
-<h2 style={{ marginTop: "40px" }}>
-  Video Gallery
-</h2>
-
-<input
-  type="file"
-  accept="video/*"
-  onChange={(e) =>
-    setVideoFile(
-      e.target.files?.[0] || null
-    )
-  }
-/>
-
-
-<br />
-<br />
-
-<input
-  type="file"
-  accept="image/*"
-  onChange={(e) =>
-    setThumbnailFile(
-      e.target.files?.[0] || null
-    )
-  }
-/>
-
-<br />
-<br />
-
-<button
-  onClick={uploadVideo}
-  style={{
-    padding: "12px 20px",
-    background: "#2e8b57",
-    color: "white",
-    border: "none",
-    cursor: "pointer",
-  }}
->
-  Upload Video
-</button>
-
-<div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(3, 1fr)",
-    gap: "20px",
-    marginTop: "30px",
-  }}
->
-  {videos.map((video) => (
-    <div key={video.id}>
-      <video
-        controls
-        style={{
-          width: "100%",
-          height: "200px",
-          objectFit: "cover",
-        }}
-      >
-        <source
-          src={video.video_url}
-          type="video/mp4"
-        />
-      </video>
-
-      <button
-        onClick={() =>
-          deleteVideo(video.id)
-        }
-      >
-        Delete
-      </button>
-    </div>
-  ))}
-</div>
-
-
-<h2 style={{ marginTop: "40px" }}>
-  Members
-</h2>
-
-<table
-  style={{
-    width: "100%",
-    borderCollapse: "collapse",
-  }}
->
-  <thead>
-  <tr>
-  <th>Member ID</th>
-<th>Name</th>
-<th>Device</th>
-<th>Photo</th>
-<th>Status</th>
-<th>Last Seen</th>
-<th>Actions</th>
-</tr>
-</thead>
-
-  <tbody>
-    {members.map((member) => (
-      <tr key={member.id}>
-        <td>{member.member_id}</td>
-
-        <td>{member.name}</td>
-       
-        <td>
-         {member.device_id
-          ? member.device_id.slice(0, 8)
-          : "None"}
-        </td>
-
-        <td>
-          {member.photo_url ? (
-            <img
-              src={member.photo_url}
-              width="60"
-            />
-          ) : (
-            "No Photo"
-          )}
-        </td>
-
-        <td>
-  {member.banned ? "🚫 Banned" : "✅ Active"}
-</td>
-
-<td>
-  {getLastSeenText(member.last_seen)} 
-</td>
-
-<td>
-  <button
-    onClick={() =>
-      toggleBan(member.id, member.banned)
-    }
-    style={{
-      background: member.banned
-        ? "#28a745"
-        : "#ffc107",
-      color: "black",
-      border: "none",
-      padding: "6px 12px",
-      marginRight: "10px",
-      cursor: "pointer",
-    }}
-  >
-    {member.banned ? "Unban" : "Ban"}
-  </button>
-
-  {member.device_banned ? (
-  <button
-    onClick={() => unbanDevice(member)}
-    style={{
-      background: "#28a745",
-      color: "white",
-      border: "none",
-      padding: "6px 12px",
-      marginRight: "10px",
-      cursor: "pointer",
-    }}
-  >
-    Unban Device
-  </button>
-) : (
-  <button
-    onClick={() => banDevice(member)}
-    style={{
-      background: "#8b0000",
-      color: "white",
-      border: "none",
-      padding: "6px 12px",
-      marginRight: "10px",
-      cursor: "pointer",
-    }}
-  >
-    Ban Device
-  </button>
-)}
-
-  <button
-    onClick={() =>
-      deleteMember(member.id)
-    }
-    style={{
-      background: "#dc3545",
-      color: "white",
-      border: "none",
-      padding: "6px 12px",
-      cursor: "pointer",
-    }}
-  >
-    Delete
-  </button>
-</td>
-      </tr>
-    ))}
-  </tbody>
-</table>
-
-<h2 style={{ marginTop: "30px" }}>
-  Recent Visitors
-</h2>
-
-<div
-  style={{
-    background: "#fff",
-    padding: "15px",
-    borderRadius: "10px",
-    marginTop: "10px",
-  }}
->
-  {visits.map((visit) => (
-    <div
-      key={visit.id}
+    <button
+      onClick={() => {
+        localStorage.removeItem("mspace_admin");
+        window.location.href = "/admin/login";
+      }}
       style={{
-        padding: "10px 0",
-        borderBottom: "1px solid #eee",
+        display: "flex",
+        alignItems: "center",
+        gap: "6px",
+        background:
+          "linear-gradient(135deg, #ef4444, #dc2626)",
+        color: "#ffffff",
+        border: "none",
+        padding: "10px 13px",
+        borderRadius: "12px",
+        fontSize: "14px",
+        fontWeight: 700,
+        cursor: "pointer",
+        boxShadow:
+          "0 5px 14px rgba(220,38,38,0.20)",
       }}
     >
-      <strong>{visit.member_name}</strong>
-
-      <br />
-
-      <small>
-        {new Date(
-          visit.visited_at
-        ).toLocaleString()}
-      </small>
-    </div>
-  ))}
+      <LogOut size={18} />
+      Logout
+    </button>
+  </div>
 </div>
 
+    <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "12px",
+    marginBottom: "24px",
+  }}
+>
+  {/* Members */}
+  <div
+    style={{
+  background: "linear-gradient(135deg, #eef6ff, #e3efff)",
+  border: "1px solid rgba(59,130,246,0.08)",
+  borderRadius: "22px",
+  padding: "14px",
+  height: "90px",
+  boxSizing: "border-box",
+  boxShadow: "0 5px 18px rgba(59,130,246,0.08)",
+}}
+  >
+    <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    height: "100%",
+  }}
+>
+  <div
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "50%",
+      background: "rgba(59,130,246,0.10)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#2563eb",
+      flexShrink: 0,
+    }}
+  >
+    <Users size={23} />
+  </div>
+
+  <div>
+    <div
+      style={{
+        fontSize: "15px",
+        fontWeight: 600,
+        color: "#334155",
+      }}
+    >
+      Members
+    </div>
+
+    <div
+      style={{
+        fontSize: "28px",
+        lineHeight: 1,
+        fontWeight: 800,
+        color: "#2563eb",
+        marginTop: "6px",
+      }}
+    >
+      {totalMembers}
+    </div>
+  </div>
+</div>
+  </div>
+
+  {/* Online */}
+  <div
+    style={{
+      background: "linear-gradient(135deg, #edfff4, #e2faeb)",
+      border: "1px solid rgba(34,197,94,0.08)",
+      borderRadius: "22px",
+      padding: "14px",
+      height: "90px",
+      boxSizing: "border-box",
+      boxShadow: "0 5px 18px rgba(34,197,94,0.08)",
+    }}
+  >
+    <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    height: "100%",
+  }}
+>
+  <div
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "50%",
+      background: "rgba(34,197,94,0.10)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#16a34a",
+      flexShrink: 0,
+    }}
+  >
+    <Activity size={23} />
+  </div>
+
+  <div>
+    <div
+      style={{
+        fontSize: "15px",
+        fontWeight: 600,
+        color: "#334155",
+      }}
+    >
+      Online
+    </div>
+
+    <div
+      style={{
+        fontSize: "28px",
+        lineHeight: 1,
+        fontWeight: 800,
+        color: "#16a34a",
+        marginTop: "6px",
+      }}
+    >
+      {onlineCount}
+    </div>
+  </div>
+</div>
+  </div>
+
+  {/* Photos */}
+  <div
+    style={{
+      background: "linear-gradient(135deg, #fff8eb, #fff1dc)",
+      border: "1px solid rgba(245,158,11,0.08)",
+      borderRadius: "22px",
+      padding: "14px",
+      height: "90px",
+      boxSizing: "border-box",
+      boxShadow: "0 5px 18px rgba(245,158,11,0.08)",
+    }}
+  
+>
+  
+  <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    height: "100%",
+  }}
+>
+  <div
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "50%",
+      background: "rgba(245,158,11,0.10)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#f59e0b",
+      flexShrink: 0,
+    }}
+  >
+    <Image size={23} />
+  </div>
+
+  <div>
+    <div
+      style={{
+        fontSize: "15px",
+        fontWeight: 600,
+        color: "#334155",
+      }}
+    >
+      Photos
+    </div>
+
+    <div
+      style={{
+        fontSize: "28px",
+        lineHeight: 1,
+        fontWeight: 800,
+        color: "#ea580c",
+        marginTop: "6px",
+      }}
+    >
+      {photos.length}
+    </div>
+  </div>
+</div>
+  </div>
+
+  {/* Videos */}
+  <div
+    style={{
+      background: "linear-gradient(135deg, #f7f0ff, #f0e7ff)",
+      border: "1px solid rgba(124,58,237,0.08)",
+      borderRadius: "22px",
+      padding: "14px",
+      height: "90px",
+      boxSizing: "border-box",
+      boxShadow: "0 5px 18px rgba(124,58,237,0.08)",
+    }}
+  >
+    <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    height: "100%",
+  }}
+>
+  <div
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "50%",
+      background: "rgba(124,58,237,0.10)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#7c3aed",
+      flexShrink: 0,
+    }}
+  >
+    <Video size={23} />
+  </div>
+
+  <div>
+    <div
+      style={{
+        fontSize: "15px",
+        fontWeight: 600,
+        color: "#334155",
+      }}
+    >
+      Videos
+    </div>
+
+    <div
+      style={{
+        fontSize: "28px",
+        lineHeight: 1,
+        fontWeight: 800,
+        color: "#7c3aed",
+        marginTop: "6px",
+      }}
+    >
+      {videos.length}
+    </div>
+  </div>
+</div>
+  </div>
+</div>
+
+{/* Profile Management */}
+<div
+  onClick={() => {
+    window.location.href = "/admin/manage/profile";
+  }}
+  style={{
+    background: "#ffffff",
+    borderRadius: "22px",
+    padding: "18px",
+    marginTop: "20px",
+    marginBottom: "20px",
+    border: "1px solid #f0f0f0",
+    boxShadow: "0 8px 30px rgba(30,41,59,0.06)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "14px",
+      minWidth: 0,
+    }}
+  >
+    <div
+      style={{
+        width: "52px",
+        height: "52px",
+        borderRadius: "17px",
+        background: "#f1e8ff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#7c3aed",
+        flexShrink: 0,
+      }}
+    >
+      <UserRound size={25} />
+    </div>
+
+    <div>
+      <div
+        style={{
+          fontSize: "18px",
+          fontWeight: 700,
+          color: "#172554",
+        }}
+      >
+        Profile Management
+      </div>
+
+      <div
+        style={{
+          fontSize: "13px",
+          color: "#64748b",
+          marginTop: "4px",
+        }}
+      >
+        Update your profile photo, name and bio
+      </div>
+    </div>
+  </div>
+
+  <div
+    style={{
+      fontSize: "30px",
+      color: "#94a3b8",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    ›
+  </div>
+</div>
+
+
+{/* Photo Gallery */}
+<div
+  onClick={() => {
+    window.location.href = "/admin/manage/photos";
+  }}
+  style={{
+    background: "#ffffff",
+    borderRadius: "22px",
+    padding: "18px",
+    marginBottom: "20px",
+    boxShadow:
+      "0 8px 30px rgba(30, 41, 59, 0.06)",
+    border: "1px solid #f0f0f0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+    cursor: "pointer",
+
+  }}
+>
+  <div
+    style={{
+      width: "52px",
+      height: "52px",
+      borderRadius: "17px",
+      background: "#dcfce7",
+      color: "#16a34a",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    }}
+  >
+    <Image size={30} />
+  </div>
+
+  <div
+    style={{
+      flex: 1,
+      minWidth: 0,
+    }}
+  >
+    <div
+      style={{
+        fontSize: "18px",
+        fontWeight: 700,
+        color: "#172554",
+      }}
+    >
+      Photo Gallery
+    </div>
+
+    <div
+      style={{
+        fontSize: "13px",
+        color: "#64748b",
+        marginTop: "4px",
+      }}
+    >
+      Upload and manage photos for members
+    </div>
+  </div>
+
+  <div
+    style={{
+      fontSize: "32px",
+      color: "#64748b",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    ›
+  </div>
+</div>
+
+{/* Video Gallery */}
+<div
+  onClick={() => {
+    window.location.href = "/admin/manage/videos";
+  }}
+  style={{
+    background: "#ffffff",
+    borderRadius: "22px",
+    padding: "18px",
+    marginBottom: "20px",
+    border: "1px solid #f0f0f0",
+    boxShadow: "0 8px 30px rgba(30,41,59,0.06)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "14px",
+      minWidth: 0,
+    }}
+  >
+    <div
+      style={{
+        width: "52px",
+        height: "52px",
+        borderRadius: "17px",
+        background: "#fce7f3",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#e11d48",
+        flexShrink: 0,
+      }}
+    >
+      <Video size={25} />
+    </div>
+
+    <div
+      style={{
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          fontSize: "18px",
+          fontWeight: 700,
+          color: "#172554",
+        }}
+      >
+        Video Gallery
+      </div>
+
+      <div
+        style={{
+          fontSize: "13px",
+          color: "#64748b",
+          marginTop: "4px",
+        }}
+      >
+        Upload and manage videos for members
+      </div>
+    </div>
+  </div>
+
+  <div
+    style={{
+      fontSize: "30px",
+      color: "#94a3b8",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    ›
+  </div>
+</div>
+
+<div
+  onClick={() => {
+    window.location.href = "/admin/manage/members";
+  }}
+  style={{
+    background: "#ffffff",
+    borderRadius: "22px",
+    padding: "18px",
+    marginTop: "20px",
+    marginBottom: "20px",
+    border: "1px solid #f0f0f0",
+    boxShadow: "0 8px 30px rgba(30,41,59,0.06)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "14px",
+      minWidth: 0,
+    }}
+  >
+    <div
+      style={{
+        width: "48px",
+        height: "48px",
+        borderRadius: "16px",
+        background: "#EDE7F6",
+        color: "#6A1B9A",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <Users size={25} />
+    </div>
+
+    <div style={{ minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: "17px",
+          fontWeight: 700,
+          color: "#1f2937",
+        }}
+      >
+        Members
+      </div>
+
+      <div
+        style={{
+          fontSize: "13px",
+          color: "#6b7280",
+          marginTop: "4px",
+        }}
+      >
+        Manage members, bans and devices
+      </div>
+    </div>
+  </div>
+
+  <div
+    style={{
+      fontSize: "28px",
+      color: "#9ca3af",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    ›
+  </div>
+</div>
+
+<div
+  onClick={() => {
+    window.location.href = "/admin/manage/visitors";
+  }}
+  style={{
+    background: "#ffffff",
+    borderRadius: "22px",
+    padding: "18px",
+    marginBottom: "20px",
+    border: "1px solid #f0f0f0",
+    boxShadow: "0 8px 30px rgba(30,41,59,0.06)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "14px",
+      minWidth: 0,
+    }}
+  >
+    <div
+      style={{
+        width: "48px",
+        height: "48px",
+        borderRadius: "16px",
+        background: "#f1e8ff",
+        color: "#6d28d9",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <Eye size={25} />
+    </div>
+
+    <div style={{ minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: "17px",
+          fontWeight: 700,
+          color: "#1f2937",
+        }}
+      >
+        Recent Visitors
+      </div>
+
+      <div
+        style={{
+          fontSize: "13px",
+          color: "#6b7280",
+          marginTop: "4px",
+        }}
+      >
+        See your latest unique visitors
+      </div>
+    </div>
+  </div>
+
+  <div
+    style={{
+      fontSize: "28px",
+      color: "#9ca3af",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    ›
+  </div>
+</div>
 </div>
   );
 }
