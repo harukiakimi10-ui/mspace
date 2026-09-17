@@ -15,6 +15,31 @@ const [isMounted, setIsMounted] = useState(false);
 
 const [loading, setLoading] = useState(true);
 
+const [language, setLanguage] =
+  useState<"en" | "zh">("en");
+
+useEffect(() => {
+  setLanguage(
+    navigator.language.startsWith("zh")
+      ? "zh"
+      : "en"
+  );
+}, []);
+
+const t = {
+  en: {
+    profile: "Profile",
+    member: "Member",
+    editProfile: "Edit Profile",
+  },
+
+  zh: {
+    profile: "个人资料",
+    member: "成员",
+    editProfile: "编辑个人资料",
+  },
+}[language];
+
 
 useEffect(() => {
   const body = document.body;
@@ -153,7 +178,7 @@ useEffect(() => {
     fontWeight: 700,
   }}
 >
-  {memberName || "Profile"}
+  {memberName || t.profile}
 </div>
       </div>
 
@@ -238,7 +263,7 @@ useEffect(() => {
               fontWeight: 700,
             }}
           >
-            {memberName || "Member"}
+            {memberName || t.member}
           </div>
 
           {/* EDIT BUTTON */}
@@ -265,7 +290,7 @@ useEffect(() => {
             }}
           >
             <Pencil size={18} />
-            Edit Profile
+{t.editProfile}
           </button>
         </div>
       </div>

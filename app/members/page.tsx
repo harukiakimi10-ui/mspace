@@ -859,7 +859,7 @@ async function loadUnreadCount() {
   </button>
 </div>
 
-  <NotificationButton />
+  {!isOffline && <NotificationButton />}
 </div>
 
    <div

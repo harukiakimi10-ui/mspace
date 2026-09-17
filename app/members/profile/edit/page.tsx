@@ -16,6 +16,47 @@ export default function EditMemberProfilePage() {
     useState<File | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState("");
 
+  const [language, setLanguage] =
+  useState<"en" | "zh">("en");
+
+useEffect(() => {
+  setLanguage(
+    navigator.language.startsWith("zh")
+      ? "zh"
+      : "en"
+  );
+}, []);
+
+const t = {
+  en: {
+    editProfile: "Edit Profile",
+    save: "Save",
+    member: "Member",
+    name: "Name",
+    profilePhoto: "Profile Photo",
+    tapToChangePhoto: "Tap to change photo",
+    imageFormats: "JPG, PNG or WebP",
+    pleaseEnterName: "Please enter your name",
+    photoUploadFailed: "Photo upload failed",
+    profileUpdateFailed: "Profile update failed",
+    couldNotSave: "Could not save your profile.",
+  },
+
+  zh: {
+    editProfile: "编辑个人资料",
+    save: "保存",
+    member: "成员",
+    name: "姓名",
+    profilePhoto: "个人头像",
+    tapToChangePhoto: "点击更换照片",
+    imageFormats: "JPG、PNG 或 WebP",
+    pleaseEnterName: "请输入您的姓名",
+    photoUploadFailed: "照片上传失败",
+    profileUpdateFailed: "个人资料更新失败",
+    couldNotSave: "无法保存您的个人资料。",
+  },
+}[language];
+
   useEffect(() => {
   const body = document.body;
   const html = document.documentElement;
@@ -262,7 +303,7 @@ export default function EditMemberProfilePage() {
               fontWeight: 700,
             }}
           >
-            Edit Profile
+            {t.editProfile}
           </div>
         </div>
 
@@ -281,7 +322,7 @@ export default function EditMemberProfilePage() {
             cursor: "pointer",
           }}
         >
-          Save
+          {t.save}
         </button>
       </div>
 
@@ -394,7 +435,7 @@ export default function EditMemberProfilePage() {
             marginBottom: "8px",
           }}
         >
-          Name
+          {t.name}
         </label>
 
         <input
@@ -425,7 +466,7 @@ export default function EditMemberProfilePage() {
             marginBottom: "8px",
           }}
         >
-          Profile Photo
+          {t.profilePhoto}
         </label>
 
         <label
@@ -454,7 +495,7 @@ export default function EditMemberProfilePage() {
               fontWeight: 700,
             }}
           >
-            Tap to change photo
+            {t.tapToChangePhoto}
           </div>
 
           <div
@@ -464,7 +505,7 @@ export default function EditMemberProfilePage() {
               color: "#6b7280",
             }}
           >
-            JPG, PNG or WebP
+            {t.imageFormats}
           </div>
 
           <input

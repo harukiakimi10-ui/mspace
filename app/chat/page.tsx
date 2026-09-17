@@ -28,6 +28,7 @@ import { createId } from "@/lib/createId";
 import { compressVideo } from "./videoCompressor";
 import LocationPreview from "./LocationPreview";
 import MSpaceBrowser from "@/components/MSpaceBrowser";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 import * as tus from "tus-js-client";
 
@@ -4371,19 +4372,39 @@ paddingBottom: showStickerPanel
   >
     <div
   style={{
-    background: "#ffffff",
-    color: "#222222",
-    WebkitTextFillColor: "#222222",
-    padding: "12px",
-    borderRadius: "15px",
-    maxWidth: "250px",
+    display: "flex",
+    alignItems: "flex-start",
     marginBottom: "15px",
-    boxShadow: "0 2px 8px rgba(0,0,0,.08)",
   }}
 >
-  {t.hello} 👋
-  <br />
-  {t.welcome}
+  <div
+    style={{
+      marginRight: "8px",
+      flexShrink: 0,
+    }}
+  >
+    <ProfileAvatar
+      name={profileName || "Admin"}
+      photoUrl={profilePhoto}
+      size={45}
+    />
+  </div>
+
+  <div
+    style={{
+      background: "#ffffff",
+      color: "#222222",
+      WebkitTextFillColor: "#222222",
+      padding: "12px",
+      borderRadius: "15px",
+      maxWidth: "250px",
+      boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+    }}
+  >
+    {t.hello} 👋
+    <br />
+    {t.welcome}
+  </div>
 </div>
 
    {messageFocus && (
