@@ -608,24 +608,6 @@ function getLastSeenText(lastSeen: string | null) {
       minWidth: 0,
     }}
   >
-    <div
-      style={{
-        width: "42px",
-        height: "42px",
-        borderRadius: "50%",
-        background:
-          "linear-gradient(135deg, #7c3aed, #9333ea)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#ffffff",
-        boxShadow:
-          "0 6px 16px rgba(124,58,237,0.25)",
-        flexShrink: 0,
-      }}
-    >
-      <MessageCircleMore size={22} />
-    </div>
 
     <div
       style={{
@@ -648,6 +630,7 @@ function getLastSeenText(lastSeen: string | null) {
       gap: "8px",
     }}
   >
+
     <button
       onClick={() => {
         window.location.href = "/admin/chats";
@@ -655,20 +638,20 @@ function getLastSeenText(lastSeen: string | null) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "6px",
+        gap: "5px",
         background: "#ffffff",
         color: "#222222",
         border: "1px solid #e5e5e5",
-        padding: "9px 12px",
+        padding: "8px 9px",
         borderRadius: "12px",
-        fontSize: "14px",
+        fontSize: "13px",
         fontWeight: 600,
         cursor: "pointer",
         boxShadow:
           "0 2px 8px rgba(0,0,0,0.04)",
       }}
     >
-      <MessageCircleMore size={18} />
+      <MessageCircleMore size={17} />
       Chats
     </button>
 
@@ -680,21 +663,21 @@ function getLastSeenText(lastSeen: string | null) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "6px",
+        gap: "5px",
         background:
           "linear-gradient(135deg, #ef4444, #dc2626)",
         color: "#ffffff",
         border: "none",
-        padding: "10px 13px",
+        padding: "9px 10px",
         borderRadius: "12px",
-        fontSize: "14px",
+        fontSize: "13px",
         fontWeight: 700,
         cursor: "pointer",
         boxShadow:
           "0 5px 14px rgba(220,38,38,0.20)",
       }}
     >
-      <LogOut size={18} />
+      <LogOut size={17} />
       Logout
     </button>
   </div>

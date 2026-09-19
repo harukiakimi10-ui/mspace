@@ -4,9 +4,8 @@ import Link from "next/link";
 import {
   MessageCircleMore,
   Settings,
-  LogOut,
+  Eye,
 } from "lucide-react";
-
 export default function Header() {
   return (
   <div
@@ -62,42 +61,39 @@ export default function Header() {
 </div>
 
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-      }}
-    >
-      <Link
-        href="/admin/chats"
-        style={{
-  display: "flex",
-  alignItems: "center",
-  gap: "5px",
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  }}
+>
+  <button
+    onClick={() => {
+      window.location.href = "/admin/manage/member-view";
+    }}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "5px",
+      background: "#f5edff",
+      color: "#6d28d9",
+      border: "1px solid #e9d5ff",
+      padding: "7px 10px",
+       borderRadius: "10px",
+      fontSize: "13px",
+      fontWeight: 700,
+      cursor: "pointer",
+      boxShadow: "0 2px 8px rgba(109,40,217,0.06)",
+      whiteSpace: "nowrap",
+      flexShrink: 0,
+    }}
+  >
+    <Eye size={17} />
+    <span>Member View</span>
+  </button>
 
-  padding: "7px 10px",
-
-  borderRadius: "10px",
-
-  fontSize: "13px",
-  fontWeight: 600,
-
-  color: "#333",
-  textDecoration: "none",
-
-  background: "#fafafa",
-
-  border: "1px solid #ececec",
-}}
-      >
-        <>
-  <MessageCircleMore size={16} />
-  Chats
-</>
-      </Link>
-
-      <Link
-        href="/admin/manage"
+  <Link
+    href="/admin/manage"
         style={{
   display: "flex",
   alignItems: "center",
@@ -123,40 +119,6 @@ export default function Header() {
   Manage
 </>
       </Link>
-
-      <button
-        onClick={() => {
-          localStorage.removeItem("mspace_admin");
-          window.location.replace("/admin/login");
-        }}
-        style={{
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-
-  background: "linear-gradient(135deg,#ef4444,#dc2626)",
-  color: "#fff",
-
-  border: "none",
-
-  padding: "8px 12px",
-
-  borderRadius: "12px",
-
-  fontSize: "13px",
-  fontWeight: 700,
-
-  cursor: "pointer",
-
-  boxShadow:
-    "0 8px 20px rgba(239,68,68,.25)",
-}}
-      >
-        <>
-  <LogOut size={16} />
-  Logout
-</>
-      </button>
     </div>
   </div>
 );
