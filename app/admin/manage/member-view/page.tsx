@@ -15,10 +15,12 @@ import {
 WifiOff,
 Pencil,
 ImagePlus,
-Video,
 Camera,
 Trash2,
 Play,
+Grid3X3,
+Image,
+Video,
 } from "lucide-react";
 
 
@@ -261,6 +263,10 @@ async function uploadSelectedVideos() {
 }
 
 const videoInputRef = useRef<HTMLInputElement | null>(null);
+
+const videoViewerRef = useRef<HTMLDivElement | null>(null);
+
+
 const fullscreenVideoRefs =
   useRef<(HTMLVideoElement | null)[]>([]);
  useEffect(() => {
@@ -344,8 +350,138 @@ const [cacheReady, setCacheReady] = useState(false);
 
   const [selectedIndex, setSelectedIndex] =
   useState<number | null>(null);
+
+  useEffect(() => {
+  if (selectedIndex === null) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    const viewer = document.getElementById(
+  "photo-viewer"
+) as HTMLElement | null;
+
+    if (!viewer) return;
+
+    viewer.scrollTo({
+      top: selectedIndex * viewer.clientHeight,
+      behavior: "instant",
+    });
+  }, 100);
+
+  return () => clearTimeout(timer);
+}, [selectedIndex]);
+
+ const [activeMediaTab, setActiveMediaTab] = useState<
+  "all" | "photos" | "videos"
+>("all");
+const allMedia = useMemo(() => {
+  const photoItems = photos.map((photo) => ({
+    type: "photo" as const,
+    id: photo.id,
+    url: photo.image_url,
+    created_at: photo.created_at,
+  }));
+
+  const videoItems = videos.map((video) => ({
+    type: "video" as const,
+    id: video.id,
+    url: video.video_url,
+    thumbnail_url: video.thumbnail_url,
+    created_at: video.created_at,
+  }));
+
+  return [...photoItems, ...videoItems].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() -
+      new Date(a.created_at).getTime()
+  );
+}, [photos, videos]);
+
+useEffect(() => {
+  if (activeMediaTab !== "all") return;
+
+  const videos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  if (videos.length === 0) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const video =
+          entry.target as HTMLVideoElement;
+
+        if (entry.isIntersecting) {
+          videos.forEach((otherVideo) => {
+            if (otherVideo !== video) {
+              otherVideo.pause();
+            }
+          });
+
+          video.muted = true;
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      });
+    },
+    {
+      threshold: 0.7,
+    }
+  );
+
+  videos.forEach((video) => {
+    observer.observe(video);
+  });
+
+  return () => {
+    observer.disconnect();
+  };
+}, [activeMediaTab, allMedia.length]);
+
   const [selectedVideoIndex, setSelectedVideoIndex] =
   useState<number | null>(null);
+
+  const [videoViewerControlsVisible, setVideoViewerControlsVisible] =
+  useState<number | null>(null);
+
+  useEffect(() => {
+  if (
+    selectedVideoIndex === null ||
+    !videoViewerRef.current
+  ) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    const viewer = videoViewerRef.current;
+
+    if (!viewer) return;
+
+    viewer.scrollTo({
+      top: selectedVideoIndex * viewer.clientHeight,
+      behavior: "instant",
+    });
+
+    const videosInViewer =
+      viewer.querySelectorAll("video");
+
+    videosInViewer.forEach((video, index) => {
+      if (index === selectedVideoIndex) {
+        video.muted = false;
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  }, 100);
+
+  return () => clearTimeout(timer);
+}, [selectedVideoIndex]);
+
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -1045,6 +1181,7 @@ function openChat() {
  {/* ADMIN MEMBER VIEW HEADER */}
 
 <div
+id="member-view-top"
   style={{
     width: "100%",
     display: "flex",
@@ -2450,16 +2587,6 @@ disabled={savingProfile}
 >
   {photos.length}
 </div>
-        <div
-  style={{
-    fontSize: "13px",
-    color: "#555",
-    fontWeight: "600",
-    marginTop: "4px",
-  }}
->
-  {t.photos}
-</div>
       </div>
 
       <div style={{ textAlign: "center" }}>
@@ -2475,16 +2602,6 @@ disabled={savingProfile}
   }}
 >
   {videos.length}
-</div>
-        <div
-  style={{
-    fontSize: "13px",
-    color: "#555",
-    fontWeight: "600",
-    marginTop: "4px",
-  }}
->
-  {t.videos}
 </div>
       </div>
     </div>
@@ -2531,22 +2648,194 @@ disabled={savingProfile}
       
       {/* PHOTOS */}
 
-  <h2
+  <div
   style={{
-    color: "#7c3aed",
-    fontSize: "18px",
-    textAlign: "left",
-    marginTop: "4px",
-    marginBottom: "2px",
-    marginLeft: isMobile ? "10px" : "40px",
-    fontWeight: "700",
-    display: editingProfile ? "none" : "block",
+    display: editingProfile ? "none" : "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "60px",
+    marginTop: "14px",
+    marginBottom: "14px",
+    marginLeft: "0px",
+    width: "100%",
+boxSizing: "border-box",
 
+    position:
+      activeMediaTab === "all"
+        ? "sticky"
+        : "static",
+
+    top: 0,
+    zIndex: 1000,
+    background: "#ffffff",
+    paddingTop: "10px",
+    paddingBottom: "10px",
   }}
 >
-  {t.photos}
-</h2>
+  {/* ALL */}
+  <button
+    type="button"
+    onClick={() => {
+      setActiveMediaTab("all");
+    }}
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "12px",
+      border: "none",
+      background:
+        activeMediaTab === "all"
+          ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+          : "#f3f4f6",
+      color:
+        activeMediaTab === "all"
+          ? "#fff"
+          : "#555",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+    }}
+  >
+    <Grid3X3 size={21} />
+  </button>
 
+  {/* PHOTOS */}
+  <button
+    type="button"
+    onClick={() => {
+  setActiveMediaTab("photos");
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document
+        .getElementById("member-view-top")
+        ?.scrollIntoView({
+          behavior: "instant",
+          block: "start",
+        });
+    });
+  });
+}}
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "12px",
+      border: "none",
+      background:
+        activeMediaTab === "photos"
+          ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+          : "#f3f4f6",
+      color:
+        activeMediaTab === "photos"
+          ? "#fff"
+          : "#555",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+    }}
+  >
+    <Image size={21} />
+  </button>
+
+  {/* VIDEOS */}
+  <button
+    type="button"
+    onClick={() => {
+  setActiveMediaTab("videos");
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document
+        .getElementById("member-view-top")
+        ?.scrollIntoView({
+          behavior: "instant",
+          block: "start",
+        });
+    });
+  });
+}}
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "12px",
+      border: "none",
+      background:
+        activeMediaTab === "videos"
+          ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+          : "#f3f4f6",
+      color:
+        activeMediaTab === "videos"
+          ? "#fff"
+          : "#555",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+    }}
+  >
+    <Video size={21} />
+  </button>
+</div>
+
+{activeMediaTab === "all" && (
+  <div
+    id="all-media"
+    style={{
+      width: "100%",
+      padding: 0,
+      margin: 0,
+    }}
+  >
+    {allMedia.map((media) => (
+      <div
+        key={`${media.type}-${media.id}`}
+        style={{
+          width: "100%",
+          height: "100dvh",
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          background: "#000",
+          scrollSnapAlign: "start",
+        }}
+      >
+        {media.type === "photo" ? (
+          <img
+            src={media.url}
+            alt=""
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        ) : (
+          <video
+            src={media.url}
+            muted
+            playsInline
+            preload="metadata"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+              background: "#000",
+            }}
+          />
+        )}
+      </div>
+    ))}
+  </div>
+)}
+
+
+{activeMediaTab === "photos" && (
       <div
   id="photos"
   style={{
@@ -2554,7 +2843,7 @@ disabled={savingProfile}
     gridTemplateColumns: isMobile
   ? "repeat(3, 1fr)"
   : "repeat(6, 1fr)",
-    gap: "4px",
+    gap: "0px",
     marginBottom: "2px",
     paddingLeft: isMobile ? "10px" : "40px",
     paddingRight: isMobile ? "10px" : "40px",
@@ -2593,38 +2882,24 @@ disabled={savingProfile}
     }}
     style={{
       width: "100%",
-      height: isMobile ? "95px" : "110px",
+      height: isMobile ? "160px" : "190px",
       objectFit: "cover",
-      borderRadius: "20px",
+      borderRadius: "0px",
       border: "1px solid #e8e8e8",
       boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
       cursor: "pointer",
       transition: "all 0.3s ease",
     }}
   />
-))}
-    
+))}    
 </div>
+)}
       
 
       {/* VIDEOS */}
 
- <h2
-  style={{
-    color: "#7c3aed",
-    fontSize: "16px",
-    textAlign: "left",
-    marginTop: "0px",
-    marginBottom: "2px",
-    marginLeft: isMobile ? "10px" : "40px",
-    fontWeight: "700",
-    display: editingProfile ? "none" : "block",
 
-  }}
->
-  {t.videos}
-</h2>
-
+{activeMediaTab === "videos" && (
      <div
   id="videos"
   style={{
@@ -2632,7 +2907,7 @@ disabled={savingProfile}
     gridTemplateColumns: isMobile
   ? "repeat(3, 1fr)"
   : "repeat(6, 1fr)",
-    gap: "12px", 
+    gap: "2px",
     paddingLeft: isMobile ? "10px" : "40px",
     paddingRight: isMobile ? "10px" : "40px",
   }}
@@ -2640,14 +2915,16 @@ disabled={savingProfile}
   {videos.map((video, index) => (
   <div
   key={video.id}
-  onClick={() => setSelectedVideoIndex(index)}
-  onTouchStart={() => setSelectedVideoIndex(index)}
+  onClick={() => {
+  setSelectedVideoIndex(index);
+  setVideoViewerControlsVisible(null);
+}}
   style={{
     cursor: "pointer",
     width: "100%",
-    height: isMobile ? "95px" : "100px",
+    height: isMobile ? "160px" : "190px",
     overflow: "hidden",
-    borderRadius: "20px",
+    borderRadius: "0px",
     position: "relative",
   }}
 >
@@ -2681,43 +2958,15 @@ disabled={savingProfile}
       height: "100%",
       objectFit: "cover",
       pointerEvents: "none",
-      borderRadius: "20px",
-      border: "1px solid #e8e8e8",
-      boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
+      borderRadius: "0px",
+      border: "none",
+      boxShadow: "none",
     }}
   />
-
-  {/* PLAY BUTTON */}
-<div
-  style={{
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    background: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    pointerEvents: "none",
-    boxShadow: "0 3px 10px rgba(0,0,0,0.18)",
-  }}
->
-  <div
-  style={{
-    width: "16px",
-    height: "18px",
-    background: "#000",
-    clipPath: "polygon(0 0, 0 100%, 100% 50%)",
-    transform: "translateX(2px)",
-  }}
-/>
-  </div>
 </div>
   ))}
 </div>
+)}
 
 <footer
   style={{
@@ -2764,7 +3013,8 @@ disabled={savingProfile}
 
  {selectedIndex !== null && (
   <div
-    style={{
+  id="photo-viewer"
+  style={{
       position: "fixed",
       inset: 0,
       background: "rgba(0,0,0,0.96)",
@@ -3061,158 +3311,121 @@ if (videoToPlay) {
 
 
 {selectedVideoIndex !== null && (
-<div
-  onClick={() => setSelectedVideoIndex(null)}
-  onTouchStart={(e) => {
-    setTouchStartX(e.changedTouches[0].clientX);
-  }}
-  onTouchEnd={(e) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
+  <div
+    ref={videoViewerRef}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.96)",
+      zIndex: 99999,
+      overflowY: "auto",
+      overflowX: "hidden",
+      WebkitOverflowScrolling: "touch",
+      scrollSnapType: "y mandatory",
+    }}
+    onScroll={(e) => {
+  const container = e.currentTarget;
 
-    if (diff > 50) {
-      setSelectedVideoIndex(
-        selectedVideoIndex === videos.length - 1
-          ? 0
-          : selectedVideoIndex + 1
-      );
-    }
+  const index = Math.round(
+    container.scrollTop / container.clientHeight
+  );
 
-    if (diff < -50) {
-      setSelectedVideoIndex(
-        selectedVideoIndex === 0
-          ? videos.length - 1
-          : selectedVideoIndex - 1
-      );
-    }
-  }}
-  style={{
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.95)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 99999,
-  touchAction: "pan-y",
+  const videoElements =
+    container.querySelectorAll("video");
+
+  videoElements.forEach((video, videoIndex) => {
+    if (videoIndex === index) {
+  video.muted = false;
+
+  video
+    .play()
+    .catch(() => {});
+} else {
+  video.pause();
+}
+  });
+
+  if (
+    index >= 0 &&
+    index < videos.length &&
+    index !== selectedVideoIndex
+  ) {
+    setSelectedVideoIndex(index);
+  }
 }}
->
-  <ChevronLeft
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
-<button
+  >
+    {/* CLOSE */}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setSelectedVideoIndex(null);
+setVideoViewerControlsVisible(null);
+      }}
+      style={{
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        width: "46px",
+        height: "46px",
+        borderRadius: "50%",
+        border: "1px solid rgba(255,255,255,0.18)",
+        background: "rgba(255,255,255,0.88)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        color: "#222",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+        zIndex: 100000,
+      }}
+    >
+      <X size={22} />
+    </button>
+
+    {/* ALL VIDEOS */}
+    {videos.map((video, index) => (
+      <div
+        key={video.id}
+        style={{
+          width: "100%",
+          height: "100dvh",
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          scrollSnapAlign: "start",
+          boxSizing: "border-box",
+          padding: "20px",
+        }}
+      >
+        <video
+  playsInline
+  muted
+  controls={videoViewerControlsVisible === index}
   onClick={(e) => {
     e.stopPropagation();
-
-    setSelectedVideoIndex(
-      selectedVideoIndex === 0
-        ? videos.length - 1
-        : selectedVideoIndex - 1
-    );
+    setVideoViewerControlsVisible(index);
   }}
-  style={{
-  position: "fixed",
-  left: "20px",
-  top: "50%",
-  transform: "translateY(-50%)",
-  zIndex: 99999,
-  background: "transparent",
-  border: "none",
-  fontSize: "25px",
-  color: "#000",
-  cursor: "pointer",
-}}
->
-  <ChevronLeft
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
-
-  <video
-  key={selectedVideoIndex}
-  controls
-  autoPlay
-  playsInline
-  disablePictureInPicture
-  controlsList="nofullscreen"
-  onClick={(e) => e.stopPropagation()}
-  style={{
-    maxWidth: "95%",
-    maxHeight: "90vh",
-  }}
->
-      <source
-        src={
-          videos[selectedVideoIndex]
-            .video_url
-        }
-        type="video/mp4"
-      />
-    </video>
-
-    <button
-      onClick={(e) => {
-  e.stopPropagation();
-        setSelectedVideoIndex(
-          selectedVideoIndex ===
-            videos.length - 1
-            ? 0
-            : selectedVideoIndex + 1
-        );
-      }}
-      
-  
-  style={{
-  position: "fixed",
-  right: "20px",
-  top: "50%",
-  transform: "translateY(-50%)",
-  zIndex: 99999,
-  background: "transparent",
-  border: "none",
-  fontSize: "25px",
-  color: "#000",
-  cursor: "pointer",
-}}
->
-  <ChevronRight
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
-
-    <button
-      onClick={() =>
-        setSelectedVideoIndex(null)
-      }
-      
-  style={{
-  position: "fixed",
-  top: "20px",
-  right: "20px",
-  zIndex: 99999,
-  background: "transparent",
-  border: "none",
-  fontSize: "25px",
-  color: "#000",
-  cursor: "pointer",
-}}
-
->
-  <X
-  size={24}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
+          style={{
+            width: "100%",
+            height: "100%",
+            maxWidth: "100%",
+            maxHeight: "100%",
+            objectFit: "contain",
+            background: "#000",
+          }}
+        >
+          <source
+            src={video.video_url}
+            type="video/mp4"
+          />
+        </video>
+      </div>
+    ))}
   </div>
-
-
 )}
 </main>
 );
