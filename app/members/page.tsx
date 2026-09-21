@@ -787,18 +787,46 @@ async function loadUnreadCount() {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-   padding: "10px 10px 0",
+    padding: "10px 10px 0",
     boxSizing: "border-box",
   }}
 >
-  <div
+  <h1
+    style={{
+      fontSize: "25px",
+      fontWeight: "900",
+      letterSpacing: "-1px",
+      margin: 0,
+      background:
+        "linear-gradient(135deg,#7c3aed,#a855f7,#c084fc)",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+    }}
+  >
+    {t.appName}
+  </h1>
+
+  {!isOffline && <NotificationButton />}
+</div>
+
+   
+
+      {/* MEMBER PROFILE */}
+
+<div
   style={{
     display: "flex",
     alignItems: "center",
+    justifyContent: "flex-start",
     background: "#f9fafb",
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
     padding: "6px 10px 6px 6px",
+    marginTop: "12px",
+    marginBottom: "10px",
+    width: "fit-content",
+marginLeft: "5px",
+marginRight: "0",
     boxSizing: "border-box",
   }}
 >
@@ -816,10 +844,10 @@ async function loadUnreadCount() {
     }}
   >
     <ProfileAvatar
-  name={memberName || "Member"}
-  photoUrl={memberPhoto}
-  size={38}
-/>
+      name={memberName || "Member"}
+      photoUrl={memberPhoto}
+      size={38}
+    />
 
     <span
       style={{
@@ -840,35 +868,7 @@ async function loadUnreadCount() {
   </button>
 </div>
 
-  {!isOffline && <NotificationButton />}
-</div>
-
-   <div
-  style={{
-    textAlign: "center",
-    marginTop: "-5px",
-    marginBottom: "-5px",
-    width: "100%",
-  }}
->
-  <h1
-  style={{
-    textAlign: "center",
-    fontSize: "25px",
-    fontWeight: "900",
-    letterSpacing: "-1px",
-    margin: "10px 0",
-    background:
-      "linear-gradient(135deg,#7c3aed,#a855f7,#c084fc)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  }}
->
-  {t.appName}
-</h1>
-</div>
-
-      {/* PROFILE SECTION */}
+{/* PROFILE SECTION */}
 
  <div
   style={{

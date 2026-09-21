@@ -21,6 +21,7 @@ Play,
 Grid3X3,
 Image,
 Video,
+Settings,
 } from "lucide-react";
 
 
@@ -77,6 +78,10 @@ async function getCachedMediaUrl(url: string) {
 
 const [editingProfile, setEditingProfile] = useState(false);
 const [savingProfile, setSavingProfile] = useState(false);
+
+const [activeAction, setActiveAction] = useState<
+  "profile" | "photos" | "videos" | null
+>(null);
 
   const [photos, setPhotos] = useState<any[]>([]);
 
@@ -245,6 +250,11 @@ async function uploadSelectedVideos() {
 
     await loadVideos();
 
+setVideoPreviewFiles([]);
+setVideoPreviewIndex(0);
+setVideoThumbnailFiles([]);
+setActiveAction(null);
+
     alert("Videos uploaded successfully!");
   } catch (error) {
     console.error(
@@ -350,11 +360,15 @@ const [cacheReady, setCacheReady] = useState(false);
 
   const [selectedIndex, setSelectedIndex] =
   useState<number | null>(null);
+  const [photoViewerCurrentIndex, setPhotoViewerCurrentIndex] =
+  useState<number | null>(null);
 
   useEffect(() => {
   if (selectedIndex === null) {
     return;
   }
+
+  setPhotoViewerCurrentIndex(selectedIndex);
 
   const timer = setTimeout(() => {
     const viewer = document.getElementById(
@@ -924,9 +938,10 @@ async function saveProfileChanges() {
     await loadSettings();
 
     // Close editor
-    setEditingProfile(false);
+setEditingProfile(false);
+setActiveAction(null);
 
-    alert("Profile updated successfully!");
+alert("Profile updated successfully!");
   } finally {
     setSavingProfile(false);
   }
@@ -1047,9 +1062,13 @@ if (!file) {
 
     setPhotoFile(null);
 
-    await loadPhotos();
+await loadPhotos();
 
-    alert("Photo uploaded!");
+setPhotoPreviewFiles([]);
+setPhotoPreviewIndex(0);
+setActiveAction(null);
+
+alert("Photo uploaded!");
   } finally {
     setUploadingPhoto(false);
   }
@@ -1276,6 +1295,32 @@ id="member-view-top"
 
       <span>Chat</span>
     </button>
+
+    <button
+  onClick={() => {
+    window.location.href = "/admin/manage";
+  }}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    background: "#ffffff",
+    color: "#333333",
+    border: "1px solid #e5e5e5",
+    padding: "9px 12px",
+    borderRadius: "12px",
+    fontSize: "13px",
+    fontWeight: 600,
+    cursor: "pointer",
+    boxShadow:
+      "0 2px 8px rgba(0,0,0,0.04)",
+  }}
+>
+  <Settings size={17} />
+  Manage
+</button>
+
+
     {/* LOGOUT */}
 
     <button
@@ -1329,7 +1374,11 @@ id="member-view-top"
   <button
   onClick={async () => {
   await loadSettings();
+
+  setPhotoPreviewFiles([]);
+  setVideoPreviewFiles([]);
   setEditingProfile(true);
+  setActiveAction("profile");
 }}
     style={{
       flex: 1,
@@ -1338,9 +1387,22 @@ id="member-view-top"
       justifyContent: "center",
       gap: "6px",
       height: "44px",
-      background: "#f5edff",
-      color: "#6d28d9",
-      border: "1px solid #e9d5ff",
+      background:
+  activeAction === "profile"
+    ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+    : "#f5edff",
+color:
+  activeAction === "profile"
+    ? "#ffffff"
+    : "#6d28d9",
+border:
+  activeAction === "profile"
+    ? "1px solid #7c3aed"
+    : "1px solid #e9d5ff",
+boxShadow:
+  activeAction === "profile"
+    ? "0 5px 14px rgba(124,58,237,0.25)"
+    : "none",
       borderRadius: "11px",
       fontSize: "13px",
       fontWeight: 700,
@@ -1360,9 +1422,22 @@ id="member-view-top"
     justifyContent: "center",
     gap: "6px",
     height: "44px",
-    background: "#f5edff",
-    color: "#6d28d9",
-    border: "1px solid #e9d5ff",
+    background:
+  activeAction === "photos"
+    ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+    : "#f5edff",
+color:
+  activeAction === "photos"
+    ? "#ffffff"
+    : "#6d28d9",
+border:
+  activeAction === "photos"
+    ? "1px solid #7c3aed"
+    : "1px solid #e9d5ff",
+boxShadow:
+  activeAction === "photos"
+    ? "0 5px 14px rgba(124,58,237,0.25)"
+    : "none",
     borderRadius: "11px",
     fontSize: "13px",
     fontWeight: 700,
@@ -1388,10 +1463,15 @@ id="member-view-top"
 
     if (files.length === 0) return;
 
-    setPhotoPreviewFiles(files);
-    setPhotoPreviewIndex(0);
+setEditingProfile(false);
+setVideoPreviewFiles([]);
 
-    e.target.value = "";
+setActiveAction("photos");
+
+setPhotoPreviewFiles(files);
+setPhotoPreviewIndex(0);
+
+e.target.value = "";
   }}
   style={{
     display: "none",
@@ -1401,7 +1481,9 @@ id="member-view-top"
 
   <button
   type="button"
-  onClick={() => videoInputRef.current?.click()}
+  onClick={() => {
+    videoInputRef.current?.click();
+  }}
   disabled={uploadingVideo}
   style={{
     flex: 1,
@@ -1410,9 +1492,22 @@ id="member-view-top"
     justifyContent: "center",
     gap: "6px",
     height: "44px",
-    background: "#f5edff",
-    color: "#6d28d9",
-    border: "1px solid #e9d5ff",
+    background:
+  activeAction === "videos"
+    ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+    : "#f5edff",
+color:
+  activeAction === "videos"
+    ? "#ffffff"
+    : "#6d28d9",
+border:
+  activeAction === "videos"
+    ? "1px solid #7c3aed"
+    : "1px solid #e9d5ff",
+boxShadow:
+  activeAction === "videos"
+    ? "0 5px 14px rgba(124,58,237,0.25)"
+    : "none",
     borderRadius: "11px",
     fontSize: "13px",
     fontWeight: 700,
@@ -1439,6 +1534,10 @@ id="member-view-top"
   );
 
   if (files.length === 0) return;
+
+  setEditingProfile(false);
+setPhotoPreviewFiles([]);
+setActiveAction("videos");
 
   setVideoPreviewFiles(files);
   setVideoPreviewIndex(0);
@@ -1830,7 +1929,10 @@ setVideoThumbnailFiles(thumbnails);
 >
   <button
     type="button"
-    onClick={() => setPhotoPreviewFiles([])}
+    onClick={() => {
+  setPhotoPreviewFiles([]);
+  setActiveAction(null);
+}}
     style={{
           flex: 1,
           height: "44px",
@@ -2027,9 +2129,10 @@ setVideoThumbnailFiles(thumbnails);
       <button
         type="button"
         onClick={() => {
-          setVideoPreviewFiles([]);
-          setVideoPreviewIndex(0);
-        }}
+  setVideoPreviewFiles([]);
+  setVideoPreviewIndex(0);
+  setActiveAction(null);
+}}
         style={{
           flex: 1,
           height: "44px",
@@ -2393,7 +2496,10 @@ setVideoThumbnailFiles(thumbnails);
     >
       <button
         type="button"
-        onClick={() => setEditingProfile(false)}
+        onClick={() => {
+  setEditingProfile(false);
+  setActiveAction(null);
+}}
         style={{
           flex: 1,
           height: "44px",
@@ -2650,7 +2756,12 @@ disabled={savingProfile}
 
   <div
   style={{
-    display: editingProfile ? "none" : "flex",
+    display:
+  editingProfile ||
+  photoPreviewFiles.length > 0 ||
+  videoPreviewFiles.length > 0
+    ? "none"
+    : "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "60px",
@@ -3014,6 +3125,23 @@ boxSizing: "border-box",
  {selectedIndex !== null && (
   <div
   id="photo-viewer"
+  onScroll={(e) => {
+    const viewer = e.currentTarget;
+
+    if (viewer.clientHeight === 0) return;
+
+    const index = Math.round(
+      viewer.scrollTop / viewer.clientHeight
+    );
+
+    if (
+      index >= 0 &&
+      index < photos.length &&
+      index !== photoViewerCurrentIndex
+    ) {
+      setPhotoViewerCurrentIndex(index);
+    }
+  }}
   style={{
       position: "fixed",
       inset: 0,
@@ -3054,6 +3182,109 @@ boxSizing: "border-box",
     >
       <X size={22} />
     </button>
+
+    {/* DELETE PHOTO */}
+<button
+  type="button"
+  onClick={async () => {
+    if (photoViewerCurrentIndex === null) return;
+
+    const photo = photos[photoViewerCurrentIndex];
+
+    if (!photo) return;
+
+    const confirmed = window.confirm(
+      "Delete this photo?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const photoPath = photo.image_url.split(
+        "/photos/"
+      )[1];
+
+      if (photoPath) {
+        const { error: storageError } =
+          await supabase.storage
+            .from("photos")
+            .remove([photoPath]);
+
+        if (storageError) {
+          console.error(
+            "Photo storage delete error:",
+            storageError
+          );
+          return;
+        }
+      }
+
+      const { error: databaseError } =
+        await supabase
+          .from("photos")
+          .delete()
+          .eq("id", photo.id);
+
+      if (databaseError) {
+        console.error(
+          "Photo database delete error:",
+          databaseError
+        );
+        return;
+      }
+
+      const nextIndex =
+  photos.length <= 1
+    ? null
+    : photoViewerCurrentIndex! >= photos.length - 1
+      ? photos.length - 2
+      : photoViewerCurrentIndex!;
+
+setPhotos((prev) =>
+  prev.filter((item) => item.id !== photo.id)
+);
+
+if (nextIndex === null) {
+  setSelectedIndex(null);
+  setPhotoViewerCurrentIndex(null);
+} else {
+  setSelectedIndex(nextIndex);
+  setPhotoViewerCurrentIndex(nextIndex);
+}
+
+  
+    } catch (error) {
+      console.error(
+        "Delete photo error:",
+        error
+      );
+    }
+  }}
+  style={{
+    position: "fixed",
+    top: "20px",
+    left: "20px",
+    width: "46px",
+    height: "46px",
+    borderRadius: "50%",
+    border:
+      "1px solid rgba(255,255,255,0.18)",
+    background:
+      "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    color: "#222",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    boxShadow:
+      "0 8px 24px rgba(0,0,0,0.35)",
+    zIndex: 100001,
+  }}
+>
+  <Trash2 size={20} />
+</button>
 
     {/* ALL PHOTOS */}
     {photos.map((photo, index) => (
@@ -3384,6 +3615,128 @@ setVideoViewerControlsVisible(null);
     >
       <X size={22} />
     </button>
+
+    {/* DELETE VIDEO */}
+<button
+  type="button"
+  onClick={async () => {
+    if (selectedVideoIndex === null) return;
+
+    const video = videos[selectedVideoIndex];
+
+    if (!video) return;
+
+    const confirmed = window.confirm(
+      "Delete this video?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const videoPath = video.video_url.split(
+        "/videos/"
+      )[1];
+
+      if (videoPath) {
+        const { error: storageError } =
+          await supabase.storage
+            .from("videos")
+            .remove([videoPath]);
+
+        if (storageError) {
+          console.error(
+            "Video storage delete error:",
+            storageError
+          );
+          return;
+        }
+      }
+
+      if (video.thumbnail_url) {
+        const thumbnailPath =
+          video.thumbnail_url.split(
+            "/Thumbnails/"
+          )[1];
+
+        if (thumbnailPath) {
+          const { error: thumbnailError } =
+            await supabase.storage
+              .from("Thumbnails")
+              .remove([thumbnailPath]);
+
+          if (thumbnailError) {
+            console.error(
+              "Thumbnail delete error:",
+              thumbnailError
+            );
+          }
+        }
+      }
+
+      const { error: databaseError } =
+        await supabase
+          .from("videos")
+          .delete()
+          .eq("id", video.id);
+
+      if (databaseError) {
+        console.error(
+          "Video database delete error:",
+          databaseError
+        );
+        return;
+      }
+
+      const nextIndex =
+        videos.length <= 1
+          ? null
+          : selectedVideoIndex >= videos.length - 1
+            ? videos.length - 2
+            : selectedVideoIndex;
+
+      setVideos((prev) =>
+        prev.filter((item) => item.id !== video.id)
+      );
+
+      if (nextIndex === null) {
+        setSelectedVideoIndex(null);
+        setVideoViewerControlsVisible(null);
+      } else {
+        setSelectedVideoIndex(nextIndex);
+        setVideoViewerControlsVisible(null);
+      }
+    } catch (error) {
+      console.error(
+        "Delete video error:",
+        error
+      );
+    }
+  }}
+  style={{
+    position: "fixed",
+    top: "20px",
+    left: "20px",
+    width: "46px",
+    height: "46px",
+    borderRadius: "50%",
+    border:
+      "1px solid rgba(255,255,255,0.18)",
+    background:
+      "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    color: "#222",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    boxShadow:
+      "0 8px 24px rgba(0,0,0,0.35)",
+    zIndex: 100001,
+  }}
+>
+  <Trash2 size={20} />
+</button>
 
     {/* ALL VIDEOS */}
     {videos.map((video, index) => (

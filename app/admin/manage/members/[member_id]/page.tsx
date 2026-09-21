@@ -11,6 +11,7 @@ import {
   Ban,
   Smartphone,
   Trash2,
+  ChevronLeft,
   UserRound,
 } from "lucide-react";
 import ProfileAvatar from "@/app/chat/ProfileAvatar";
@@ -146,30 +147,42 @@ export default function MemberDetailsPage() {
           zIndex: 1000,
         }}
       >
+
+        {/* Back */}
+
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              width: "52px",
-              height: "52px",
-              borderRadius: "50%",
-              background: "#7c3aed",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              boxShadow: "0 8px 20px rgba(124,58,237,0.25)",
-            }}
-          >
-            <MessageCircleMore size={30} />
-          </div>
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minWidth: 0,
+  }}
+>
+  <button
+    onClick={() => {
+  window.location.href = "/admin/manage/visitors";
+}}
+    style={{
+      width: "42px",
+      height: "42px",
+      cursor: "pointer",
+      borderRadius: "50%",
+      background: "rgba(255,255,255,0.55)",
+      backdropFilter: "blur(14px)",
+      WebkitBackdropFilter: "blur(14px)",
+      border: "1px solid rgba(255,255,255,0.65)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#64748b",
+      boxShadow:
+        "0 8px 24px rgba(0,0,0,0.10)",
+      flexShrink: 0,
+      padding: 0,
+    }}
+  >
+    <ChevronLeft size={30} strokeWidth={2.2} />
+  </button>
 
           <div style={{ minWidth: 0 }}>
             <div
@@ -260,25 +273,6 @@ export default function MemberDetailsPage() {
           margin: "0 auto",
         }}
       >
-        {/* Back */}
-        <div
-          onClick={() => {
-  window.location.href = "/admin/manage/visitors";
-}}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "10px",
-            color: "#64748b",
-            fontSize: "17px",
-            fontWeight: 700,
-            cursor: "pointer",
-            marginBottom: "24px",
-          }}
-        >
-          <ArrowLeft size={27} />
-          Back to visitors
-        </div>
 
         {/* Member profile card */}
         <div

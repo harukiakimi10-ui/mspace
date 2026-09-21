@@ -11,6 +11,7 @@ import {
   Smartphone,
   Trash2,
   Clock,
+  ChevronLeft,
   ArrowLeft,
 } from "lucide-react";
 import ProfileAvatar from "@/app/chat/ProfileAvatar";
@@ -272,34 +273,45 @@ export default function MembersPage() {
           zIndex: 1000,
         }}
       >
-        {/* Branding */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "9px",
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "50%",
-              background:
-                "linear-gradient(135deg, #7c3aed, #9333ea)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#ffffff",
-              boxShadow:
-                "0 6px 16px rgba(124,58,237,0.25)",
-              flexShrink: 0,
-            }}
-          >
-            <MessageCircleMore size={22} />
-          </div>
+        
+         {/* Back */}
 
+        <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    minWidth: 0,
+  }}
+>
+  <button
+    onClick={() => {
+  window.location.href = "/admin/manage";
+}}
+    style={{
+      width: "42px",
+      height: "42px",
+      cursor: "pointer",
+      borderRadius: "50%",
+      background: "rgba(255,255,255,0.55)",
+      backdropFilter: "blur(14px)",
+      WebkitBackdropFilter: "blur(14px)",
+      border: "1px solid rgba(255,255,255,0.65)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#64748b",
+      boxShadow:
+        "0 8px 24px rgba(0,0,0,0.10)",
+      flexShrink: 0,
+      padding: 0,
+    }}
+  >
+    <ChevronLeft size={30} strokeWidth={2.2} />
+  </button>
+
+
+       {/* Branding */}
           <div>
             <div
               style={{
@@ -387,30 +399,6 @@ export default function MembersPage() {
           </button>
         </div>
       </div>
-
-      {/* Back */}
-      <button
-        onClick={() => {
-          window.location.href =
-            "/admin/manage";
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          background: "transparent",
-          border: "none",
-          color: "#64748b",
-          fontSize: "16px",
-          fontWeight: 700,
-          padding: "4px 0",
-          marginBottom: "20px",
-          cursor: "pointer",
-        }}
-      >
-        <ArrowLeft size={22} />
-        Back to Manage
-      </button>
 
       {/* Members heading */}
       <div

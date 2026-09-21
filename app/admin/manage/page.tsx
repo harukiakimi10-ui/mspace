@@ -600,27 +600,39 @@ function getLastSeenText(lastSeen: string | null) {
   }}
 >
   {/* MSpace branding */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    minWidth: 0,
+  }}
+>
   <div
     style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "9px",
-      minWidth: 0,
+      fontSize: "22px",
+      fontWeight: 800,
+      color: "#7c3aed",
+      letterSpacing: "-0.5px",
+      lineHeight: 1.1,
+      whiteSpace: "nowrap",
     }}
   >
-
-    <div
-      style={{
-        fontSize: "22px",
-        fontWeight: 800,
-        color: "#7c3aed",
-        letterSpacing: "-0.5px",
-        whiteSpace: "nowrap",
-      }}
-    >
-      MSpace
-    </div>
+    MSpace
   </div>
+
+  <div
+    style={{
+      fontSize: "13px",
+      color: "#64748b",
+      marginTop: "3px",
+      lineHeight: 1.1,
+      whiteSpace: "nowrap",
+    }}
+  >
+    Admin Dashboard
+  </div>
+</div>
 
   {/* Navigation */}
   <div
@@ -680,6 +692,63 @@ function getLastSeenText(lastSeen: string | null) {
       <LogOut size={17} />
       Logout
     </button>
+  </div>
+</div>
+
+{/* OVERVIEW HEADER */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "20px",
+    marginBottom: "18px",
+  }}
+>
+  <div>
+    <div
+      style={{
+        fontSize: "28px",
+        fontWeight: 800,
+        color: "#172554",
+        lineHeight: 1.15,
+      }}
+    >
+      Overview
+    </div>
+
+    <div
+      style={{
+        fontSize: "16px",
+        color: "#64748b",
+        marginTop: "5px",
+      }}
+    >
+      A quick snapshot of your MSpace
+    </div>
+  </div>
+
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      color: "#7c3aed",
+      fontSize: "15px",
+      fontWeight: 600,
+      whiteSpace: "nowrap",
+      marginTop: "10px",
+    }}
+  >
+    <div
+      style={{
+        width: "14px",
+        height: "14px",
+        borderRadius: "50%",
+        background: "#a855f7",
+      }}
+    />
+    Live data
   </div>
 </div>
 
@@ -942,244 +1011,95 @@ function getLastSeenText(lastSeen: string | null) {
   </div>
 </div>
 
-{/* Profile Management */}
+{/* MEMBER VIEW */}
 <div
   onClick={() => {
-    window.location.href = "/admin/manage/profile";
+    window.location.href =
+      "/admin/manage/member-view";
   }}
   style={{
-    background: "#ffffff",
-    borderRadius: "22px",
-    padding: "18px",
-    marginTop: "20px",
-    marginBottom: "20px",
-    border: "1px solid #f0f0f0",
-    boxShadow: "0 8px 30px rgba(30,41,59,0.06)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "14px",
-    cursor: "pointer",
-    userSelect: "none",
-  }}
->
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "14px",
-      minWidth: 0,
-    }}
-  >
-    <div
-      style={{
-        width: "52px",
-        height: "52px",
-        borderRadius: "17px",
-        background: "#f1e8ff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#7c3aed",
-        flexShrink: 0,
-      }}
-    >
-      <UserRound size={25} />
-    </div>
-
-    <div>
-      <div
-        style={{
-          fontSize: "18px",
-          fontWeight: 700,
-          color: "#172554",
-        }}
-      >
-        Profile Management
-      </div>
-
-      <div
-        style={{
-          fontSize: "13px",
-          color: "#64748b",
-          marginTop: "4px",
-        }}
-      >
-        Update your profile photo, name and bio
-      </div>
-    </div>
-  </div>
-
-  <div
-    style={{
-      fontSize: "30px",
-      color: "#94a3b8",
-      lineHeight: 1,
-      flexShrink: 0,
-    }}
-  >
-    ›
-  </div>
-</div>
-
-
-{/* Photo Gallery */}
-<div
-  onClick={() => {
-    window.location.href = "/admin/manage/photos";
-  }}
-  style={{
-    background: "#ffffff",
-    borderRadius: "22px",
-    padding: "18px",
-    marginBottom: "20px",
+    background:
+      "linear-gradient(135deg, #7c3aed, #9333ea)",
+    borderRadius: "24px",
+    padding: "22px",
+    marginTop: "4px",
+    marginBottom: "24px",
+    minHeight: "100px",
+    boxSizing: "border-box",
     boxShadow:
-      "0 8px 30px rgba(30, 41, 59, 0.06)",
-    border: "1px solid #f0f0f0",
+      "0 12px 30px rgba(124,58,237,0.22)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "14px",
-    cursor: "pointer",
-
-  }}
->
-  <div
-    style={{
-      width: "52px",
-      height: "52px",
-      borderRadius: "17px",
-      background: "#dcfce7",
-      color: "#16a34a",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-    }}
-  >
-    <Image size={30} />
-  </div>
-
-  <div
-    style={{
-      flex: 1,
-      minWidth: 0,
-    }}
-  >
-    <div
-      style={{
-        fontSize: "18px",
-        fontWeight: 700,
-        color: "#172554",
-      }}
-    >
-      Photo Gallery
-    </div>
-
-    <div
-      style={{
-        fontSize: "13px",
-        color: "#64748b",
-        marginTop: "4px",
-      }}
-    >
-      Upload and manage photos for members
-    </div>
-  </div>
-
-  <div
-    style={{
-      fontSize: "32px",
-      color: "#64748b",
-      lineHeight: 1,
-      flexShrink: 0,
-    }}
-  >
-    ›
-  </div>
-</div>
-
-{/* Video Gallery */}
-<div
-  onClick={() => {
-    window.location.href = "/admin/manage/videos";
-  }}
-  style={{
-    background: "#ffffff",
-    borderRadius: "22px",
-    padding: "18px",
-    marginBottom: "20px",
-    border: "1px solid #f0f0f0",
-    boxShadow: "0 8px 30px rgba(30,41,59,0.06)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "14px",
+    gap: "18px",
     cursor: "pointer",
     userSelect: "none",
+    color: "#ffffff",
   }}
 >
   <div
     style={{
       display: "flex",
       alignItems: "center",
-      gap: "14px",
+      gap: "16px",
       minWidth: 0,
     }}
   >
     <div
       style={{
-        width: "52px",
-        height: "52px",
-        borderRadius: "17px",
-        background: "#fce7f3",
+        width: "58px",
+        height: "58px",
+        borderRadius: "18px",
+        background:
+          "rgba(255,255,255,0.16)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#e11d48",
         flexShrink: 0,
+        border:
+          "1px solid rgba(255,255,255,0.12)",
       }}
     >
-      <Video size={25} />
+      <Eye size={25} />
     </div>
 
-    <div
-      style={{
-        minWidth: 0,
-      }}
-    >
+    <div style={{ minWidth: 0 }}>
       <div
         style={{
-          fontSize: "18px",
-          fontWeight: 700,
-          color: "#172554",
+          fontSize: "24px",
+          fontWeight: 800,
+          lineHeight: 1.15,
         }}
       >
-        Video Gallery
+        Member View
       </div>
 
       <div
         style={{
-          fontSize: "13px",
-          color: "#64748b",
-          marginTop: "4px",
+          fontSize: "14px",
+          color: "rgba(255,255,255,0.82)",
+          marginTop: "7px",
+          lineHeight: 1.4,
         }}
       >
-        Upload and manage videos for members
+        See and manage exactly what your members see
       </div>
     </div>
   </div>
 
   <div
-    style={{
-      fontSize: "30px",
-      color: "#94a3b8",
-      lineHeight: 1,
-      flexShrink: 0,
-    }}
-  >
-    ›
-  </div>
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    fontSize: "36px",
+    lineHeight: 1,
+    color: "#ffffff",
+  }}
+>
+  ›
+</div>
 </div>
 
 <div
@@ -1336,6 +1256,51 @@ function getLastSeenText(lastSeen: string | null) {
     }}
   >
     ›
+  </div>
+</div>
+{/* MSPACE FOOTER */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: "46px",
+    paddingBottom: "28px",
+    textAlign: "center",
+  }}
+>
+  <img
+    src="/mspace-icon.png"
+    alt="MSpace"
+    style={{
+      width: "48px",
+      height: "48px",
+      objectFit: "contain",
+      display: "block",
+      marginBottom: "8px",
+    }}
+  />
+
+  <div
+    style={{
+      fontSize: "18px",
+      fontWeight: 800,
+      color: "#172554",
+      lineHeight: 1.2,
+    }}
+  >
+    MSpace
+  </div>
+
+  <div
+    style={{
+      fontSize: "13px",
+      color: "#94a3b8",
+      marginTop: "5px",
+    }}
+  >
+    A more personal space
   </div>
 </div>
 </div>
