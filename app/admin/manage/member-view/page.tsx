@@ -9,8 +9,8 @@ import { compressVideo } from "@/app/chat/videoCompressor";
 import {
   LogOut,
   MessageCircleMore,
-  ChevronLeft,
-  ChevronRight,
+  Volume2,
+VolumeX,
   X,
 WifiOff,
 Pencil,
@@ -462,6 +462,9 @@ useEffect(() => {
   const [videoViewerControlsVisible, setVideoViewerControlsVisible] =
   useState<number | null>(null);
 
+  const [videoViewerMuted, setVideoViewerMuted] =
+  useState(true);
+
   useEffect(() => {
   if (
     selectedVideoIndex === null ||
@@ -485,16 +488,16 @@ useEffect(() => {
 
     videosInViewer.forEach((video, index) => {
       if (index === selectedVideoIndex) {
-        video.muted = false;
-        video.play().catch(() => {});
-      } else {
-        video.pause();
-      }
+  video.muted = videoViewerMuted;
+  video.play().catch(() => {});
+} else {
+  video.pause();
+}
     });
   }, 100);
 
   return () => clearTimeout(timer);
-}, [selectedVideoIndex]);
+}, [selectedVideoIndex, videoViewerMuted]);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
@@ -2771,10 +2774,7 @@ disabled={savingProfile}
     width: "100%",
 boxSizing: "border-box",
 
-    position:
-      activeMediaTab === "all"
-        ? "sticky"
-        : "static",
+    position: "sticky",
 
     top: 0,
     zIndex: 1000,
@@ -3566,7 +3566,7 @@ if (videoToPlay) {
 
   videoElements.forEach((video, videoIndex) => {
     if (videoIndex === index) {
-  video.muted = false;
+  video.muted = videoViewerMuted;
 
   video
     .play()
@@ -3585,14 +3585,67 @@ if (videoToPlay) {
   }
 }}
   >
+
+    {/* MUTE / UNMUTE */}
+
+<button
+  onClick={(e) => {
+  e.stopPropagation();
+
+  const video =
+    fullscreenVideoRefs.current[
+      selectedVideoIndex ?? -1
+    ];
+
+  if (!video) return;
+
+  video.muted = !video.muted;
+
+  setVideoViewerMuted(video.muted);
+}}
+  style={{
+    position: "fixed",
+    bottom: "28px",
+    right: "18px",
+    zIndex: 100000,
+    width: "46px",
+    height: "46px",
+    borderRadius: "50%",
+    border: "none",
+    background: "#fff",
+    color: "#000",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+  }}
+>
+  {videoViewerMuted ? (
+    <VolumeX size={23} strokeWidth={2.4} />
+  ) : (
+    <Volume2 size={23} strokeWidth={2.4} />
+  )}
+</button>
+
+
     {/* CLOSE */}
     <button
       type="button"
       onClick={(e) => {
-        e.stopPropagation();
-        setSelectedVideoIndex(null);
-setVideoViewerControlsVisible(null);
-      }}
+  e.stopPropagation();
+
+  setVideoViewerMuted(true);
+
+  fullscreenVideoRefs.current.forEach((video) => {
+    if (video) {
+      video.muted = true;
+      video.pause();
+    }
+  });
+
+  setSelectedVideoIndex(null);
+  setVideoViewerControlsVisible(null);
+}}
       style={{
         position: "fixed",
         top: "20px",
@@ -3755,8 +3808,11 @@ setVideoViewerControlsVisible(null);
         }}
       >
         <video
+  ref={(el) => {
+    fullscreenVideoRefs.current[index] = el;
+  }}
   playsInline
-  muted
+  muted={videoViewerMuted}
   controls={videoViewerControlsVisible === index}
   onClick={(e) => {
     e.stopPropagation();

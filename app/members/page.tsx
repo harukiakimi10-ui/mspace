@@ -1,7 +1,12 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useState } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { MessagesSquare } from "lucide-react";
@@ -12,7 +17,13 @@ import {
   MessageCircleMore,
   ChevronLeft,
   ChevronRight,
-  X,WifiOff,
+  X,
+  WifiOff,
+  Grid3X3,
+  Image,
+  Video,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 
@@ -74,6 +85,10 @@ const [videos, setVideos] = useState<any[]>([]);
 const [profileName, setProfileName] = useState("");
 const [profileBio, setProfileBio] = useState("");
 
+const [activeMediaTab, setActiveMediaTab] =
+  useState<"all" | "photos" | "videos">("all");
+
+
 const [profilePhoto, setProfilePhoto] = useState("");
 const [cacheReady, setCacheReady] = useState(false);
 
@@ -87,6 +102,58 @@ const [memberPhoto, setMemberPhoto] = useState("");
   useState<number | null>(null);
   const [selectedVideoIndex, setSelectedVideoIndex] =
   useState<number | null>(null);
+  useEffect(() => {
+  if (
+    selectedVideoIndex === null ||
+    !videoViewerRef.current
+  ) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const viewer = videoViewerRef.current;
+
+    if (!viewer) return;
+
+    viewer.scrollTo({
+      top:
+        selectedVideoIndex *
+        viewer.clientHeight,
+      behavior: "instant",
+    });
+  });
+}, [selectedVideoIndex]);
+
+  const [photoViewerCurrentIndex, setPhotoViewerCurrentIndex] =
+  useState<number | null>(null);
+
+const [videoViewerControlsVisible, setVideoViewerControlsVisible] =
+  useState<number | null>(null);
+
+  const [videoViewerMuted, setVideoViewerMuted] =
+  useState(true);
+
+  const [videoViewerReady, setVideoViewerReady] =
+  useState<Record<number, boolean>>({});
+
+  const [allMediaMuted, setAllMediaMuted] =
+  useState<Record<string, boolean>>({});
+
+  const [allMediaPlaying, setAllMediaPlaying] =
+  useState<Record<string, boolean>>({});
+
+const photoViewerRef =
+  useRef<HTMLDivElement | null>(null);
+
+const videoViewerRef =
+  useRef<HTMLDivElement | null>(null);
+
+const fullscreenPhotoRefs =
+  useRef<(HTMLImageElement | null)[]>([]);
+
+const fullscreenVideoRefs =
+  useRef<(HTMLVideoElement | null)[]>([]);
+
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -731,6 +798,138 @@ async function loadUnreadCount() {
 }
 
 
+const allMedia = useMemo(() => {
+  const photoItems = photos.map((photo) => ({
+    type: "photo" as const,
+    id: photo.id,
+    url: photo.image_url,
+    created_at: photo.created_at,
+  }));
+
+  const videoItems = videos.map((video) => ({
+    type: "video" as const,
+    id: video.id,
+    url: video.video_url,
+    thumbnail_url: video.thumbnail_url,
+    created_at: video.created_at,
+  }));
+
+  return [...photoItems, ...videoItems].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() -
+      new Date(a.created_at).getTime()
+  );
+}, [photos, videos]);
+
+useEffect(() => {
+  if (selectedIndex === null) return;
+
+  setPhotoViewerCurrentIndex(selectedIndex);
+
+  requestAnimationFrame(() => {
+    const viewer = photoViewerRef.current;
+
+    if (!viewer) return;
+
+    const target = viewer.children[
+      selectedIndex
+    ] as HTMLElement | undefined;
+
+    target?.scrollIntoView({
+      behavior: "instant",
+      block: "start",
+    });
+  });
+}, [selectedIndex]);
+
+useEffect(() => {
+  if (activeMediaTab !== "all") return;
+
+  const videos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  if (videos.length === 0) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const video =
+          entry.target as HTMLVideoElement;
+
+        if (entry.isIntersecting) {
+          videos.forEach((otherVideo) => {
+            if (otherVideo !== video) {
+              otherVideo.pause();
+            }
+          });
+
+          const activeMedia = allMedia.find(
+  (item) => item.type === "video" && item.url === video.src
+);
+
+video.muted = activeMedia
+  ? allMediaMuted[activeMedia.id] ?? true
+  : true;
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      });
+    },
+    {
+      threshold: 0.7,
+    }
+  );
+
+  videos.forEach((video) => {
+    observer.observe(video);
+  });
+
+  return () => {
+    observer.disconnect();
+  };
+}, [activeMediaTab, allMedia.length, allMediaMuted]);
+
+useEffect(() => {
+  const previousScrollRestoration =
+    window.history.scrollRestoration;
+
+  window.history.scrollRestoration = "manual";
+
+  const timer = setTimeout(() => {
+    window.scrollTo(0, 0);
+  }, 100);
+
+  return () => {
+    clearTimeout(timer);
+    window.history.scrollRestoration =
+      previousScrollRestoration;
+  };
+}, []);
+
+
+useEffect(() => {
+  if (
+    activeMediaTab !== "photos" &&
+    activeMediaTab !== "videos"
+  ) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document
+        .getElementById("members-page-header")
+        ?.scrollIntoView({
+          behavior: "instant",
+          block: "start",
+        });
+    });
+  });
+}, [activeMediaTab]);
+
 
   return (
   
@@ -782,6 +981,7 @@ async function loadUnreadCount() {
  {/* HEADER */}
 
 <div
+  id="members-page-header"
   style={{
     width: "100%",
     display: "flex",
@@ -900,6 +1100,8 @@ marginRight: "0",
     profilePhoto ||
     "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
   }
+  loading="eager"
+  decoding="sync"
   alt="Donald Lee"
   onError={async (e) => {
     const image = e.currentTarget;
@@ -1105,164 +1307,476 @@ marginRight: "0",
         
 
       
-      {/* PHOTOS */}
+      {/* MEDIA NAVIGATION */}
 
-  <h2
+<div
   style={{
-    color: "#7c3aed",
-    fontSize: "18px",
-    textAlign: "left",
-    marginTop: "4px",
-    marginBottom: "2px",
-    marginLeft: isMobile ? "10px" : "40px",
-    fontWeight: "700",
-
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "60px",
+    marginTop: "14px",
+    marginBottom: "14px",
+    width: "100%",
+    boxSizing: "border-box",
+    position: "sticky",
+    top: 0,
+    zIndex: 1000,
+    background: "#ffffff",
+    paddingTop: "10px",
+    paddingBottom: "10px",
   }}
 >
-  {t.photos}
-</h2>
-
-      <div
-  id="photos"
-  style={{
-    display: "grid",
-    gridTemplateColumns: isMobile
-  ? "repeat(3, 1fr)"
-  : "repeat(6, 1fr)",
-    gap: "4px",
-    marginBottom: "2px",
-    paddingLeft: isMobile ? "10px" : "40px",
-    paddingRight: isMobile ? "10px" : "40px",
-  }}
->
-  {photos.map((photo, index) => (
-  <img
-  key={photo.id}
-  src={photo.image_url}
-  alt="Photo"
-  onError={async (e) => {
-    const image = e.currentTarget;
-
-    if (image.dataset.fallbackApplied === "true") {
-      return;
-    }
-
-    image.dataset.fallbackApplied = "true";
-
-    const cachedUrl = await getCachedMediaUrl(
-      photo.image_url
-    );
-
-    if (cachedUrl !== photo.image_url) {
-      image.src = cachedUrl;
-    }
-  }}
-    onClick={() =>
-  setSelectedIndex(index)
-}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = "scale(1.03)";
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = "scale(1)";
+  {/* ALL */}
+  <button
+    type="button"
+    onClick={() => {
+      setActiveMediaTab("all");
     }}
     style={{
-      width: "100%",
-      height: isMobile ? "95px" : "110px",
-      objectFit: "cover",
-      borderRadius: "20px",
-      border: "1px solid #e8e8e8",
-      boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
+      width: "44px",
+      height: "44px",
+      borderRadius: "12px",
+      border: "none",
+      background:
+        activeMediaTab === "all"
+          ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+          : "#f3f4f6",
+      color:
+        activeMediaTab === "all"
+          ? "#fff"
+          : "#555",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
       cursor: "pointer",
-      transition: "all 0.3s ease",
+    }}
+  >
+    <Grid3X3 size={21} />
+  </button>
+
+  {/* PHOTOS */}
+  <button
+    type="button"
+    onClick={() => {
+  const allVideos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  allVideos.forEach((video) => {
+    video.muted = true;
+    video.pause();
+  });
+
+  setAllMediaMuted((prev) => {
+    const next = { ...prev };
+
+    allMedia.forEach((item) => {
+      if (item.type === "video") {
+        next[item.id] = true;
+      }
+    });
+
+    return next;
+  });
+
+  setActiveMediaTab("photos");
+    }}
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "12px",
+      border: "none",
+      background:
+        activeMediaTab === "photos"
+          ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+          : "#f3f4f6",
+      color:
+        activeMediaTab === "photos"
+          ? "#fff"
+          : "#555",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+    }}
+  >
+    <Image size={21} />
+  </button>
+
+  {/* VIDEOS */}
+  <button
+    type="button"
+    onClick={() => {
+  const allVideos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  allVideos.forEach((video) => {
+    video.muted = true;
+    video.pause();
+  });
+
+  setAllMediaMuted((prev) => {
+    const next = { ...prev };
+
+    allMedia.forEach((item) => {
+      if (item.type === "video") {
+        next[item.id] = true;
+      }
+    });
+
+    return next;
+  });
+
+  setActiveMediaTab("videos");
+    }}
+    style={{
+      width: "44px",
+      height: "44px",
+      borderRadius: "12px",
+      border: "none",
+      background:
+        activeMediaTab === "videos"
+          ? "linear-gradient(135deg,#7c3aed,#9333ea)"
+          : "#f3f4f6",
+      color:
+        activeMediaTab === "videos"
+          ? "#fff"
+          : "#555",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+    }}
+  >
+    <Video size={21} />
+  </button>
+</div>
+
+{/* ALL MEDIA */}
+
+{activeMediaTab === "all" && (
+  <div
+    id="all-media"
+    style={{
+      width: "100%",
+      padding: 0,
+      margin: 0,
+    }}
+  >
+    {allMedia.map((media) => (
+      <div
+        key={`${media.type}-${media.id}`}
+        style={{
+          width: "100%",
+          height: "100dvh",
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          background: "#000",
+          scrollSnapAlign: "start",
+        }}
+      >
+        {media.type === "photo" ? (
+          <img
+            src={media.url}
+            alt=""
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        ) : (
+  <div
+    style={{
+      position: "relative",
+      width: "100%",
+      height: "100%",
+    }}
+  >
+
+    {!allMediaPlaying[media.id] && (
+  <img
+    src={media.thumbnail_url}
+    alt=""
+    style={{
+      position: "absolute",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "contain",
+      display: "block",
+      background: "#000",
+      zIndex: 1,
     }}
   />
-))}
-    
-</div>
-      
+)}
 
-      {/* VIDEOS */}
-
- <h2
-  style={{
-    color: "#7c3aed",
-    fontSize: "16px",
-    textAlign: "left",
-    marginTop: "0px",
-    marginBottom: "2px",
-    marginLeft: isMobile ? "10px" : "40px",
-    fontWeight: "700",
-
+    <video
+  src={media.url}
+  poster={media.thumbnail_url}
+  muted={allMediaMuted[media.id] ?? true}
+  playsInline
+  preload="auto"
+  onLoadStart={() => {
+    setAllMediaPlaying((prev) => ({
+      ...prev,
+      [media.id]: false,
+    }));
   }}
->
-  {t.videos}
-</h2>
+  onPlaying={(e) => {
+  const video = e.currentTarget;
 
-     <div
-  id="videos"
-  style={{
-    display: "grid",
-    gridTemplateColumns: isMobile
-  ? "repeat(3, 1fr)"
-  : "repeat(6, 1fr)",
-    gap: "12px", 
-    paddingLeft: isMobile ? "10px" : "40px",
-    paddingRight: isMobile ? "10px" : "40px",
-  }}
->
-  {videos.map((video, index) => (
-  <div
-  key={video.id}
-  onClick={() => setSelectedVideoIndex(index)}
-  onTouchStart={() => setSelectedVideoIndex(index)}
-  style={{
-    cursor: "pointer",
-    width: "100%",
-    height: isMobile ? "95px" : "100px",
-    overflow: "hidden",
-    borderRadius: "20px",
-    position: "relative",
-  }}
->
-  <img
-  src={
-    video.thumbnail_url ||
-    "https://via.placeholder.com/300x200?text=Video"
+  if ("requestVideoFrameCallback" in video) {
+    video.requestVideoFrameCallback(() => {
+      setAllMediaPlaying((prev) => ({
+        ...prev,
+        [media.id]: true,
+      }));
+    });
+  } else {
+    requestAnimationFrame(() => {
+      setAllMediaPlaying((prev) => ({
+        ...prev,
+        [media.id]: true,
+      }));
+    });
   }
-  alt="Video Thumbnail"
-  onError={async (e) => {
-    const image = e.currentTarget;
-
-    if (image.dataset.fallbackApplied === "true") {
-      return;
-    }
-
-    image.dataset.fallbackApplied = "true";
-
-    if (video.thumbnail_url) {
-      const cachedUrl = await getCachedMediaUrl(
-        video.thumbnail_url
-      );
-
-      if (cachedUrl !== video.thumbnail_url) {
-        image.src = cachedUrl;
-      }
-    }
-  }}
+}}
   style={{
     width: "100%",
     height: "100%",
-    objectFit: "cover",
-    pointerEvents: "none",
-    borderRadius: "20px",
-    border: "1px solid #e8e8e8",
-    boxShadow: "0 12px 30px rgba(0,0,0,0.15)",
+    objectFit: "contain",
+    display: "block",
+    background: "#000",
+    opacity: allMediaPlaying[media.id] ? 1 : 0,
+    zIndex: 2,
   }}
 />
-    </div>
-  ))}
-</div>
+          
+        <button
+          onClick={(e) => {
+  e.stopPropagation();
+
+  const video =
+    e.currentTarget.parentElement?.querySelector(
+      "video"
+    );
+
+  if (!video) return;
+
+  const nextMuted = !video.muted;
+
+  const allVideos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  allVideos.forEach((otherVideo) => {
+    otherVideo.muted = nextMuted;
+  });
+
+  const nextStates: Record<string, boolean> = {};
+
+  allMedia.forEach((item) => {
+    if (item.type === "video") {
+      nextStates[item.id] = nextMuted;
+    }
+  });
+
+  setAllMediaMuted(nextStates);
+}}
+          style={{
+            position: "absolute",
+            bottom: "24px",
+            right: "18px",
+            width: "46px",
+            height: "46px",
+            borderRadius: "50%",
+            border: "none",
+            background: "#fff",
+            color: "#000",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 10,
+          }}
+        >
+          {allMediaMuted[media.id] ?? true ? (
+            <VolumeX size={23} strokeWidth={2.4} />
+          ) : (
+            <Volume2 size={23} strokeWidth={2.4} />
+          )}
+        </button>
+        </div>
+
+        )}
+      </div>
+    ))}
+  </div>
+)}
+
+{/* PHOTOS */}
+
+{activeMediaTab === "photos" && (
+  <div
+    id="photos"
+    style={{
+      display: "grid",
+      gridTemplateColumns: isMobile
+        ? "repeat(3, 1fr)"
+        : "repeat(6, 1fr)",
+      gap: "0px",
+      marginBottom: "2px",
+      paddingLeft: isMobile ? "10px" : "40px",
+      paddingRight: isMobile ? "10px" : "40px",
+    }}
+  >
+    {photos.map((photo, index) => (
+      <img
+        key={photo.id}
+        src={photo.image_url}
+        alt="Photo"
+        onError={async (e) => {
+          const image = e.currentTarget;
+
+          if (
+            image.dataset.fallbackApplied ===
+            "true"
+          ) {
+            return;
+          }
+
+          image.dataset.fallbackApplied = "true";
+
+          const cachedUrl =
+            await getCachedMediaUrl(
+              photo.image_url
+            );
+
+          if (
+            cachedUrl !== photo.image_url
+          ) {
+            image.src = cachedUrl;
+          }
+        }}
+        onClick={() =>
+          setSelectedIndex(index)
+        }
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform =
+            "scale(1.03)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform =
+            "scale(1)";
+        }}
+        style={{
+          width: "100%",
+          height: isMobile ? "160px" : "190px",
+          objectFit: "cover",
+          borderRadius: "0px",
+          border: "1px solid #e8e8e8",
+          boxShadow:
+            "0 12px 30px rgba(0,0,0,0.15)",
+          cursor: "pointer",
+          transition:
+            "all 0.3s ease",
+        }}
+      />
+    ))}
+  </div>
+)}
+
+{/* VIDEOS */}
+
+{activeMediaTab === "videos" && (
+  <div
+    id="videos"
+    style={{
+      display: "grid",
+      gridTemplateColumns: isMobile
+        ? "repeat(3, 1fr)"
+        : "repeat(6, 1fr)",
+      gap: "0px",
+      paddingLeft: isMobile ? "10px" : "40px",
+      paddingRight: isMobile ? "10px" : "40px",
+    }}
+  >
+    {videos.map((video, index) => (
+      <div
+        key={video.id}
+        onClick={() =>
+          setSelectedVideoIndex(index)
+        }
+        style={{
+          cursor: "pointer",
+          width: "100%",
+          height: isMobile ? "160px" : "190px",
+          overflow: "hidden",
+          borderRadius: "0px",
+          position: "relative",
+        }}
+      >
+        <img
+          src={
+            video.thumbnail_url ||
+            "https://via.placeholder.com/300x200?text=Video"
+          }
+          alt="Video Thumbnail"
+          onError={async (e) => {
+            const image =
+              e.currentTarget;
+
+            if (
+              image.dataset
+                .fallbackApplied ===
+              "true"
+            ) {
+              return;
+            }
+
+            image.dataset.fallbackApplied =
+              "true";
+
+            if (video.thumbnail_url) {
+              const cachedUrl =
+                await getCachedMediaUrl(
+                  video.thumbnail_url
+                );
+
+              if (
+                cachedUrl !==
+                video.thumbnail_url
+              ) {
+                image.src = cachedUrl;
+              }
+            }
+          }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            pointerEvents: "none",
+            borderRadius: "0px",
+            border:
+              "1px solid #e8e8e8",
+            boxShadow:
+              "0 12px 30px rgba(0,0,0,0.15)",
+          }}
+        />
+      </div>
+    ))}
+  </div>
+)}
 
 <footer
   style={{
@@ -1328,284 +1842,318 @@ marginRight: "0",
 )}
 
 
- {selectedIndex !== null && (
+ {/* FULLSCREEN PHOTO VIEWER */}
+
+{selectedIndex !== null && (
   <div
-    onClick={() => setSelectedIndex(null)}
-    onTouchStart={(e) => {
-      setTouchStartX(e.changedTouches[0].clientX);
-    }}
-    onTouchEnd={(e) => {
-      const touchEndX = e.changedTouches[0].clientX;
-      const diff = touchStartX - touchEndX;
-
-      if (diff > 50) {
-        setSelectedIndex(
-          selectedIndex === photos.length - 1
-            ? 0
-            : selectedIndex + 1
-        );
-      }
-
-      if (diff < -50) {
-        setSelectedIndex(
-          selectedIndex === 0
-            ? photos.length - 1
-            : selectedIndex - 1
-        );
-      }
-    }}
+    ref={photoViewerRef}
     style={{
       position: "fixed",
       inset: 0,
-      background: "rgba(0,0,0,0.95)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
       zIndex: 99999,
+      background: "#000",
+      overflowY: "auto",
+      overflowX: "hidden",
+      scrollSnapType: "y mandatory",
+      WebkitOverflowScrolling: "touch",
+    }}
+    onScroll={(e) => {
+      const viewer = e.currentTarget;
+      const index = Math.round(
+        viewer.scrollTop / window.innerHeight
+      );
+
+      if (
+        index >= 0 &&
+        index < photos.length &&
+        index !== photoViewerCurrentIndex
+      ) {
+        setPhotoViewerCurrentIndex(index);
+      }
     }}
   >
+    {photos.map((photo, index) => (
+      <div
+        key={photo.id}
+        style={{
+          width: "100%",
+          height: "100dvh",
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#000",
+          scrollSnapAlign: "start",
+          scrollSnapStop: "always",
+          position: "relative",
+        }}
+      >
+        <img
+          ref={(element) => {
+            fullscreenPhotoRefs.current[index] =
+              element;
+          }}
+          src={photo.image_url}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            display: "block",
+          }}
+        />
+      </div>
+    ))}
+
+    {/* CLOSE */}
     <button
-  onClick={(e) => {
-    e.stopPropagation();
-    setSelectedIndex(
-      selectedIndex === 0
-        ? photos.length - 1
-        : selectedIndex - 1
-    );
-  }}
-  style={{
-    position: "fixed",
-    left: "20px",
-    top: "50%",
-    transform: "translateY(-50%)",
-    zIndex: 99999,
-    background: "transparent",
-    border: "none",
-    fontSize: "25px",
-    cursor: "pointer",
-  }}
->
- <ChevronLeft
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
-
-<img
-  src={photos[selectedIndex].image_url}
-  alt=""
-  style={{
-    maxWidth: "95%",
-    maxHeight: "90vh",
-    objectFit: "contain",
-  }}
-/>
-
-<button
-  onClick={(e) => {
-    e.stopPropagation();
-    setSelectedIndex(
-      selectedIndex === photos.length - 1
-        ? 0
-        : selectedIndex + 1
-    );
-  }}
-  style={{
-    position: "fixed",
-    right: "20px",
-    top: "50%",
-    transform: "translateY(-50%)",
-    zIndex: 99999,
-    background: "transparent",
-    border: "none",
-    fontSize: "25px",
-    cursor: "pointer",
-  }}
->
-  <ChevronRight
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
-
-<button
-  onClick={() => setSelectedIndex(null)}
-  style={{
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    zIndex: 99999,
-    background: "transparent",
-    border: "none",
-    fontSize: "25px",
-    cursor: "pointer",
-  }}
->
-  <X
-  size={24}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
+      onClick={() => {
+        setSelectedIndex(null);
+        setPhotoViewerCurrentIndex(null);
+      }}
+      style={{
+        position: "fixed",
+        top: "18px",
+        right: "18px",
+        zIndex: 100000,
+        width: "42px",
+        height: "42px",
+        borderRadius: "50%",
+        border: "none",
+        background: "#fff",
+        color: "#000",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+      }}
+    >
+      <X size={24} strokeWidth={2.4} />
+    </button>
   </div>
 )}
 
 
+{/* FULLSCREEN VIDEO VIEWER */}
+
 {selectedVideoIndex !== null && (
-<div
-  onClick={() => setSelectedVideoIndex(null)}
-  onTouchStart={(e) => {
-    setTouchStartX(e.changedTouches[0].clientX);
-  }}
-  onTouchEnd={(e) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
+  <div
+    ref={videoViewerRef}
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 99999,
+      background: "#000",
+      overflowY: "auto",
+      overflowX: "hidden",
+      scrollSnapType: "y mandatory",
+      WebkitOverflowScrolling: "touch",
+    }}
+    onScroll={(e) => {
+  const viewer = e.currentTarget;
 
-    if (diff > 50) {
-      setSelectedVideoIndex(
-        selectedVideoIndex === videos.length - 1
-          ? 0
-          : selectedVideoIndex + 1
-      );
-    }
+  const index = Math.round(
+    viewer.scrollTop / viewer.clientHeight
+  );
 
-    if (diff < -50) {
-      setSelectedVideoIndex(
-        selectedVideoIndex === 0
-          ? videos.length - 1
-          : selectedVideoIndex - 1
-      );
+  const videoElements =
+    viewer.querySelectorAll<HTMLVideoElement>("video");
+
+  videoElements.forEach((video, videoIndex) => {
+    if (videoIndex === index) {
+      // Keep the same mute state when moving to another video
+      video.muted = videoViewerMuted;
+
+      video.play().catch(() => {});
+    } else {
+      video.pause();
     }
-  }}
-  style={{
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.95)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 99999,
-  touchAction: "pan-y",
+  });
+
+  if (
+    index >= 0 &&
+    index < videos.length &&
+    index !== selectedVideoIndex
+  ) {
+    setSelectedVideoIndex(index);
+  }
 }}
->
-  <ChevronLeft
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
+  >
+    {videos.map((video, index) => (
+      <div
+        key={video.id}
+        style={{
+          width: "100%",
+          height: "100dvh",
+          minHeight: "100dvh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#000",
+          scrollSnapAlign: "start",
+          scrollSnapStop: "always",
+          position: "relative",
+        }}
+      >
+
+        {!videoViewerReady[index] && (
+  <img
+    src={video.thumbnail_url || ""}
+    alt=""
+    style={{
+      position: "absolute",
+      inset: 0,
+      width: "100%",
+      height: "100%",
+      objectFit: "contain",
+      zIndex: 1,
+    }}
+  />
+)}
+        <video
+          ref={(element) => {
+            fullscreenVideoRefs.current[index] =
+              element;
+          }}
+          src={video.video_url}
+          poster={video.thumbnail_url || undefined}
+          onLoadStart={() => {
+    setVideoViewerReady((prev) => ({
+      ...prev,
+      [index]: false,
+    }));
+  }}
+  onPlaying={(e) => {
+    const videoElement = e.currentTarget;
+
+    if ("requestVideoFrameCallback" in videoElement) {
+      videoElement.requestVideoFrameCallback(() => {
+        setVideoViewerReady((prev) => ({
+          ...prev,
+          [index]: true,
+        }));
+      });
+    } else {
+      requestAnimationFrame(() => {
+        setVideoViewerReady((prev) => ({
+          ...prev,
+          [index]: true,
+        }));
+      });
+    }
+  }}
+          muted
+          playsInline
+          autoPlay={index === selectedVideoIndex}
+          controls={
+            videoViewerControlsVisible === index
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+
+            setVideoViewerControlsVisible(
+              videoViewerControlsVisible === index
+                ? null
+                : index
+            );
+          }}
+          onLoadedMetadata={(e) => {
+            if (index === selectedVideoIndex) {
+              e.currentTarget.play().catch(() => {});
+            }
+          }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            display: "block",
+            background: "#000",
+            opacity: videoViewerReady[index] ? 1 : 0,
+zIndex: 2,
+          }}
+        />
+      </div>
+    ))}
+
+    {/* MUTE / UNMUTE */}
+
 <button
   onClick={(e) => {
     e.stopPropagation();
 
-    setSelectedVideoIndex(
-      selectedVideoIndex === 0
-        ? videos.length - 1
-        : selectedVideoIndex - 1
-    );
+    const video =
+      fullscreenVideoRefs.current[
+        selectedVideoIndex
+      ];
+
+    if (!video) return;
+
+    const nextMuted = !video.muted;
+
+    video.muted = nextMuted;
+    setVideoViewerMuted(nextMuted);
   }}
   style={{
-  position: "fixed",
-  left: "20px",
-  top: "50%",
-  transform: "translateY(-50%)",
-  zIndex: 99999,
-  background: "transparent",
-  border: "none",
-  fontSize: "25px",
-  color: "#000",
-  cursor: "pointer",
-}}
+    position: "fixed",
+    bottom: "28px",
+    right: "18px",
+    zIndex: 100000,
+    width: "46px",
+    height: "46px",
+    borderRadius: "50%",
+    border: "none",
+    background: "#fff",
+    color: "#000",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+  }}
 >
-  <ChevronLeft
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
+  {videoViewerMuted ? (
+    <VolumeX size={23} strokeWidth={2.4} />
+  ) : (
+    <Volume2 size={23} strokeWidth={2.4} />
+  )}
 </button>
 
-  <video
-  key={selectedVideoIndex}
-  controls
-  autoPlay
-  playsInline
-  disablePictureInPicture
-  controlsList="nofullscreen"
-  onClick={(e) => e.stopPropagation()}
-  style={{
-    maxWidth: "95%",
-    maxHeight: "90vh",
-  }}
->
-      <source
-        src={
-          videos[selectedVideoIndex]
-            .video_url
-        }
-        type="video/mp4"
-      />
-    </video>
-
+    {/* CLOSE */}
     <button
       onClick={(e) => {
   e.stopPropagation();
-        setSelectedVideoIndex(
-          selectedVideoIndex ===
-            videos.length - 1
-            ? 0
-            : selectedVideoIndex + 1
-        );
+
+  fullscreenVideoRefs.current.forEach((video) => {
+    if (video) {
+      video.muted = true;
+      video.pause();
+    }
+  });
+
+  setVideoViewerMuted(true);
+  setSelectedVideoIndex(null);
+  setVideoViewerControlsVisible(null);
+}}
+      style={{
+        position: "fixed",
+        top: "18px",
+        right: "18px",
+        zIndex: 100000,
+        width: "42px",
+        height: "42px",
+        borderRadius: "50%",
+        border: "none",
+        background: "#fff",
+        color: "#000",
+
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
       }}
-      
-  
-  style={{
-  position: "fixed",
-  right: "20px",
-  top: "50%",
-  transform: "translateY(-50%)",
-  zIndex: 99999,
-  background: "transparent",
-  border: "none",
-  fontSize: "25px",
-  color: "#000",
-  cursor: "pointer",
-}}
->
-  <ChevronRight
-  size={28}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
-
-    <button
-      onClick={() =>
-        setSelectedVideoIndex(null)
-      }
-      
-  style={{
-  position: "fixed",
-  top: "20px",
-  right: "20px",
-  zIndex: 99999,
-  background: "transparent",
-  border: "none",
-  fontSize: "25px",
-  color: "#000",
-  cursor: "pointer",
-}}
-
->
-  <X
-  size={24}
-  strokeWidth={2.6}
-  color="#111"
-/>
-</button>
+    >
+      <X size={24} strokeWidth={2.4} />
+    </button>
   </div>
-
-
 )}
 </main>
 );

@@ -14,6 +14,7 @@ import { Pin } from "lucide-react";
 
 import ImageViewer from "./ImageViewer";
 import VideoViewer from "./VideoViewer";
+import MediaViewer from "@/app/chat/MediaViewer";
 import MessageMenu from "./MessageMenu";
 import MediaPreview from "./MediaPreview";
 import ChatHeader from "./ChatHeader";
@@ -342,6 +343,8 @@ const longPressTriggeredRef =
 
 
 const fileInputRef = useRef<HTMLInputElement>(null);
+const videoInputRef = useRef<HTMLInputElement | null>(null);
+
 const cameraInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 const typingActiveRef = useRef(false);
@@ -375,11 +378,26 @@ const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
 const [previewFile, setPreviewFile] = useState<File | null>(null);
 const [showPreview, setShowPreview] = useState(false);
+const [previewFiles, setPreviewFiles] =
+  useState<File[]>([]);
+
+const [previewUrls, setPreviewUrls] =
+  useState<string[]>([]);
+
 const [showImageViewer, setShowImageViewer] = useState(false);
 const [viewerImage, setViewerImage] = useState("");
 const [viewerName, setViewerName] = useState("");
 const [showVideoViewer, setShowVideoViewer] = useState(false);
 const [viewerVideo, setViewerVideo] = useState("");
+const [viewerMediaIndex, setViewerMediaIndex] =
+  useState(0);
+
+  const conversationMedia = messages.filter(
+  (message) =>
+    message.message_type === "image" ||
+    message.message_type === "video"
+);
+
 const [selectedMessage, setSelectedMessage] = useState<any>(null);
 const [showMessageMenu, setShowMessageMenu] = useState(false);
 
@@ -1651,12 +1669,23 @@ function resetComposer() {
 function handleFileChange(
   e: React.ChangeEvent<HTMLInputElement>
 ) {
-  const file = e.target.files?.[0];
+  const files = Array.from(e.target.files || []);
 
-  if (!file) return;
+  if (files.length === 0) return;
 
-  setPreviewFile(file);
-  setPreviewUrl(URL.createObjectURL(file));
+  const urls = files.map((file) =>
+    URL.createObjectURL(file)
+  );
+
+  setPreviewFiles(files);
+  setPreviewUrls(urls);
+
+  // Keep the existing single-media preview
+  // connected while we transition to the
+  // multi-media layout.
+  setPreviewFile(files[0]);
+  setPreviewUrl(urls[0]);
+
   setShowPreview(true);
 
   e.target.value = "";
@@ -2618,32 +2647,76 @@ setTimeout(() => {
 }
 
 
-const cancelUpload = (uploadId: string) => {
-  console.log("Cancelling upload:", uploadId);
-
-  // Get the actual TUS upload
-  const upload = activeUploadsRef.current[uploadId];
-
-  // Stop the real upload first
-  if (upload) {
-    upload.abort();
-    delete activeUploadsRef.current[uploadId];
-  }
-
-  // Remove the temporary message
-  setPendingUploads((prev) =>
-    prev.filter(
-      (msg) =>
-        msg.upload_id !== uploadId &&
-        msg.id !== uploadId
-    )
+const cancelUpload = (uploadIdOrGroupId: string) => {
+  console.log(
+    "Cancelling upload:",
+    uploadIdOrGroupId
   );
 
-  // Remove its progress
-  setUploadProgress((prev) => {
-    const next = { ...prev };
-    delete next[uploadId];
-    return next;
+  setPendingUploads((prev) => {
+    const groupMessages = prev.filter(
+      (msg) =>
+        msg.media_group_id ===
+        uploadIdOrGroupId
+    );
+
+    // GROUP UPLOAD
+    if (groupMessages.length > 0) {
+      groupMessages.forEach((msg) => {
+        if (msg.upload_id) {
+          const upload =
+            activeUploadsRef.current[
+              msg.upload_id
+            ];
+
+          if (upload) {
+            upload.abort();
+            delete activeUploadsRef.current[
+              msg.upload_id
+            ];
+          }
+
+          setUploadProgress((current) => {
+            const next = { ...current };
+            delete next[msg.upload_id!];
+            return next;
+          });
+        }
+      });
+
+      return prev.filter(
+        (msg) =>
+          msg.media_group_id !==
+          uploadIdOrGroupId
+      );
+    }
+
+    // SINGLE UPLOAD
+    const upload =
+      activeUploadsRef.current[
+        uploadIdOrGroupId
+      ];
+
+    if (upload) {
+      upload.abort();
+
+      delete activeUploadsRef.current[
+        uploadIdOrGroupId
+      ];
+    }
+
+    setUploadProgress((current) => {
+      const next = { ...current };
+      delete next[uploadIdOrGroupId];
+      return next;
+    });
+
+    return prev.filter(
+      (msg) =>
+        msg.upload_id !==
+          uploadIdOrGroupId &&
+        msg.id !== uploadIdOrGroupId
+    );
   });
 };
 
@@ -2781,7 +2854,9 @@ async function uploadFile(
   uploadId?: string,
   conversationIdOverride?: string,
   voiceDuration?: number,
-  voiceReplyMessage?: any
+  voiceReplyMessage?: any,
+  mediaGroupId?: string | null,
+  sendPushNotification: boolean = true
 ) {
   const activeConversationId =
     conversationIdOverride ?? conversationId;
@@ -3131,13 +3206,16 @@ if (uploadFile.type.startsWith("video/")) {
   await supabase
     .from("messages")
     .insert({
-      conversation_id: activeConversationId,
-      sender: "member",
+  conversation_id: activeConversationId,
+  sender: "member",
 
-      message_type: voiceDuration !== undefined
-  ? "voice"
-  : uploadFile.type.startsWith("image/")
-  ? "image"
+  media_group_id: mediaGroupId,
+
+  message_type:
+    voiceDuration !== undefined
+      ? "voice"
+      : uploadFile.type.startsWith("image/")
+        ? "image"
   : uploadFile.type.startsWith("video/")
   ? "video"
   : "file",
@@ -3228,47 +3306,53 @@ if (error) {
  * The media message was successfully saved.
  * Notify the MSpace admin only.
  */
-try {
-  const pushResponse = await fetch(
-    "/api/push/send",
-    {
-      method: "POST",
+if (sendPushNotification) {
+  try {
+    fetch("/api/push/send", {
+    method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+    headers: {
+      "Content-Type": "application/json",
+    },
 
-      body: JSON.stringify({
-        body:
-  voiceDuration !== undefined
-    ? "🎤 Voice message"
-    : uploadFile.type.startsWith("image/")
-    ? "📷Photo"
-    : uploadFile.type.startsWith("video/")
-    ? "🎥Video"
-    : "📎File",
+    body: JSON.stringify({
+      body:
+        voiceDuration !== undefined
+          ? "🎤 Voice message"
+          : uploadFile.type.startsWith("image/")
+          ? "📷Photo"
+          : uploadFile.type.startsWith("video/")
+          ? "🎥Video"
+          : "📎File",
 
-        conversationId: activeConversationId,
+      conversationId: activeConversationId,
 
-        targetMemberId:
-          "11111111-1111-1111-1111-111111111111",
-      }),
-    }
-  );
+      targetMemberId:
+        "11111111-1111-1111-1111-111111111111",
+    }),
+  })
+    .then(async (response) => {
+      const pushResult = await response.json();
 
-  const pushResult =
-    await pushResponse.json();
-
-  console.log(
-    "Member → Admin media push result:",
-    pushResult
-  );
+      console.log(
+        "Member → Admin media push result:",
+        pushResult
+      );
+    })
+    .catch((pushError) => {
+      console.error(
+        "Member → Admin media push error:",
+        pushError
+      );
+    });
 
 } catch (pushError) {
   console.error(
     "Member → Admin media push error:",
     pushError
   );
+}
+
 }
 
 
@@ -3622,17 +3706,15 @@ console.log("RENDER profilePhoto:", profilePhoto);
 return (
   <>
 
-<ImageViewer
-  open={showImageViewer}
-  image={viewerImage}
-  name={viewerName}
-  onClose={() => setShowImageViewer(false)}
-/>
 
-<VideoViewer
-  open={showVideoViewer}
-  video={viewerVideo}
-  onClose={() => setShowVideoViewer(false)}
+<MediaViewer
+  open={showImageViewer || showVideoViewer}
+  media={conversationMedia}
+  initialIndex={viewerMediaIndex}
+  onClose={() => {
+    setShowImageViewer(false);
+    setShowVideoViewer(false);
+  }}
 />
 
 <MessageMenu
@@ -3783,16 +3865,20 @@ onDeleteForEveryone={async () => {
 }}
 
   onPhoto={() => {
-    setShowAttachmentMenu(false);
+  setShowAttachmentMenu(false);
 
-    fileInputRef.current?.click();
-  }}
+  document
+    .getElementById("mspace-photo-input")
+    ?.click();
+}}
 
-  onVideo={() => {
-    setShowAttachmentMenu(false);
+onVideo={() => {
+  setShowAttachmentMenu(false);
 
-    fileInputRef.current?.click();
-  }}
+  document
+    .getElementById("mspace-video-input")
+    ?.click();
+}}
 
   onLocation={() => {
   setShowAttachmentMenu(false);
@@ -4010,6 +4096,8 @@ setMessages(prev => [
   open={showPreview}
   previewFile={previewFile}
   previewUrl={previewUrl}
+  previewFiles={previewFiles}
+  previewUrls={previewUrls}
 
   onCancel={() => {
     setShowPreview(false);
@@ -4017,181 +4105,374 @@ setMessages(prev => [
     setPreviewUrl("");
   }}
 
-  onSend={async () => {
-  if (!previewFile) return;
-
-  // Keep references to the file and preview URL
-  // before clearing the preview state.
-  const fileToUpload = previewFile;
-  const localPreviewUrl = previewUrl;
-
-  const tempId = "temp-" + Date.now();
-  const uploadId = createId();
-
-  let temporaryThumbnail: string | null = null;
-
-if (fileToUpload.type.startsWith("video/")) {
-  temporaryThumbnail =
-    await createTemporaryVideoThumbnail(
-      fileToUpload
-    );
-}
-
-  // Show the video immediately in the chat while uploading.
-  setPendingUploads((prev) => [
-    ...prev,
-    {
-      id: tempId,
-      upload_id: uploadId,
-      sender: "member",
-      message_type: fileToUpload.type.startsWith("image/")
-        ? "image"
-        : "video",
-      file_url: localPreviewUrl,
-      thumbnail_url: temporaryThumbnail,
-      file_name: fileToUpload.name,
-      created_at: new Date().toISOString(),
-      uploading: true,
-      offline: !navigator.onLine,
-      progress: 0,
-      is_read: false,
-    },
-  ]);
-
-  setTimeout(() => {
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "smooth",
-  });
-}, 50);
-
- 
-
-  // IMPORTANT:
-  // Close and completely clear the full-screen preview
-  // immediately when Send is pressed.
-  setShowPreview(false);
-setPreviewFile(null);
-setPreviewUrl("");
-
-// OFFLINE MEDIA QUEUE
-if (!navigator.onLine) {
-  try {
-    await saveOfflineUpload({
-      id: tempId,
-      conversation_id: conversationId!,
-      upload_id: uploadId,
-      file: fileToUpload,
-    });
-
-    console.log(
-      "MSpace: media queued for offline upload:",
-      fileToUpload.name
-    );
-
-    return;
-  } catch (error) {
-    console.error(
-      "MSpace: failed to save offline media:",
-      error
-    );
-
-    // Remove the temporary message if it could not
-    // be saved into the offline queue.
-    setPendingUploads((prev) =>
-      prev.filter(
-        (message) => message.id !== tempId
-      )
-    );
-
-    return;
-  }
-}
-
-try {
-    // Upload using the captured file, NOT previewFile state.
-    const insertedMessage =
-  await uploadFile(fileToUpload, uploadId);
-
-if (!insertedMessage?.file_url) {
-  throw new Error("Supabase did not return a file URL");
-}
-
-// Wait until the real Supabase image is fully loaded
-if (insertedMessage.message_type === "image") {
-  await new Promise<void>((resolve, reject) => {
-    const img = new Image();
-
-    img.onload = () => resolve();
-
-    img.onerror = () => {
-      reject(
-        new Error("Real Supabase image failed to load")
-      );
-    };
-
-    img.src = insertedMessage.file_url;
-  });
-}
-
-// Wait until the real Supabase video thumbnail is fully loaded
-if (
-  insertedMessage.message_type === "video" &&
-  insertedMessage.reply_thumbnail_url
-) {
-  await new Promise<void>((resolve, reject) => {
-    const img = new Image();
-
-    img.onload = () => resolve();
-
-    img.onerror = () => {
-      reject(
-        new Error(
-          "Real Supabase video thumbnail failed to load"
-        )
-      );
-    };
-
-    img.src = insertedMessage.reply_thumbnail_url;
-  });
-}
-
-
-// Put the real message into the chat
-setMessages((prev) => {
-  const alreadyExists = prev.some(
-    (message) => message.id === insertedMessage.id
+  onDelete={(index) => {
+  setPreviewFiles((prev) =>
+    prev.filter((_, i) => i !== index)
   );
 
-  if (alreadyExists) {
-    return prev;
+  setPreviewUrls((prev) =>
+    prev.filter((_, i) => i !== index)
+  );
+
+  setPreviewFile((prev) => {
+    if (!prev) return null;
+
+    return previewFiles[index] === prev
+      ? previewFiles.filter(
+          (_, i) => i !== index
+        )[0] ?? null
+      : prev;
+  });
+
+  setPreviewUrl((prev) => {
+    if (!prev) return null;
+
+    return previewUrls[index] === prev
+      ? previewUrls.filter(
+          (_, i) => i !== index
+        )[0] ?? null
+      : prev;
+  });
+}}
+
+  onSend={async () => {
+  const filesToUpload =
+    previewFiles.length > 0
+      ? previewFiles
+      : previewFile
+        ? [previewFile]
+        : [];
+
+  const urlsToUpload =
+    previewUrls.length > 0
+      ? previewUrls
+      : previewUrl
+        ? [previewUrl]
+        : [];
+
+  if (filesToUpload.length === 0) return;
+
+  const mediaGroupId =
+    filesToUpload.length > 1
+      ? crypto.randomUUID()
+      : null;
+
+  // Keep references before clearing the preview.
+  setShowPreview(false);
+  setPreviewFiles([]);
+  setPreviewUrls([]);
+  setPreviewFile(null);
+  setPreviewUrl("");
+
+  /*
+   * STEP 1
+   * Prepare ALL temporary messages first.
+   */
+  const preparedUploads: {
+  fileToUpload: File;
+  localPreviewUrl: string;
+  tempId: string;
+  uploadId: string;
+  messageType: "image" | "video";
+  temporaryThumbnail: string | null;
+}[] = [];
+
+  for (
+    let index = 0;
+    index < filesToUpload.length;
+    index++
+  ) {
+    const fileToUpload =
+      filesToUpload[index];
+
+    const localPreviewUrl =
+      urlsToUpload[index];
+
+    const tempId =
+      "temp-" + createId();
+
+    const uploadId = createId();
+
+    const messageType =
+      fileToUpload.type.startsWith("image/")
+        ? "image"
+        : "video";
+
+    let temporaryThumbnail:
+      string | null = null;
+
+    if (messageType === "video") {
+      temporaryThumbnail =
+        await createTemporaryVideoThumbnail(
+          fileToUpload
+        );
+    }
+
+    preparedUploads.push({
+      fileToUpload,
+      localPreviewUrl,
+      tempId,
+      uploadId,
+      messageType,
+      temporaryThumbnail,
+    });
   }
 
-  return [
+  /*
+   * STEP 2
+   * Put ALL temporary messages into chat at once.
+   */
+  setPendingUploads((prev) => [
     ...prev,
-    insertedMessage,
-  ];
-});
+    ...preparedUploads.map(
+      ({
+        localPreviewUrl,
+        tempId,
+        uploadId,
+        messageType,
+        temporaryThumbnail,
+        fileToUpload,
+      }) => ({
+        id: tempId,
+        upload_id: uploadId,
+        sender: "member",
+        message_type: messageType,
+        file_url: localPreviewUrl,
+        thumbnail_url:
+          temporaryThumbnail,
+        file_name:
+          fileToUpload.name,
+        created_at:
+          new Date().toISOString(),
 
-// Remove the temporary uploading message
-setPendingUploads((prev) =>
-  prev.filter(
-    (message) => message.id !== tempId
-  )
+        media_group_id:
+          mediaGroupId,
+
+        uploading: true,
+        offline: !navigator.onLine,
+        progress: 0,
+        is_read: false,
+      })
+    ),
+  ]);
+
+  /*
+   * Scroll once after the complete group
+   * has been inserted.
+   */
+  setTimeout(() => {
+    messagesRef.current?.scrollTo({
+      top:
+        messagesRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, 50);
+
+  /*
+   * STEP 3
+   * Now upload each file.
+   */
+  await Promise.all(
+  preparedUploads.map(async (prepared) => {
+    const {
+      fileToUpload,
+      tempId,
+      uploadId,
+    } = prepared;
+
+    // OFFLINE MEDIA QUEUE
+    if (!navigator.onLine) {
+      try {
+        await saveOfflineUpload({
+          id: tempId,
+          conversation_id:
+            conversationId!,
+          upload_id: uploadId,
+          file: fileToUpload,
+        });
+
+        console.log(
+          "MSpace: media queued for offline upload:",
+          fileToUpload.name
+        );
+      } catch (error) {
+        console.error(
+          "MSpace: failed to save offline media:",
+          error
+        );
+
+        setPendingUploads((prev) =>
+          prev.filter(
+            (message) =>
+              message.id !== tempId
+          )
+        );
+      }
+
+      return;
+    }
+
+    try {
+      const insertedMessage =
+  await uploadFile(
+    fileToUpload,
+    uploadId,
+    undefined,
+    undefined,
+    undefined,
+    mediaGroupId,
+    false
+  );
+
+      if (!insertedMessage?.file_url) {
+        throw new Error(
+          "Supabase did not return a file URL"
+        );
+      }
+
+      // Wait for the real image to load.
+      if (
+        insertedMessage.message_type ===
+        "image"
+      ) {
+        await new Promise<void>(
+          (resolve, reject) => {
+            const img = new Image();
+
+            img.onload = () =>
+              resolve();
+
+            img.onerror = () =>
+              reject(
+                new Error(
+                  "Real Supabase image failed to load"
+                )
+              );
+
+            img.src =
+              insertedMessage.file_url;
+          }
+        );
+      }
+
+      // Wait for the real video thumbnail.
+      if (
+        insertedMessage.message_type ===
+          "video" &&
+        insertedMessage.reply_thumbnail_url
+      ) {
+        await new Promise<void>(
+          (resolve, reject) => {
+            const img = new Image();
+
+            img.onload = () =>
+              resolve();
+
+            img.onerror = () =>
+              reject(
+                new Error(
+                  "Real Supabase video thumbnail failed to load"
+                )
+              );
+
+            img.src =
+              insertedMessage.reply_thumbnail_url;
+          }
+        );
+      }
+
+      // Put the real message into the chat.
+      setMessages((prev) => {
+        const alreadyExists =
+          prev.some(
+            (message) =>
+              message.id ===
+              insertedMessage.id
+          );
+
+        if (alreadyExists) {
+          return prev;
+        }
+
+        return [
+          ...prev,
+          insertedMessage,
+        ];
+      });
+
+      // Remove the corresponding temporary message.
+      setPendingUploads((prev) =>
+        prev.filter(
+          (message) =>
+            message.id !== tempId
+        )
+      );
+
+      setUploadProgress((prev) => {
+        const next = { ...prev };
+
+        delete next[uploadId];
+
+        return next;
+      });
+    } catch (error) {
+      console.error("Media upload failed:", error);
+      // Keep temp message visible if upload fails.
+    }
+  })
 );
-    
- setUploadProgress((prev) => {
-  const next = { ...prev };
-  delete next[uploadId];
-  return next;
-});
 
-  } catch (error) {
-    console.error("Media upload failed:", error);
+if (
+  mediaGroupId &&
+  preparedUploads.length > 1 &&
+  navigator.onLine
+) {
+  try {
+    fetch("/api/push/send", {
+      method: "POST",
 
-    // Keep the temporary message visible if upload fails.
-    // It can show the uploading/failed state.
+      headers: {
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        body:
+          preparedUploads.length === 2
+            ? "📷 2 photos"
+            : preparedUploads.length === 3
+            ? "📷 3 photos"
+            : `📷 ${preparedUploads.length} photos`,
+
+        conversationId:
+          conversationId,
+
+        targetMemberId:
+          "11111111-1111-1111-1111-111111111111",
+      }),
+    })
+      .then(async (response) => {
+        const pushResult =
+          await response.json();
+
+        console.log(
+          "Member → Admin grouped media push result:",
+          pushResult
+        );
+      })
+      .catch((pushError) => {
+        console.error(
+          "Member → Admin grouped media push error:",
+          pushError
+        );
+      });
+  } catch (pushError) {
+    console.error(
+      "Member → Admin grouped media push error:",
+      pushError
+    );
   }
+}
+
 }}
 />
     <main
@@ -4469,6 +4750,7 @@ onOpenLink={(url) => {
   setShowImageViewer={setShowImageViewer}
   setViewerVideo={setViewerVideo}
   setShowVideoViewer={setShowVideoViewer}
+  setViewerMediaIndex={setViewerMediaIndex}
   setSelectedMessage={setSelectedMessage}
   selectedMessage={selectedMessage}
   setMenuX={setMenuX}
@@ -4672,7 +4954,8 @@ setMessageFocus={setMessageFocus}
 }}
 
   fileInputRef={fileInputRef}
-  onFileChange={handleFileChange}
+videoInputRef={videoInputRef}
+onFileChange={handleFileChange}
 
   onInput={handleMessageInput}
   onKeyDown={(e) => {

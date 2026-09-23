@@ -6,23 +6,33 @@ import {
   SendHorizontal,
   Play,
   Pause,
+  Trash2,
 } from "lucide-react";
 
 type MediaPreviewProps = {
   open: boolean;
   previewFile: File | null;
   previewUrl: string | null;
+
+  previewFiles?: File[];
+  previewUrls?: string[];
+
   onCancel: () => void;
   onSend: () => Promise<void>;
+  onDelete?: (index: number) => void;
 };
 
 export default function MediaPreview({
   open,
   previewFile,
   previewUrl,
+  previewFiles,
+  previewUrls,
   onCancel,
   onSend,
+  onDelete,
 }: MediaPreviewProps) {
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const thumbnailVideoRef =
     useRef<HTMLVideoElement | null>(null);
@@ -33,11 +43,20 @@ export default function MediaPreview({
   const [videoThumbnail, setVideoThumbnail] =
     useState<string | null>(null);
 
+    const [videoThumbnails, setVideoThumbnails] =
+  useState<Record<number, string>>({});
+
   const [videoReady, setVideoReady] =
     useState(false);
 
   const [sending, setSending] =
     useState(false);
+
+    const [viewerOpen, setViewerOpen] =
+  useState(false);
+
+const [viewerIndex, setViewerIndex] =
+  useState(0);
 
   /*
    * Generate a thumbnail from the selected
@@ -249,6 +268,160 @@ export default function MediaPreview({
     previewUrl,
   ]);
 
+  useEffect(() => {
+  if (!open) {
+    setVideoThumbnails({});
+    return;
+  }
+
+  const files =
+    previewFiles && previewFiles.length > 0
+      ? previewFiles
+      : previewFile
+        ? [previewFile]
+        : [];
+
+  const urls =
+    previewUrls && previewUrls.length > 0
+      ? previewUrls
+      : previewUrl
+        ? [previewUrl]
+        : [];
+
+  let cancelled = false;
+
+  const generateThumbnail = (
+    url: string,
+    index: number
+  ) => {
+    return new Promise<void>((resolve) => {
+      const video =
+        document.createElement("video");
+
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "auto";
+
+      const cleanup = () => {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
+
+      video.onloadedmetadata = () => {
+        const seekTime =
+          video.duration > 0
+            ? Math.min(
+                0.1,
+                Math.max(
+                  0,
+                  video.duration / 2
+                )
+              )
+            : 0;
+
+        video.currentTime = seekTime;
+      };
+
+      video.onseeked = () => {
+        if (cancelled) {
+          cleanup();
+          resolve();
+          return;
+        }
+
+        if (
+          video.videoWidth <= 0 ||
+          video.videoHeight <= 0
+        ) {
+          cleanup();
+          resolve();
+          return;
+        }
+
+        const canvas =
+          document.createElement("canvas");
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context =
+          canvas.getContext("2d");
+
+        if (!context) {
+          cleanup();
+          resolve();
+          return;
+        }
+
+        context.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        const thumbnail =
+          canvas.toDataURL(
+            "image/jpeg",
+            0.88
+          );
+
+        setVideoThumbnails((prev) => ({
+          ...prev,
+          [index]: thumbnail,
+        }));
+
+        cleanup();
+        resolve();
+      };
+
+      video.onerror = () => {
+        cleanup();
+        resolve();
+      };
+
+      video.load();
+    });
+  };
+
+  const generateAll = async () => {
+    setVideoThumbnails({});
+
+    for (
+      let index = 0;
+      index < files.length;
+      index++
+    ) {
+      if (cancelled) return;
+
+      if (
+        files[index].type.startsWith("video/") &&
+        urls[index]
+      ) {
+        await generateThumbnail(
+          urls[index],
+          index
+        );
+      }
+    }
+  };
+
+  generateAll();
+
+  return () => {
+    cancelled = true;
+  };
+}, [
+  open,
+  previewFiles,
+  previewUrls,
+  previewFile,
+  previewUrl,
+]);
+
   /*
    * Reset sending state whenever a new preview
    * is opened.
@@ -286,6 +459,11 @@ export default function MediaPreview({
     }
   };
 
+  const openViewer = (index: number) => {
+  setViewerIndex(index);
+  setViewerOpen(true);
+};
+
   const handleSend = async () => {
     if (sending) return;
 
@@ -316,183 +494,283 @@ export default function MediaPreview({
       }}
     >
       {/* MEDIA AREA */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding:
-            "30px 20px 100px 20px",
-          boxSizing: "border-box",
-        }}
-      >
-        {!isVideo ? (
-          /*
-           * PHOTO
-           */
-          <img
-            src={previewUrl ?? ""}
-            alt="Preview"
-            draggable={false}
-            style={{
-              width: "90%",
-              maxWidth: "720px",
-              maxHeight: "75vh",
-              objectFit: "contain",
-              borderRadius: 12,
-              display: "block",
-              margin: "0 auto",
+<div
+  style={{
+    flex: 1,
+    minHeight: 0,
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "30px 20px 100px 20px",
+    boxSizing: "border-box",
+  }}
+>
+  {(() => {
+    const files =
+      previewFiles && previewFiles.length > 0
+        ? previewFiles
+        : previewFile
+          ? [previewFile]
+          : [];
 
-              WebkitUserSelect:
-                "none",
-              userSelect: "none",
-            }}
-          />
-        ) : (
-          /*
-           * VIDEO
-           */
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* THUMBNAIL */}
-            {videoThumbnail ? (
-              <img
-                src={videoThumbnail}
-                alt="Video preview"
-                draggable={false}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  width: "auto",
-                  height: "auto",
-                  objectFit: "contain",
-                  display: "block",
-                  borderRadius: 12,
-                  background: "#000",
+    const urls =
+      previewUrls && previewUrls.length > 0
+        ? previewUrls
+        : previewUrl
+          ? [previewUrl]
+          : [];
 
-                  WebkitUserSelect:
-                    "none",
-                  userSelect:
-                    "none",
-                }}
-              />
-            ) : (
-              /*
-               * Temporary loading state while
-               * the first frame is generated.
-               */
+    if (files.length === 0) {
+      return null;
+    }
+
+    const visibleCount =
+      files.length >= 5 ? 4 : files.length;
+
+    const extraCount =
+      files.length > 4
+        ? files.length - 4
+        : 0;
+
+    const renderMedia = (
+      file: File,
+      url: string,
+      index: number
+    ) => {
+      const isVideo =
+        file.type.startsWith("video/");
+
+      return (
+        <div
+  key={`${file.name}-${index}`}
+  onClick={() => openViewer(index)}
+  style={{
+            position: "relative",
+            overflow: "hidden",
+            width: "100%",
+            height: "100%",
+            background: "#111",
+            borderRadius: 10,
+            cursor: "pointer",
+          }}
+        >
+          {isVideo ? (
+  videoThumbnails[index] ? (
+    <img
+      src={videoThumbnails[index]}
+      alt={`Video preview ${index + 1}`}
+      draggable={false}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: "cover",
+        display: "block",
+      }}
+    />
+  ) : (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        background: "#111",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    />
+  )
+) : (
+  <img
+    src={url}
+    alt={`Preview ${index + 1}`}
+    draggable={false}
+    style={{
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      display: "block",
+    }}
+  />
+)}
+
+          {extraCount > 0 &&
+            index === visibleCount - 1 && (
               <div
                 style={{
-                  width: "100%",
-                  height: "100%",
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "rgba(0,0,0,0.45)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color:
-                    "rgba(255,255,255,0.65)",
-                  fontSize: 14,
+                  color: "#fff",
+                  fontSize: 32,
+                  fontWeight: 600,
                 }}
               >
-                Preparing video…
+                +{extraCount}
               </div>
             )}
+        </div>
+      );
+    };
 
-            {/* ACTUAL VIDEO */}
-            <video
-              ref={videoRef}
-              src={previewUrl ?? ""}
-              playsInline
-              preload="metadata"
-              onPlay={() => {
-                setVideoPlaying(true);
-              }}
-              onPause={() => {
-                setVideoPlaying(false);
-              }}
-              onEnded={() => {
-                setVideoPlaying(false);
-              }}
-              style={{
-                position:
-                  "absolute",
-                width: "1px",
-                height: "1px",
-                opacity: 0,
-                pointerEvents:
-                  "none",
-              }}
-            />
+    const visibleFiles =
+      files.slice(0, visibleCount);
 
-            {/* PLAY / PAUSE */}
-            {videoReady && (
-              <button
-                type="button"
-                onClick={toggleVideo}
-                aria-label={
-                  videoPlaying
-                    ? "Pause video"
-                    : "Play video"
-                }
-                style={{
-                  position:
-                    "absolute",
-                  left: "50%",
-                  top: "50%",
-                  transform:
-                    "translate(-50%, -50%)",
+    const visibleUrls =
+      urls.slice(0, visibleCount);
 
-                  width: 62,
-                  height: 62,
-                  borderRadius: "50%",
-                  border: "none",
+    /*
+     * 1 MEDIA
+     */
+    if (visibleCount === 1) {
+      return (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {renderMedia(
+            visibleFiles[0],
+            visibleUrls[0],
+            0
+          )}
+        </div>
+      );
+    }
 
-                  background:
-                    "rgba(0,0,0,0.55)",
+    /*
+     * 2 MEDIA
+     */
+    if (visibleCount === 2) {
+      return (
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 720,
+            height: "75vh",
+            display: "grid",
+            gridTemplateColumns:
+              "1fr 1fr",
+            gap: 4,
+          }}
+        >
+          {visibleFiles.map(
+            (file, index) =>
+              renderMedia(
+                file,
+                visibleUrls[index],
+                index
+              )
+          )}
+        </div>
+      );
+    }
 
-                  color: "#fff",
-
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-
-                  padding: 0,
-                  cursor: "pointer",
-
-                  boxShadow:
-                    "0 4px 18px rgba(0,0,0,0.35)",
-
-                  WebkitTapHighlightColor:
-                    "transparent",
-                }}
-              >
-                {videoPlaying ? (
-                  <Pause
-                    size={27}
-                    strokeWidth={2.2}
-                  />
-                ) : (
-                  <Play
-                    size={29}
-                    strokeWidth={2.2}
-                    fill="currentColor"
-                  />
-                )}
-              </button>
+    /*
+     * 3 MEDIA
+     *
+     * Large media on the left.
+     * Two smaller media stacked
+     * vertically on the right.
+     */
+    if (visibleCount === 3) {
+      return (
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 720,
+            height: "75vh",
+            display: "grid",
+            gridTemplateColumns:
+  "1fr 1fr",
+            gridTemplateRows:
+              "1fr 1fr",
+            gap: 4,
+          }}
+        >
+          <div
+            style={{
+              gridRow: "1 / span 2",
+              minWidth: 0,
+              minHeight: 0,
+            }}
+          >
+            {renderMedia(
+              visibleFiles[0],
+              visibleUrls[0],
+              0
             )}
           </div>
+
+          <div
+            style={{
+              minWidth: 0,
+              minHeight: 0,
+            }}
+          >
+            {renderMedia(
+              visibleFiles[1],
+              visibleUrls[1],
+              1
+            )}
+          </div>
+
+          <div
+            style={{
+              minWidth: 0,
+              minHeight: 0,
+            }}
+          >
+            {renderMedia(
+              visibleFiles[2],
+              visibleUrls[2],
+              2
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    /*
+     * 4+ MEDIA
+     *
+     * Four visible tiles in a 2x2
+     * arrangement.
+     */
+    return (
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 720,
+          height: "75vh",
+          display: "grid",
+          gridTemplateColumns:
+            "1fr 1fr",
+          gridTemplateRows:
+            "1fr 1fr",
+          gap: 4,
+        }}
+      >
+        {visibleFiles.map(
+          (file, index) =>
+            renderMedia(
+              file,
+              visibleUrls[index],
+              index
+            )
         )}
       </div>
+    );
+  })()}
+</div>
 
       {/* BOTTOM CONTROLS */}
       <div
@@ -508,7 +786,7 @@ export default function MediaPreview({
             "space-between",
 
           padding:
-          "18px 24px calc(55px + env(safe-area-inset-bottom))",
+  "18px 24px calc(40px + env(safe-area-inset-bottom))",
 
           boxSizing: "border-box",
 
@@ -607,6 +885,209 @@ export default function MediaPreview({
           />
         </button>
       </div>
+      {/* FULL-SCREEN MEDIA VIEWER */}
+{viewerOpen && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "#000",
+      zIndex: 10000,
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
+    {/* CLOSE VIEWER */}
+    <button
+      type="button"
+      onClick={() => setViewerOpen(false)}
+      aria-label="Close viewer"
+      style={{
+        position: "absolute",
+        top: "calc(18px + env(safe-area-inset-top))",
+        right: 18,
+        zIndex: 20,
+        width: 44,
+        height: 44,
+        borderRadius: "50%",
+        border: "none",
+        background: "#fff",
+        color: "#000",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+      }}
+    >
+      <X size={22} />
+    </button>
+
+    {/* DELETE MEDIA */}
+<button
+  type="button"
+  onClick={() => {
+    if (!onDelete) return;
+
+    onDelete(viewerIndex);
+
+    const total =
+      previewFiles?.length ??
+      (previewFile ? 1 : 0);
+
+    if (total <= 1) {
+      setViewerOpen(false);
+    } else if (viewerIndex >= total - 1) {
+      setViewerIndex(total - 2);
+    }
+  }}
+  aria-label="Delete media"
+  style={{
+    position: "absolute",
+    top:
+      "calc(18px + env(safe-area-inset-top))",
+    left: 18,
+    zIndex: 20,
+
+    width: 44,
+    height: 44,
+    borderRadius: "50%",
+
+    border: "none",
+    background: "#fff",
+    color: "#000",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    padding: 0,
+    cursor: "pointer",
+
+    WebkitTapHighlightColor:
+      "transparent",
+  }}
+>
+  <Trash2
+    size={21}
+    strokeWidth={2.2}
+  />
+</button>
+
+    {/* HORIZONTAL MEDIA */}
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        overflowX: "auto",
+        overflowY: "hidden",
+        display: "flex",
+        scrollSnapType: "x mandatory",
+        WebkitOverflowScrolling:
+          "touch",
+      }}
+      onScroll={(e) => {
+        const element = e.currentTarget;
+
+        const index = Math.round(
+          element.scrollLeft /
+            element.clientWidth
+        );
+
+        if (
+          index >= 0 &&
+          index <
+            (previewFiles?.length || 0)
+        ) {
+          setViewerIndex(index);
+        }
+      }}
+    >
+      {(previewFiles?.length
+        ? previewFiles
+        : previewFile
+          ? [previewFile]
+          : []
+      ).map((file, index) => {
+        const url =
+          previewUrls?.[index] ??
+          (index === 0
+            ? previewUrl
+            : null);
+
+        if (!url) return null;
+
+        const isVideo =
+          file.type.startsWith("video/");
+
+        return (
+          <div
+            key={`${file.name}-viewer-${index}`}
+            style={{
+              flex: "0 0 100%",
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              scrollSnapAlign: "center",
+              padding: "30px 16px",
+              boxSizing: "border-box",
+            }}
+          >
+            {isVideo ? (
+              <video
+                src={url}
+                controls
+                playsInline
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                }}
+              />
+            ) : (
+              <img
+                src={url}
+                alt={`Media ${index + 1}`}
+                draggable={false}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                  userSelect: "none",
+                  WebkitUserSelect:
+                    "none",
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+
+    {/* MEDIA COUNTER */}
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        bottom:
+          "calc(24px + env(safe-area-inset-bottom))",
+        transform:
+          "translateX(-50%)",
+        color: "#fff",
+        background:
+          "rgba(0,0,0,0.55)",
+        padding: "6px 12px",
+        borderRadius: 20,
+        fontSize: 14,
+      }}
+    >
+      {viewerIndex + 1} /{" "}
+      {previewFiles?.length ||
+        (previewFile ? 1 : 0)}
+    </div>
+  </div>
+)}
     </div>
   );
 }

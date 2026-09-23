@@ -18,11 +18,17 @@ import MediaPreview from "@/app/chat/MediaPreview";
 
 import ImageViewer from "@/app/chat/ImageViewer";
 import VideoViewer from "@/app/chat/VideoViewer";
+import MediaViewer from "@/app/chat/MediaViewer";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
-import { Trash2, ChevronDown, MoreVertical,  ChevronLeft } from "lucide-react";
-
+import {
+  ChevronLeft,
+  MoreVertical,
+  Trash2,
+  Pin,
+ChevronDown,
+} from "lucide-react";
 
 import DeleteConversationDialog from "@/app/admin/chats/components/DeleteConversationDialog";
 import ChatComposer from "@/app/chat/ChatComposer";
@@ -96,7 +102,61 @@ export default function ChatPage() {
 const [showMessageMenu, setShowMessageMenu] = useState(false);
 
 const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null);
-const [pinnedMessage, setPinnedMessage] = useState<any | null>(null);
+const [pinnedMessage, setPinnedMessage] =
+  useState<any | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      const cachedPinnedMessage =
+        localStorage.getItem(
+          `mspace-pinned-message-${id}`
+        );
+
+      if (!cachedPinnedMessage) {
+        return null;
+      }
+
+      const parsedPinnedMessage =
+        JSON.parse(cachedPinnedMessage);
+
+      // Admin cache stores { message_id, message }
+      if (parsedPinnedMessage?.message) {
+        return parsedPinnedMessage.message;
+      }
+
+      // Also support a direct message cache
+      return parsedPinnedMessage || null;
+    } catch {
+      return null;
+    }
+  });
+  
+const displayPinnedMessage =
+  pinnedMessage ||
+  (() => {
+    if (
+      typeof window === "undefined" ||
+      !id
+    ) {
+      return null;
+    }
+
+    const cached =
+      localStorage.getItem(
+        `mspace-pinned-message-${id}`
+      );
+
+    if (!cached) return null;
+
+    try {
+      return JSON.parse(cached).message || null;
+    } catch {
+      return null;
+    }
+  })();
+
 useEffect(() => {
   console.log(
     "ADMIN PIN STATE RENDER:",
@@ -324,12 +384,19 @@ const [replyMessage, setReplyMessage] = useState<any>(null);
 const [replyPreview, setReplyPreview] = useState("");
 
 const fileInputRef = useRef<HTMLInputElement>(null);
+const videoInputRef =
+  useRef<HTMLInputElement | null>(null);
 
 const [uploading, setUploading] = useState(false);
 const [pendingUploads, setPendingUploads] = useState<any[]>([]);
 const [previewFile, setPreviewFile] = useState<File | null>(null);
 const [previewUrl, setPreviewUrl] = useState("");
 const [showPreview, setShowPreview] = useState(false);
+const [previewFiles, setPreviewFiles] =
+  useState<File[]>([]);
+
+const [previewUrls, setPreviewUrls] =
+  useState<string[]>([]);
 
 const generateLocalVideoThumbnail = (
   file: File
@@ -449,6 +516,16 @@ const [viewerName, setViewerName] = useState("");
 
 const [showVideoViewer, setShowVideoViewer] = useState(false);
 const [viewerVideo, setViewerVideo] = useState("");
+const [viewerMediaIndex, setViewerMediaIndex] =
+  useState(0);
+
+const conversationMedia = messages.filter(
+  (message) =>
+    message.message_type === "image" ||
+    message.message_type === "video"
+);
+
+
 
 const [unreadCount, setUnreadCount] = useState(0);
 
@@ -634,6 +711,31 @@ const messageInputRef =
 
   useLayoutEffect(() => {
 
+  // Restore the pinned message immediately
+  try {
+    if (id) {
+      const cachedPinnedMessage =
+        localStorage.getItem(
+          `mspace-pinned-message-${id}`
+        );
+
+      if (cachedPinnedMessage) {
+        const parsedPinnedMessage =
+          JSON.parse(cachedPinnedMessage);
+
+        setPinnedMessage(
+          parsedPinnedMessage.message ||
+            parsedPinnedMessage
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "ADMIN cached pinned message restore error:",
+      error
+    );
+  }
+
     // Load cached admin profile photo immediately
   try {
     const cachedAdminPhoto = localStorage.getItem(
@@ -716,8 +818,8 @@ const messageInputRef =
   loadUnreadConversationCount();
 
   (async () => {
+  loadPinnedMessage();
   await loadMessages();
-  await loadPinnedMessage();
 })();
 
 const handleVisibility = async () => {
@@ -1792,6 +1894,35 @@ requestAnimationFrame(() => {
 
   if (!id) return;
 
+  // Restore the pinned message immediately from local cache
+  const pinnedCacheKey = `mspace-pinned-message-${id}`;
+  const cachedPinnedMessage =
+    localStorage.getItem(pinnedCacheKey);
+
+  if (cachedPinnedMessage) {
+    try {
+      const parsedPinnedMessage =
+        JSON.parse(cachedPinnedMessage);
+
+      setPinnedMessageId(
+        parsedPinnedMessage.message_id
+      );
+
+      setPinnedMessage(
+        parsedPinnedMessage.message
+      );
+    } catch (error) {
+      console.error(
+        "MSpace pinned message cache error:",
+        error
+      );
+
+      localStorage.removeItem(
+        pinnedCacheKey
+      );
+    }
+  }
+
   const { data: pin, error: pinError } =
     await supabase
       .from("pinned_messages")
@@ -2362,7 +2493,9 @@ function formatLastSeen(date: string) {
 async function uploadFile(
   file: File,
   tempId?: string,
-  uploadId?: string
+  uploadId?: string,
+  mediaGroupId?: string | null,
+  sendPushNotification = true
 ) {
   if (!id) return;
 
@@ -2610,6 +2743,7 @@ async function uploadFile(
         .insert({
           conversation_id: id,
           sender: "admin",
+          media_group_id: mediaGroupId,
           message_type: messageType,
           content: "",
           file_url: data.publicUrl,
@@ -2657,49 +2791,51 @@ async function uploadFile(
       return;
     }
 
-    // Send push notification ONLY to this member
-    try {
-      const pushResponse = await fetch(
-        "/api/push/send",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-  body:
-    messageType === "image"
-      ? "📷 Photo"
-      : messageType === "video"
-      ? "🎥 Video"
-      : "📎 File",
-  conversationId: id,
-  targetMemberId:
-    conversation.member_id,
-}),
-        }
-      );
+    // Send push notification ONLY when requested
+if (sendPushNotification) {
+  try {
+    const pushResponse = await fetch(
+      "/api/push/send",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          body:
+            messageType === "image"
+              ? "📷 Photo"
+              : messageType === "video"
+              ? "🎥 Video"
+              : "📎 File",
+          conversationId: id,
+          targetMemberId:
+            conversation.member_id,
+        }),
+      }
+    );
 
-      const pushResult =
-        await pushResponse.json();
+    const pushResult =
+      await pushResponse.json();
 
-      console.log(
-        "Admin → Member media push result:",
+    console.log(
+      "Admin → Member media push result:",
+      pushResult
+    );
+
+    if (!pushResponse.ok) {
+      console.error(
+        "Admin → Member media push failed:",
         pushResult
       );
-
-      if (!pushResponse.ok) {
-        console.error(
-          "Admin → Member media push failed:",
-          pushResult
-        );
-      }
-    } catch (pushError) {
-      console.error(
-        "Admin → Member media push error:",
-        pushError
-      );
     }
+  } catch (pushError) {
+    console.error(
+      "Admin → Member media push error:",
+      pushError
+    );
+  }
+}
 return insertedMessage;
 
 
@@ -2889,16 +3025,20 @@ setTimeout(() => {
   }}
 
   onPhoto={() => {
-    setShowAttachmentMenu(false);
+  setShowAttachmentMenu(false);
 
-    fileInputRef.current?.click();
-  }}
+  document
+    .getElementById("mspace-photo-input")
+    ?.click();
+}}
 
-  onVideo={() => {
-    setShowAttachmentMenu(false);
+onVideo={() => {
+  setShowAttachmentMenu(false);
 
-    fileInputRef.current?.click();
-  }}
+  document
+    .getElementById("mspace-video-input")
+    ?.click();
+}}
 
  onLocation={() => {
   setShowAttachmentMenu(false);
@@ -3101,7 +3241,7 @@ setTimeout(() => {
       borderRadius: "50%",
       border: "none",
       background: "transparent",
-      color: "#fff",
+      color: "#111",
 
       display: "flex",
       alignItems: "center",
@@ -3180,6 +3320,72 @@ setTimeout(() => {
   )}
 </div>
     </div>
+
+    {/* PINNED MESSAGE */}
+
+    {displayPinnedMessage?.content && (
+      <div
+        style={{
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "10px 12px",
+          background: "#ffffff",
+          borderBottom: "1px solid #eee",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+          zIndex: 50,
+        }}
+      >
+        <Pin
+          size={17}
+          strokeWidth={2.2}
+          color="#6d28d9"
+          style={{
+            flexShrink: 0,
+          }}
+        />
+
+        <div
+          style={{
+            minWidth: 0,
+            flex: 1,
+            fontSize: "14px",
+            lineHeight: 1.4,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            overflowWrap: "break-word",
+          }}
+        >
+          <a
+            href={displayPinnedMessage.content}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
+              setMSpaceBrowserUrl(
+                displayPinnedMessage.content
+              );
+
+              setShowMSpaceBrowser(true);
+            }}
+            style={{
+              color: "#22c55e",
+              textDecoration: "underline",
+              textDecorationThickness: "1px",
+              textUnderlineOffset: "2px",
+              cursor: "pointer",
+            }}
+          >
+            {displayPinnedMessage.content}
+          </a>
+        </div>
+      </div>
+    )}
 
     {/* Messages */}
 
@@ -3289,6 +3495,7 @@ paddingBottom: showStickerPanel
   setShowImageViewer={setShowImageViewer}
   setViewerVideo={setViewerVideo}
   setShowVideoViewer={setShowVideoViewer}
+  setViewerMediaIndex={setViewerMediaIndex}
   setSelectedMessage={setSelectedMessage}
   selectedMessage={selectedMessage}
   setMenuX={setMenuX}
@@ -3483,14 +3690,25 @@ onCloseStickerPanel={() => {
 }}
 
   fileInputRef={fileInputRef}
+  videoInputRef={videoInputRef}
 
   onFileChange={(e) => {
-  const file = e.target.files?.[0];
+  const files = Array.from(
+    e.target.files || []
+  );
 
-  if (!file) return;
+  if (files.length === 0) return;
 
-  setPreviewFile(file);
-  setPreviewUrl(URL.createObjectURL(file));
+  const urls = files.map((file) =>
+    URL.createObjectURL(file)
+  );
+
+  setPreviewFiles(files);
+  setPreviewUrls(urls);
+
+  setPreviewFile(files[0]);
+  setPreviewUrl(urls[0]);
+
   setShowPreview(true);
 
   e.target.value = "";
@@ -3566,181 +3784,338 @@ onCloseStickerPanel={() => {
   open={showPreview}
   previewFile={previewFile}
   previewUrl={previewUrl}
+  previewFiles={previewFiles}
+  previewUrls={previewUrls}
   onCancel={() => {
     setShowPreview(false);
     setPreviewFile(null);
     setPreviewUrl("");
   }}
-  onSend={async () => {
-  if (!previewFile) return;
 
-  const fileToUpload = previewFile;
-  const localPreviewUrl = previewUrl;
+  onDelete={(index) => {
+  setPreviewFiles((prev) =>
+    prev.filter((_, i) => i !== index)
+  );
 
-  const tempId = "temp-" + Date.now();
-const uploadId = crypto.randomUUID();
+  setPreviewUrls((prev) =>
+    prev.filter((_, i) => i !== index)
+  );
 
-const messageType = fileToUpload.type.startsWith("image/")
-  ? "image"
-  : "video";
+  setPreviewFile((prev) => {
+    if (!prev) return null;
 
-let localVideoThumbnail: string | null = null;
-
-if (messageType === "video") {
-  localVideoThumbnail =
-    await generateLocalVideoThumbnail(
-      fileToUpload
-    );
-}
-
-  // Show the media immediately in the chat
-  setPendingUploads((prev) => [
-  ...prev,
-  {
-    id: tempId,
-    upload_id: uploadId,
-    sender: "admin",
-    message_type: messageType,
-    content: "",
-    file_url: localPreviewUrl,
-
-    // Temporary thumbnail for video
-    thumbnail_url:
-      localVideoThumbnail,
-
-    file_name: fileToUpload.name,
-    created_at: new Date().toISOString(),
-    uploading: true,
-    progress: 0,
-    is_read: false,
-  },
-]);
-
-setTimeout(() => {
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "smooth",
+    return previewFiles[index] === prev
+      ? previewFiles.filter(
+          (_, i) => i !== index
+        )[0] ?? null
+      : prev;
   });
-}, 50);
 
-  // Close the preview immediately
+  setPreviewUrl((prev) => {
+  if (!prev) return "";
+
+  return previewUrls[index] === prev
+    ? previewUrls.filter(
+        (_, i) => i !== index
+      )[0] ?? ""
+    : prev;
+});
+}}
+  onSend={async () => {
+  const filesToUpload =
+    previewFiles.length > 0
+      ? previewFiles
+      : previewFile
+        ? [previewFile]
+        : [];
+
+  const urlsToUpload =
+    previewUrls.length > 0
+      ? previewUrls
+      : previewUrl
+        ? [previewUrl]
+        : [];
+
+  if (filesToUpload.length === 0) return;
+
+  const mediaGroupId =
+  filesToUpload.length > 1
+    ? crypto.randomUUID()
+    : null;
+
   setShowPreview(false);
+
+  setPreviewFiles([]);
+  setPreviewUrls([]);
   setPreviewFile(null);
   setPreviewUrl("");
 
-  try {
-    // Upload to Supabase
-    const progressTimer = setInterval(() => {
-  setPendingUploads((prev) =>
-    prev.map((message) => {
-      if (message.id !== tempId) return message;
+  await Promise.all(
+  filesToUpload.map(
+    async (fileToUpload, index) => {
 
-      const current = message.progress ?? 0;
+    const localPreviewUrl =
+      urlsToUpload[index];
 
-      return {
-        ...message,
-        progress: Math.min(current + 2, 90),
-      };
-    })
-  );
-}, 100);
+    const tempId =
+      "temp-" + crypto.randomUUID();
 
-let realMessage: any;
+    const uploadId =
+      crypto.randomUUID();
 
-try {
-  realMessage = await uploadFile(
+    const messageType =
+      fileToUpload.type.startsWith("image/")
+        ? "image"
+        : "video";
+
+    let localVideoThumbnail:
+      string | null = null;
+
+    if (messageType === "video") {
+      localVideoThumbnail =
+        await generateLocalVideoThumbnail(
+          fileToUpload
+        );
+    }
+
+    /*
+     * Show this media immediately
+     * while it uploads.
+     */
+    setPendingUploads((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        upload_id: uploadId,
+        sender: "admin",
+        message_type: messageType,
+        content: "",
+        file_url: localPreviewUrl,
+        thumbnail_url:
+          localVideoThumbnail,
+        file_name:
+          fileToUpload.name,
+        created_at:
+          new Date().toISOString(),
+        
+        media_group_id: mediaGroupId,
+
+        uploading: true,
+        progress: 0,
+        is_read: false,
+      },
+    ]);
+
+    setTimeout(() => {
+      messagesRef.current?.scrollTo({
+        top:
+          messagesRef.current
+            .scrollHeight,
+        behavior: "smooth",
+      });
+    }, 50);
+
+    try {
+      const progressTimer =
+        setInterval(() => {
+          setPendingUploads((prev) =>
+            prev.map((message) => {
+              if (
+                message.id !== tempId
+              ) {
+                return message;
+              }
+
+              const current =
+                message.progress ?? 0;
+
+              return {
+                ...message,
+                progress: Math.min(
+                  current + 2,
+                  90
+                ),
+              };
+            })
+          );
+        }, 100);
+
+      let realMessage: any;
+
+      try {
+       realMessage =
+  await uploadFile(
     fileToUpload,
     tempId,
-    uploadId
+    uploadId,
+    mediaGroupId,
+    filesToUpload.length === 1
   );
-} finally {
-  clearInterval(progressTimer);
-}
+      } finally {
+        clearInterval(
+          progressTimer
+        );
+      }
 
+      if (!realMessage?.file_url) {
+        throw new Error(
+          "Supabase did not return a file URL"
+        );
+      }
 
-if (!realMessage?.file_url) {
-  throw new Error("Supabase did not return a file URL");
-}
+      /*
+       * Wait for the real media to be
+       * available before replacing the
+       * temporary message.
+       */
+      if (
+        realMessage.message_type ===
+        "image"
+      ) {
+        await new Promise<void>(
+          (resolve, reject) => {
+            const img =
+              new Image();
 
-// Wait until the real Supabase media is ready
-if (realMessage.message_type === "image") {
-  await new Promise<void>((resolve, reject) => {
-    const img = new Image();
+            img.onload = () =>
+              resolve();
 
-    img.onload = () => resolve();
+            img.onerror = () =>
+              reject(
+                new Error(
+                  "Real Supabase image failed to load"
+                )
+              );
 
-    img.onerror = () => {
-      reject(
-        new Error("Real Supabase image failed to load")
-      );
-    };
+            img.src =
+              realMessage.file_url;
+          }
+        );
+      }
 
-    img.src = realMessage.file_url;
-  });
-}
+      if (
+        realMessage.message_type ===
+          "video" &&
+        realMessage.reply_thumbnail_url
+      ) {
+        await new Promise<void>(
+          (resolve, reject) => {
+            const img =
+              new Image();
 
-if (
-  realMessage.message_type === "video" &&
-  realMessage.reply_thumbnail_url
-) {
-  await new Promise<void>((resolve, reject) => {
-    const img = new Image();
+            img.onload = () =>
+              resolve();
 
-    img.onload = () => resolve();
+            img.onerror = () =>
+              reject(
+                new Error(
+                  "Real Supabase video thumbnail failed to load"
+                )
+              );
 
-    img.onerror = () => {
-      reject(
-        new Error(
-          "Real Supabase video thumbnail failed to load"
+            img.src =
+              realMessage.reply_thumbnail_url;
+          }
+        );
+      }
+
+      setMessages((prev) => {
+        const alreadyExists =
+          prev.some(
+            (message) =>
+              message.id ===
+              realMessage.id
+          );
+
+        if (alreadyExists) {
+          return prev;
+        }
+
+        return [
+          ...prev,
+          realMessage,
+        ];
+      });
+
+      setPendingUploads((prev) =>
+        prev.filter(
+          (message) =>
+            message.id !== tempId
         )
       );
-    };
+    } catch (error) {
+      console.error(
+        "Admin media upload error:",
+        error
+      );
 
-    img.src = realMessage.reply_thumbnail_url;
-  });
+      setPendingUploads((prev) =>
+        prev.filter(
+          (message) =>
+            message.id !== tempId
+        )
+      );
+    }
+  }
+  )
+  )
+
+  const groupNotificationBody =
+  filesToUpload[0].type.startsWith("image/")
+    ? `📷 ${filesToUpload.length} photos`
+    : `🎥 ${filesToUpload.length} videos`;
+
+ if (filesToUpload.length > 1) {
+  try {
+    const pushResponse = await fetch(
+      "/api/push/send",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          body: groupNotificationBody,
+          conversationId: id,
+          targetMemberId:
+            conversation?.member_id,
+        }),
+      }
+    );
+
+    const pushResult =
+      await pushResponse.json();
+
+    console.log(
+      "Admin → Member grouped media push result:",
+      pushResult
+    );
+
+    if (!pushResponse.ok) {
+      console.error(
+        "Admin → Member grouped media push failed:",
+        pushResult
+      );
+    }
+  } catch (pushError) {
+    console.error(
+      "Admin → Member grouped media push error:",
+      pushError
+    );
+  }
 }
 
-// Put the real message into the chat
-setMessages((prev) => {
-  const alreadyExists = prev.some(
-    (message) => message.id === realMessage.id
-  );
-
-  if (alreadyExists) {
-    return prev;
-  }
-
-  return [
-    ...prev,
-    realMessage,
-  ];
-});
-
-// Remove the temporary uploading message
-setPendingUploads((prev) =>
-  prev.filter(
-    (message) => message.id !== tempId
-  )
-);
-
-
-  } catch (error) {
-    console.error("Admin media upload error:", error);
-  }
 }}
 />
 
-<ImageViewer
-  open={showImageViewer}
-  image={viewerImage}
-  name={viewerName}
-  onClose={() => setShowImageViewer(false)}
-/>
-
-<VideoViewer
-  open={showVideoViewer}
-  video={viewerVideo}
-  onClose={() => setShowVideoViewer(false)}
+<MediaViewer
+  open={showImageViewer || showVideoViewer}
+  media={conversationMedia}
+  initialIndex={viewerMediaIndex}
+  onClose={() => {
+    setShowImageViewer(false);
+    setShowVideoViewer(false);
+  }}
 />
 
 <MessageMenu
@@ -3788,7 +4163,15 @@ setPendingUploads((prev) =>
 
     setPinnedMessageId(null);
 setPinnedMessage(null);
-console.log("MESSAGE UNPINNED:", selectedMessage.id);
+
+localStorage.removeItem(
+  `mspace-pinned-message-${id}`
+);
+
+console.log(
+  "MESSAGE UNPINNED:",
+  selectedMessage.id
+);
 
     return;
   }
@@ -3835,7 +4218,19 @@ console.log("MESSAGE UNPINNED:", selectedMessage.id);
 
   setPinnedMessageId(selectedMessage.id);
 setPinnedMessage(selectedMessage);
-console.log("MESSAGE PINNED:", selectedMessage.id);
+
+localStorage.setItem(
+  `mspace-pinned-message-${id}`,
+  JSON.stringify({
+    message_id: selectedMessage.id,
+    message: selectedMessage,
+  })
+);
+
+console.log(
+  "MESSAGE PINNED:",
+  selectedMessage.id
+);
 }}
 
   onForward={() => {

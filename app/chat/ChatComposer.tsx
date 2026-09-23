@@ -67,6 +67,8 @@ type ChatComposerProps = {
 
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 
+  videoInputRef: React.RefObject<HTMLInputElement | null>;
+
   onFileChange: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => void;
@@ -123,7 +125,8 @@ voiceState,
   onCloseStickerPanel,
 
   fileInputRef,
-  onFileChange,
+videoInputRef,
+onFileChange,
 
   onInput,
   onKeyDown,
@@ -165,14 +168,26 @@ if (!showComposer) {
       />
 
       <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,video/*"
-        hidden
-        onChange={onFileChange}
-      />
+  id="mspace-photo-input"
+  ref={fileInputRef}
+  type="file"
+  accept="image/*"
+  multiple
+  hidden
+  onChange={onFileChange}
+/>
 
-      <input
+<input
+  id="mspace-video-input"
+  ref={videoInputRef}
+  type="file"
+  accept="video/*"
+  multiple
+  hidden
+  onChange={onFileChange}
+/>
+
+<input
   id="mspace-camera-input"
   ref={cameraInputRef}
   type="file"

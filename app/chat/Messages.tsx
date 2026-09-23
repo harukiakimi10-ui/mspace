@@ -45,6 +45,8 @@ type MessagesProps = {
   setViewerVideo: (url: string) => void;
   setShowVideoViewer: (open: boolean) => void;
 
+  setViewerMediaIndex: (index: number) => void;
+
   setSelectedMessage: (msg: any) => void;
   selectedMessage: any;
 
@@ -224,6 +226,7 @@ export default function Messages({
   setShowImageViewer,
   setViewerVideo,
   setShowVideoViewer,
+  setViewerMediaIndex,
   setSelectedMessage,
   selectedMessage,
   setMenuX,
@@ -236,6 +239,13 @@ setMessageFocus,
 
 onCancelUpload,
 }: MessagesProps) {
+
+  const conversationMedia = messages.filter(
+  (message) =>
+    message.message_type === "image" ||
+    message.message_type === "video"
+);
+
   console.log(
   "MESSAGES RECEIVED PIN:",
   pinnedMessage
@@ -257,6 +267,59 @@ const [locationViewer, setLocationViewer] = useState<{
 const [messageFocusOffset, setMessageFocusOffset] = useState(0);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+const uploadRingStartTimesRef = useRef<
+  Record<string, number>
+>({});
+const uploadRingDelaysRef = useRef<
+  Record<string, string>
+>({});
+
+const [, forceUploadRingUpdate] =
+  useState(0);
+
+  useEffect(() => {
+  const hasUploadingGroup =
+    messages.some(
+      (message) =>
+        message.uploading &&
+        message.media_group_id
+    );
+
+  if (!hasUploadingGroup) {
+    return;
+  }
+
+  let frameId: number;
+
+  const updateRing = () => {
+    forceUploadRingUpdate(
+      (value) => value + 1
+    );
+
+    frameId =
+      requestAnimationFrame(updateRing);
+  };
+
+  frameId =
+    requestAnimationFrame(updateRing);
+
+  return () => {
+    cancelAnimationFrame(frameId);
+  };
+}, [messages]);
+
+useEffect(() => {
+  messages.forEach((message) => {
+    if (
+      message.message_type === "image" &&
+      message.file_url
+    ) {
+      const img = new Image();
+      img.src = message.file_url;
+    }
+  });
+}, [messages]);
+
 const longPressTriggeredRef = useRef(false);
 
 const unlockMenuAudio = () => {
@@ -668,66 +731,35 @@ const scrollToRepliedMessage = (msg: any) => {
   <>
     <style jsx global>{`
       @keyframes mspacePendingSpin {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mspaceUploadRingGrow {
+  0% {
+    stroke-dashoffset: 100;
+  }
+
+  90% {
+    stroke-dashoffset: 10;
+  }
+
+  100% {
+    stroke-dashoffset: 10;
+  }
+}
+
+.mspace-upload-ring {
+  animation: mspaceUploadRingGrow 12s ease-out forwards;
+}
     `}
     
     </style>
-
-    {pinnedMessage?.content && (
-  <div
-  style={{
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-  width: "calc(100% + 40px)",
-  boxSizing: "border-box",
-  padding: "10px 12px",
-  marginTop: "-20px",
-  marginLeft: "-20px",
-  marginRight: "-20px",
-  marginBottom: "8px",
-  background: "#ffffff",
-  borderBottom: "1px solid #eee",
-  boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
-
-  position: "sticky",
-  top: 0,
-  zIndex: 50,
-}}
->
-    <Pin
-      size={17}
-      strokeWidth={2.2}
-      color="#6d28d9"
-      style={{
-        flexShrink: 0,
-      }}
-    />
-
-    <div
-      style={{
-        minWidth: 0,
-        flex: 1,
-        fontSize: "14px",
-        lineHeight: 1.4,
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
-        overflowWrap: "break-word",
-      }}
-    >
-      {renderTextWithLinks(
-        pinnedMessage.content,
-        onOpenLink
-      )}
-    </div>
-  </div>
-)}
 
 {messages.map((msg, index) => {
         const displayProgress = Math.min(
@@ -752,6 +784,39 @@ const isReplyLocation =
   !!msg.reply_preview;
 
   const previous = index > 0 ? messages[index - 1] : null;
+
+  const isMediaMessage =
+  msg.message_type === "image" ||
+  msg.message_type === "video";
+
+const mediaGroupMessages =
+  isMediaMessage && msg.media_group_id
+    ? messages.filter(
+        (item) =>
+          item.media_group_id ===
+            msg.media_group_id &&
+          (item.message_type === "image" ||
+            item.message_type === "video")
+      )
+    : [msg];
+
+const firstMediaGroupIndex =
+  mediaGroupMessages.length > 1
+    ? messages.findIndex(
+        (item) =>
+          item.id ===
+          mediaGroupMessages[0]?.id
+      )
+    : index;
+
+if (
+  isMediaMessage &&
+  msg.media_group_id &&
+  mediaGroupMessages.length > 1 &&
+  index !== firstMediaGroupIndex
+) {
+  return null;
+}
 
   const emojiCount = getEmojiCount(msg.content || "");
 
@@ -844,7 +909,7 @@ const locationCoordinates = isReplyLocation
     )}
 
    <div
-  key={msg.id}
+  key={msg.media_group_id || msg.id}
   ref={(el) => {
     messageRefs.current[msg.id] = el;
   }}
@@ -1722,363 +1787,513 @@ msg.reply_preview === "🎤 Voice message" ? (
   </div>
 )}
 
-{msg.message_type === "image" && (
-  <div
-    style={{
-      position: "relative",
-      display: "inline-block",
-    }}
-  >
-    <img
-      src={msg.file_url}
-      alt={t.photo}
-      onClick={() => {
-        setViewerImage(msg.file_url);
-        setViewerName(msg.file_name || t.photo);
+{(msg.message_type === "image" ||
+  msg.message_type === "video") && (() => {
+    const groupedMedia = msg.media_group_id
+      ? messages.filter(
+          (item) =>
+            item.media_group_id ===
+              msg.media_group_id &&
+            (item.message_type === "image" ||
+              item.message_type === "video")
+        )
+      : [msg];
+
+    const mediaCount = groupedMedia.length;
+
+    const uploadRingGroupId =
+  msg.media_group_id || msg.id;
+
+if (
+  mediaGroupMessages.some(
+    (media) => media.uploading
+  ) &&
+  !uploadRingStartTimesRef.current[
+    uploadRingGroupId
+  ]
+) {
+  uploadRingStartTimesRef.current[
+    uploadRingGroupId
+  ] = Date.now();
+}
+
+if (
+  !uploadRingDelaysRef.current[
+    uploadRingGroupId
+  ]
+) {
+  const uploadRingElapsed =
+    Date.now() -
+    (uploadRingStartTimesRef.current[
+      uploadRingGroupId
+    ] || Date.now());
+
+  uploadRingDelaysRef.current[
+    uploadRingGroupId
+  ] = `-${uploadRingElapsed / 1000}s`;
+}
+
+const uploadRingDelay =
+  uploadRingDelaysRef.current[
+    uploadRingGroupId
+  ];
+
+    const visibleMedia =
+      mediaCount > 4
+        ? groupedMedia.slice(0, 4)
+        : groupedMedia;
+
+    const remainingCount =
+      Math.max(0, mediaCount - 4);
+
+    const getMediaIndex = (
+      media: any
+    ) => {
+      return conversationMedia.findIndex(
+        (item) => item.id === media.id
+      );
+    };
+
+    const openMedia = (media: any) => {
+      const mediaIndex =
+        getMediaIndex(media);
+
+      setViewerMediaIndex(
+        mediaIndex >= 0 ? mediaIndex : 0
+      );
+
+      if (
+        media.message_type === "image"
+      ) {
+        setViewerImage(
+          media.file_url
+        );
+        setViewerName(
+          media.file_name || t.photo
+        );
         setShowImageViewer(true);
-      }}
-      style={{
-  width: "250px",
-  height: "320px",
-  display: "block",
-  borderRadius: "16px",
-  objectFit: "cover",
-  cursor: "pointer",
-  background: "#000",
+      } else {
+        setViewerVideo(
+          media.file_url
+        );
+        setShowVideoViewer(true);
+      }
+    };
 
-  WebkitTouchCallout: "none",
-  pointerEvents: "auto",
-  WebkitUserSelect: "none",
-  userSelect: "none",
-}}
-    />
+    const getGridStyle =
+      mediaCount === 1
+        ? {
+            gridTemplateColumns: "1fr",
+            gridTemplateRows: "1fr",
+          }
+        : mediaCount === 2
+        ? {
+            gridTemplateColumns:
+              "1fr 1fr",
+            gridTemplateRows: "1fr",
+          }
+        : mediaCount === 3
+        ? {
+            gridTemplateColumns:
+              "1fr 1fr",
+            gridTemplateRows:
+              "1fr 1fr",
+          }
+        : {
+            gridTemplateColumns:
+              "1fr 1fr",
+            gridTemplateRows:
+              "1fr 1fr",
+          };
 
-{msg.uploading && (
+    return (
       <div
         style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          pointerEvents: "none",
-        }}
+  position: "relative",
+  width: "250px",
+  height: "320px",
+  display: "grid",
+  gap: "1px",
+  overflow: "hidden",
+  borderRadius: "16px",
+  background: "#8B5CF6",
+
+  ...getGridStyle,
+}}
       >
-        <button
-          type="button"
-          aria-label={t.cancelUpload}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        {visibleMedia.map(
+          (media, mediaIndex) => {
+            const isVideo =
+              media.message_type ===
+              "video";
 
-            if (msg.upload_id) {
-              onCancelUpload(msg.upload_id);
-            }
-          }}
-          style={{
-            position: "relative",
-            width: "58px",
-            height: "58px",
-            borderRadius: "50%",
-            border: "none",
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            cursor: "pointer",
-            pointerEvents: "auto",
-          }}
-        >
-          {/* Progress / offline ring */}
-{isOfflineUpload ? (
+            const isThreeLayout =
+              mediaCount === 3;
+
+            const isLargeThreeTile =
+              isThreeLayout &&
+              mediaIndex === 0;
+
+            const isLastVisible =
+              mediaIndex ===
+              visibleMedia.length - 1;
+
+            return (
+              <div
+                key={media.id}
+                onClick={() =>
+                  openMedia(media)
+                }
+                style={{
+                  position: "relative",
+                  minWidth: 0,
+                  minHeight: 0,
+                  overflow: "hidden",
+                  cursor: "pointer",
+
+                  ...(isLargeThreeTile
+                    ? {
+                        gridRow:
+                          "1 / span 2",
+                      }
+                    : {}),
+                }}
+              >
+                {isVideo ? (
+                  media.reply_thumbnail_url ||
+                  media.thumbnail_url ? (
+                    <img
+                      src={
+                        media.reply_thumbnail_url ||
+                        media.thumbnail_url
+                      }
+                      alt={t.video}
+                      draggable={false}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit:
+                          "cover",
+                        display: "block",
+                        background:
+                          "#000",
+                      }}
+                    />
+                  ) : (
+                    <video
+                      src={
+                        media.file_url
+                      }
+                      muted
+                      playsInline
+                      preload="metadata"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit:
+                          "cover",
+                        display: "block",
+                        background:
+                          "#000",
+                        pointerEvents:
+                          "none",
+                      }}
+                    />
+                  )
+                ) : (
+                  <img
+                    src={media.file_url}
+loading="eager"
+decoding="sync"
+                    alt={
+                      media.file_name ||
+                      t.photo
+                    }
+                    draggable={false}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                      background:
+                        "#000",
+                      userSelect: "none",
+                      WebkitUserSelect:
+                        "none",
+                      WebkitTouchCallout:
+                        "none",
+                    }}
+                  />
+                )}
+
+                {/* VIDEO PLAY INDICATOR */}
+                {isVideo && (
+                  <div
+                    style={{
+                      position:
+                        "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems:
+                        "center",
+                      justifyContent:
+                        "center",
+                      pointerEvents:
+                        "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius:
+                          "50%",
+                        background:
+  "#e5e5e5",
+                        display: "flex",
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "center",
+                        boxShadow:
+                          "0 3px 14px rgba(0,0,0,0.35)",
+                      }}
+                    >
+                      <div
+  style={{
+    width: 0,
+    height: 0,
+    borderTop: "9px solid transparent",
+    borderBottom: "9px solid transparent",
+    borderLeft: "14px solid #333333",
+    marginLeft: "3px",
+  }}
+/>
+                    </span>
+                  </div>
+                )}
+
+                {/* +N OVERLAY */}
+                {mediaCount > 4 &&
+                  isLastVisible && (
+                    <div
+                      style={{
+                        position:
+                          "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "center",
+                        background:
+                          "rgba(0,0,0,0.45)",
+                        color: "#fff",
+                        fontSize: 28,
+                        fontWeight: 700,
+                        pointerEvents:
+                          "none",
+                      }}
+                    >
+                      +{remainingCount}
+                    </div>
+                  )}
+
+                {/* TIME / READ STATUS */}
+                {mediaIndex ===
+                  visibleMedia.length -
+                    1 && (
+                  <div
+                    style={{
+                      position:
+                        "absolute",
+                      right: 8,
+                      bottom: 8,
+                      display: "flex",
+                      alignItems:
+                        "center",
+                      gap: 4,
+                      padding:
+                        "2px 6px",
+                      borderRadius: 12,
+                      background:
+                        "rgba(0,0,0,.45)",
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      pointerEvents:
+                        "none",
+                    }}
+                  >
+                    <span>
+                      {formatTime(
+                        media.created_at
+                      )}
+                    </span>
+
+                    {media.sender ===
+                      currentUser && (
+                      mediaGroupMessages.some(
+  (item) =>
+    item.uploading ||
+    item.offline
+                      
+                     ) ? (
+                        <LoaderCircle
+                          size={12}
+                          strokeWidth={
+                            2.5
+                          }
+                          style={{
+                            animation:
+                              "mspacePendingSpin 0.8s linear infinite",
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            color:
+                              media.is_read
+                                ? "#53bdeb"
+                                : "#fff",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {media.is_read
+                            ? "✓✓"
+                            : "✓"}
+                        </span>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          }
+        )}
+        {mediaGroupMessages.some(
+  (media) => media.uploading
+) && (
   <div
     style={{
       position: "absolute",
       inset: 0,
-      borderRadius: "50%",
-      border: "3px solid rgba(255,255,255,0.25)",
-      borderTopColor: "#ffffff",
-      animation:
-        "mspacePendingSpin 0.8s linear infinite",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      pointerEvents: "none",
+      zIndex: 10,
     }}
-  />
-) : (
-  <div
-    style={{
-      position: "absolute",
-      inset: 0,
-      borderRadius: "50%",
-      background: `conic-gradient(
-        #ffffff ${displayProgress * 3.6}deg,
-        rgba(255,255,255,0.25) 0deg
-      )`,
-      WebkitMask:
-        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-      mask:
-        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-    }}
-  />
-)}
+  >
+    <button
+      type="button"
+      aria-label={t.cancelUpload}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
 
-          {/* X */}
-          <span
-            style={{
-              position: "relative",
-              color: "#ffffff",
-              fontSize: "25px",
-              fontWeight: 300,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </span>
-        </button>
-      </div>
-    )}
+        if (msg.media_group_id) {
+  onCancelUpload(
+    msg.media_group_id
+  );
+} else {
+  const uploadingMedia =
+    mediaGroupMessages.find(
+      (media) => media.uploading
+    );
 
-    <div
-      style={{
-        position: "absolute",
-        right: 8,
-        bottom: 8,
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "2px 6px",
-        borderRadius: "12px",
-        background: "rgba(0,0,0,.45)",
-        color: "#fff",
-        fontSize: "11px",
-        fontWeight: 500,
+  if (uploadingMedia?.upload_id) {
+    onCancelUpload(
+      uploadingMedia.upload_id
+    );
+  }
+}
       }}
-    >
-      <span>{formatTime(msg.created_at)}</span>
-
-      {msg.sender === currentUser && (
-  (isOfflineUpload || msg.uploading) ? (
-    <LoaderCircle
-      size={12}
-      strokeWidth={2.5}
-      style={{
-        color: "#ffffff",
-        animation:
-          "mspacePendingSpin 0.8s linear infinite",
-      }}
-    />
-  ) : (
-    <span
-      style={{
-        color: msg.is_read ? "#53bdeb" : "#ffffff",
-      }}
-    >
-      {msg.is_read ? "✓✓" : "✓"}
-    </span>
-  )
-)}
-    </div>
-  </div>
-)}
-
-{msg.message_type === "video" && (
-  msg.uploading ? (
-    <div
       style={{
         position: "relative",
-        width: "250px",
-        height: "320px",
-        overflow: "hidden",
-        borderRadius: "16px",
-        background: "#000",
+        width: 58,
+        height: 58,
+        borderRadius: "50%",
+        border: "none",
+        background:
+          "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+        cursor: "pointer",
+        pointerEvents: "auto",
       }}
     >
-      {/* TEMPORARY VIDEO THUMBNAIL */}
-
-      <video
-  src={msg.file_url}
-  muted
-  playsInline
-  preload="metadata"
-  ref={(video) => {
-    if (video) {
-      video.pause();
-
-      if (video.readyState >= 2) {
-        video.currentTime = 0;
-      }
-    }
-  }}
-  onLoadedMetadata={(e) => {
-    const video = e.currentTarget;
-
-    video.pause();
-    video.currentTime = 0;
-  }}
-  onLoadedData={(e) => {
-    const video = e.currentTarget;
-
-    video.pause();
-    video.currentTime = 0;
-  }}
+      <svg
+  width="58"
+  height="58"
+  viewBox="0 0 58 58"
   style={{
     position: "absolute",
     inset: 0,
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-    background: "#000",
-    pointerEvents: "none",
+    width: "58px",
+    height: "58px",
+    transform: "rotate(-90deg)",
   }}
+>
+  {/* Background circle */}
+  <circle
+    cx="29"
+    cy="29"
+    r="26"
+    fill="none"
+    stroke="rgba(255,255,255,0.25)"
+    strokeWidth="3"
+  />
+
+  {/* Growing loading arc */}
+  <circle
+  cx="29"
+  cy="29"
+  r="26"
+  fill="none"
+  stroke="#ffffff"
+  strokeWidth="3"
+  strokeLinecap="round"
+  pathLength="100"
+  strokeDasharray="100 100"
+  strokeDashoffset={
+  Math.max(
+    10,
+    100 -
+      Math.min(
+        90,
+        ((Date.now() -
+          (uploadRingStartTimesRef.current[
+            uploadRingGroupId
+          ] || Date.now())) /
+          12000) *
+          90
+      )
+  )
+}
 />
+</svg>
 
-      {/* UPLOAD RING */}
-
-      <div
+      <span
         style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          pointerEvents: "none",
+          position: "relative",
+          color: "#ffffff",
+          fontSize: 25,
+          fontWeight: 300,
+          lineHeight: 1,
         }}
       >
-        <button
-          type="button"
-          aria-label={t.cancelVideoUpload}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (msg.upload_id) {
-              onCancelUpload(msg.upload_id);
-            }
-          }}
-          style={{
-            position: "relative",
-            width: "58px",
-            height: "58px",
-            borderRadius: "50%",
-            border: "none",
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            cursor: "pointer",
-            pointerEvents: "auto",
-          }}
-        >
-          {/* PROGRESS RING */}
-
-          {isOfflineUpload ? (
-  <div
-    style={{
-      position: "absolute",
-      inset: 0,
-      borderRadius: "50%",
-      border: "3px solid rgba(255,255,255,0.25)",
-      borderTopColor: "#ffffff",
-      animation:
-        "mspacePendingSpin 0.8s linear infinite",
-    }}
-  />
-) : (
-  <div
-    style={{
-      position: "absolute",
-      inset: 0,
-      borderRadius: "50%",
-      background: `conic-gradient(
-        #ffffff ${displayProgress * 3.6}deg,
-        rgba(255,255,255,0.25) 0deg
-      )`,
-      WebkitMask:
-        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-      mask:
-        "radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0)",
-    }}
-  />
-)}
-
-          {/* CANCEL */}
-
-          <span
-            style={{
-              position: "relative",
-              color: "#ffffff",
-              fontSize: "25px",
-              fontWeight: 300,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </span>
-        </button>
-      </div>
-
-      {/* TIMESTAMP */}
-
-      <div
-        style={{
-          position: "absolute",
-          right: 8,
-          bottom: 8,
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          padding: "2px 6px",
-          borderRadius: "12px",
-          background: "rgba(0,0,0,.45)",
-          color: "#fff",
-          fontSize: "11px",
-          fontWeight: 500,
-          pointerEvents: "none",
-        }}
-      >
-        <span>{formatTime(msg.created_at)}</span>
-        {msg.sender === currentUser && (
-  isOfflineUpload || msg.uploading ? (
-    <LoaderCircle
-      size={12}
-      strokeWidth={2.5}
-      style={{
-        color: "#ffffff",
-        animation:
-          "mspacePendingSpin 0.8s linear infinite",
-      }}
-    />
-  ) : (
-    <span
-      style={{
-        color: "#ffffff",
-        fontWeight: 700,
-      }}
-    >
-      ✓
-    </span>
-  )
+        ×
+      </span>
+    </button>
+  </div>
 )}
       </div>
-    </div>
-  ) : (
-    <VideoMessage
-      msg={msg}
-      currentUser={currentUser}
-      formatTime={formatTime}
-      onOpen={() => {
-        setViewerVideo(msg.file_url);
-        setShowVideoViewer(true);
-      }}
-      onClose={() => {
-        setShowVideoViewer(false);
-      }}
-    />
-  )
-)}
-
-
+    );
+  })()}
+ 
 {msg.message_type === "voice" && (
   <VoiceMessage
     msg={msg}

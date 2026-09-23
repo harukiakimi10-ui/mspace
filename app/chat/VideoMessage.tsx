@@ -666,7 +666,14 @@ export default function VideoMessage({
          ========================= */}
 
       <div
-  onClick={openPlayer}
+  onClick={() => {
+  if (onOpen) {
+    onOpen();
+    return;
+  }
+
+  openPlayer();
+}}
   style={{
     position: "relative",
     width: "250px",

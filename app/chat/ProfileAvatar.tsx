@@ -51,8 +51,10 @@ export default function ProfileAvatar({
         }}
       >
         <img
-          src={photoUrl}
-          alt=""
+  src={photoUrl}
+  loading="eager"
+  decoding="sync"
+  alt=""
           style={{
             width: "100%",
             height: "100%",
