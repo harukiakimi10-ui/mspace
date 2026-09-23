@@ -3178,13 +3178,15 @@ onVideo={() => {
   <div
     style={{
       flexShrink: 0,
-      width: "100%",
+      width: "calc(100% + 48px)",
       height: 60,
       minHeight: 60,
+      marginLeft: -24,
       overflow: "hidden",
       background: "#ffffff",
       position: "relative",
       zIndex: 1200,
+      
     }}
   >
     <Header />
@@ -3195,7 +3197,7 @@ onVideo={() => {
   <div
     style={{
       position: "absolute",
-      top: 68,
+      top: 65,
       left: 25,
       width: 550,
       height: 84,
@@ -3429,18 +3431,21 @@ onVideo={() => {
       boxSizing: "border-box",
       background: "#ffffff",
       borderRight: "1px solid #e9e5f2",
+      borderRadius: "16px 16px 0 0",
       display: "flex",
       flexDirection: "column",
       zIndex: 1000,
       overflow: "hidden",
     }}
   >
-
-    {/* Search */}
+{/* Search */}
 <div
   style={{
     padding: "14px 16px",
     borderBottom: "1px solid #f0edf5",
+    borderRadius: "16px 16px 0 0",
+    overflow: "hidden",
+    
   }}
 >
   <div

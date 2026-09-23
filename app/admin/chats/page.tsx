@@ -3,6 +3,12 @@
 import Header from "./components/Header";
 import Stats from "./components/Stats";
 import ConversationList from "./components/ConversationList";
+import {
+  Search,
+  Activity,
+  Users,
+  BellDot,
+} from "lucide-react";
 import NotificationButton from "@/app/NotificationButton";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -12,6 +18,22 @@ import {
 } from "react";
 
 export default function AdminChatsPage() {
+
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+
+    checkDesktop();
+
+    window.addEventListener("resize", checkDesktop);
+
+    return () => {
+      window.removeEventListener("resize", checkDesktop);
+    };
+  }, []);
 
   
 
@@ -40,12 +62,23 @@ const [selectedConversation, setSelectedConversation] = useState<any>(null);
 const [messages, setMessages] = useState<any[]>([]);
 const [reply, setReply] = useState("");
 const [onlineCount, setOnlineCount] = useState(0);
+const [conversationSearch, setConversationSearch] = useState("");
 const conversationRefreshTimeout =
   useRef<ReturnType<typeof setTimeout> | null>(null);
 
 const conversationListRef = useRef<HTMLDivElement>(null);  
 
 const totalMembers = conversations.length;
+const filteredConversations = conversations.filter((chat) => {
+  const search = conversationSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  const name = chat.member?.name?.toLowerCase() || "";
+  const memberId = chat.member?.member_id?.toLowerCase() || "";
+
+  return name.includes(search) || memberId.includes(search);
+});
 const unreadCount = conversations.filter(
   (c) => c.has_unread
 ).length;
@@ -437,35 +470,378 @@ console.log("Inserted admin message:", data);
   loadConversations();
 }
 
-  return (
+  return isDesktop ? (
+  /* =========================
+     DESKTOP ADMIN CHAT LIST
+     ========================= */
   <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      width: "100%",
+      height: "100dvh",
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+      background: "#f7f7fb",
+    }}
+  >
+    <Header />
+
+    <div
+      style={{
+        position: "relative",
+        flex: 1,
+        minHeight: 0,
+        overflow: "hidden",
+      }}
+    >
+      {/* Desktop stats */}
+<div
   style={{
-    position: "fixed",
-    inset: 0,
-    width: "100%",
-    height: "100dvh",
-    minHeight: 0,
-
+    position: "absolute",
+    top: 5,
+    left: 25,
+    width: 550,
+    height: 84,
+    boxSizing: "border-box",
     display: "flex",
-    flexDirection: "column",
-
-    overflow: "hidden",
-
-    background: "#fff",
-
-    overscrollBehavior: "none",
+    gap: 14,
+    padding: "8px 0",
+    background: "#f7f7fb",
+    zIndex: 1100,
   }}
 >
+  {/* ONLINE */}
+  <div
+    style={{
+      flex: 1,
+      borderRadius: 14,
+      padding: "10px 16px",
+      background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+      border: "1px solid rgba(255,255,255,.8)",
+      boxSizing: "border-box",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: "#dcfce7",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Activity
+          size={16}
+          color="#16a34a"
+          strokeWidth={2.3}
+        />
+      </div>
+
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#444",
+        }}
+      >
+        Online
+      </span>
+    </div>
+
+    <div
+      style={{
+        textAlign: "center",
+        fontSize: 24,
+        fontWeight: 700,
+        lineHeight: 1,
+        color: "#16a34a",
+        marginTop: 6,
+      }}
+    >
+      {onlineCount}
+    </div>
+  </div>
+
+  {/* MEMBERS */}
+  <div
+    style={{
+      flex: 1,
+      borderRadius: 14,
+      padding: "10px 16px",
+      background: "linear-gradient(135deg,#eff6ff,#dbeafe)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+      border: "1px solid rgba(255,255,255,.8)",
+      boxSizing: "border-box",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: "#dbeafe",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Users
+          size={16}
+          color="#2563eb"
+          strokeWidth={2.3}
+        />
+      </div>
+
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#444",
+        }}
+      >
+        Members
+      </span>
+    </div>
+
+    <div
+      style={{
+        textAlign: "center",
+        fontSize: 24,
+        fontWeight: 700,
+        lineHeight: 1,
+        color: "#2563eb",
+        marginTop: 6,
+      }}
+    >
+      {totalMembers}
+    </div>
+  </div>
+
+  {/* UNREAD */}
+  <div
+    style={{
+      flex: 1,
+      borderRadius: 14,
+      padding: "10px 16px",
+      background: "linear-gradient(135deg,#fef2f2,#fee2e2)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+      border: "1px solid rgba(255,255,255,.8)",
+      boxSizing: "border-box",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: "#fee2e2",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <BellDot
+          size={16}
+          color="#dc2626"
+          strokeWidth={2.3}
+        />
+      </div>
+
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#444",
+        }}
+      >
+        Unread
+      </span>
+    </div>
+
+    <div
+      style={{
+        textAlign: "center",
+        fontSize: 24,
+        fontWeight: 700,
+        lineHeight: 1,
+        color: "#dc2626",
+        marginTop: 6,
+      }}
+    >
+      {unreadCount}
+    </div>
+  </div>
+</div>
+
+      {/* Desktop conversation sidebar */}
+      <div
+        style={{
+          position: "absolute",
+          left: 25,
+          top: 98,
+          bottom: 0,
+          width: 550,
+          background: "#fff",
+          border: "1px solid #ece8f4",
+          borderRadius: 16,
+          overflow: "hidden",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.05)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Search */}
+        <div
+          style={{
+            padding: "14px 16px",
+            borderBottom: "1px solid #f0edf5",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              height: 40,
+              borderRadius: 12,
+              background: "#f6f4fa",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 14px",
+              gap: 10,
+            }}
+          >
+            <Search
+              size={18}
+              color="#7c3aed"
+              strokeWidth={2.2}
+            />
+
+            <input
+              type="text"
+              value={conversationSearch}
+              onChange={(e) =>
+                setConversationSearch(e.target.value)
+              }
+              placeholder="Search conversations"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                fontSize: 14,
+                color: "#111",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Conversation list */}
+        <div
+          ref={conversationListRef}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehaviorY: "contain",
+          }}
+        >
+          <ConversationList
+            conversations={filteredConversations}
+          />
+        </div>
+      </div>
+
+      {/* Empty desktop chat area */}
+      <div
+        style={{
+          position: "absolute",
+          left: 600,
+          right: 24,
+          top: 14,
+          bottom: 0,
+          borderRadius: 16,
+          background: "#faf9fc",
+          border: "1px solid #ece8f4",
+        }}
+      />
+    </div>
+  </div>
+) : (
+  /* =========================
+     MOBILE — EXISTING LAYOUT
+     ========================= */
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      width: "100%",
+      height: "100dvh",
+      minHeight: 0,
+
+      display: "flex",
+      flexDirection: "column",
+
+      overflow: "hidden",
+
+      background: "#fff",
+
+      overscrollBehavior: "none",
+    }}
+  >
     {/* Fixed Header + Counters */}
     <div
-  style={{
-    flexShrink: 0,
-    position: "relative",
-    zIndex: 1000,
-    background: "#fff",
-    overflow: "hidden",
-  }}
->
+      style={{
+        flexShrink: 0,
+        position: "relative",
+        zIndex: 1000,
+        background: "#fff",
+        overflow: "hidden",
+      }}
+    >
       <Header />
 
       <div style={{ padding: "8px 20px 0" }}>
@@ -476,24 +852,24 @@ console.log("Inserted admin message:", data);
         />
 
         <div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    padding: "10px 20px",
-  }}
->
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "10px 20px",
+          }}
+        />
 
-</div>
-
-        <div
-  style={{
-    display: "flex",
-    justifyContent: "flex-end",
-    padding: "8px 0 4px",
-  }}
->
-  <NotificationButton isAdmin={true} />
-</div>
+        {!isDesktop && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              padding: "8px 0 4px",
+            }}
+          >
+            <NotificationButton isAdmin={true} />
+          </div>
+        )}
       </div>
 
       <div
@@ -505,21 +881,21 @@ console.log("Inserted admin message:", data);
     </div>
 
     {/* ONLY THIS AREA SCROLLS */}
-<div
-ref={conversationListRef}
-  style={{
-    flex: 1,
-    minHeight: 0,
-    height: 0,
+    <div
+      ref={conversationListRef}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        height: 0,
 
-    overflowY: "auto",
-    overflowX: "hidden",
+        overflowY: "auto",
+        overflowX: "hidden",
 
-    WebkitOverflowScrolling: "touch",
+        WebkitOverflowScrolling: "touch",
 
-    overscrollBehaviorY: "contain",
-  }}
->
+        overscrollBehaviorY: "contain",
+      }}
+    >
       <ConversationList
         conversations={conversations}
       />
