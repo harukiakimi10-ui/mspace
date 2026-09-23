@@ -36,6 +36,8 @@ const t = {
 type AttachmentMenuProps = {
   open: boolean;
 
+  isDesktop?: boolean;
+
   onClose: () => void;
 
   onCamera: () => void;
@@ -49,6 +51,7 @@ type AttachmentMenuProps = {
 
 export default function AttachmentMenu({
   open,
+  isDesktop = false,
   onClose,
   onCamera,
   onPhoto,
@@ -67,7 +70,7 @@ export default function AttachmentMenu({
     position: "fixed",
     inset: 0,
 
-    background: "rgba(0,0,0,.12)",
+    background: "transparent",
     transition: "opacity .25s ease",
 
     zIndex: 1998,
@@ -81,11 +84,14 @@ export default function AttachmentMenu({
         style={{
   position: "fixed",
 
-  left: 0,
-  right: 0,
+  left: isDesktop ? "50%" : 0,
+  right: isDesktop ? "auto" : 0,
   bottom: 0,
+  width: isDesktop ? 430 : "auto",
 
-  transform: open
+  transform: isDesktop
+  ? "translateX(-50%)"
+  : open
     ? "translateY(0)"
     : "translateY(100%)",
 
@@ -94,10 +100,10 @@ export default function AttachmentMenu({
   willChange: "transform",
 
   background: "#fff",
-          borderTopLeftRadius: 0,
-          borderTopRightRadius: 0,
+          borderTopLeftRadius: isDesktop ? 18 : 0,
+          borderTopRightRadius: isDesktop ? 18 : 0,
 
-          padding: "18px",
+          padding: isDesktop ? "10px 18px 12px" : "18px",
 
           boxShadow:
             "0 -8px 30px rgba(0,0,0,.12)",
@@ -110,8 +116,8 @@ export default function AttachmentMenu({
         <div
   style={{
     position: "relative",
-    height: 36,
-    marginBottom: 20,
+    height: isDesktop ? 28 : 36,
+    marginBottom: isDesktop ? 8 : 20,
   }}
 >
   <div
@@ -120,7 +126,7 @@ export default function AttachmentMenu({
       left: "50%",
       transform: "translateX(-50%)",
       fontWeight: 700,
-      fontSize: 18,
+      fontSize: isDesktop ? 16 : 18,
       color: "#6d28d9",
     }}
   >
@@ -138,7 +144,7 @@ export default function AttachmentMenu({
       cursor: "pointer",
     }}
   >
-    <X size={22} color="#666" />
+    <X size={isDesktop ? 22 : 28} color="#666" />
   </button>
 </div>
 
@@ -153,25 +159,25 @@ export default function AttachmentMenu({
           }}
     >
   <MenuItem
-    icon={<Camera size={28} color="#6d28d9" />}
+    icon={<Camera size={isDesktop ? 22 : 28} color="#6d28d9" />}
     label={t.camera}
     onClick={onCamera}
   />
 
   <MenuItem
-  icon={<Image size={28} color="#6d28d9" />}
+  icon={<Image size={isDesktop ? 22 : 28} color="#6d28d9" />}
   label={t.photos}
   onClick={onPhoto}
 />
 
   <MenuItem
-    icon={<Video size={28} color="#6d28d9" />}
+    icon={<Video size={isDesktop ? 22 : 28} color="#6d28d9" />}
     label={t.video}
     onClick={onVideo}
   />
 
   <MenuItem
-    icon={<MapPin size={28} color="#6d28d9" />}
+    icon={<MapPin size={isDesktop ? 22 : 28} color="#6d28d9" />}
     label={t.location}
     onClick={onLocation}
   />

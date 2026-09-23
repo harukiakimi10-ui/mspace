@@ -40,10 +40,12 @@ type Conversation = {
 
 type Props = {
   conversations: Conversation[];
+  selectedConversationId?: string;
 };
 
 export default function ConversationList({
   conversations,
+  selectedConversationId,
 }: Props) {
 
   const router = useRouter();
@@ -153,10 +155,20 @@ function MessageReadReceipt({
           style={{
   display: "flex",
   alignItems: "center",
-  gap: "10px",
-  padding: "14px",
-  borderBottom: "1px solid #eee",
+  gap: "12px",
+  padding: "13px 16px",
+  borderBottom: "1px solid #f1eef6",
+  borderLeft:
+    selectedConversationId === chat.id
+      ? "3px solid #6d28d9"
+      : "3px solid transparent",
+  background:
+    selectedConversationId === chat.id
+      ? "#f5f1ff"
+      : "#ffffff",
   cursor: "pointer",
+  transition: "background 0.15s ease",
+  boxSizing: "border-box",
 }}
         >
           <ProfileAvatar

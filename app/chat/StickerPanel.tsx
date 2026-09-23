@@ -9,6 +9,9 @@ import data from "@emoji-mart/data";
 
 type StickerPanelProps = {
   open: boolean;
+
+  isDesktop?: boolean;
+  composerHeight?: number;
   onClose: () => void;
   onStickerSelect: (sticker: string) => void;
   onEmojiSelect: (emoji: string) => void;
@@ -16,6 +19,8 @@ type StickerPanelProps = {
 
 export default function StickerPanel({
   open,
+  isDesktop = false,
+  composerHeight = 70,
   onClose,
   onStickerSelect,
   onEmojiSelect,
@@ -42,25 +47,42 @@ export default function StickerPanel({
       <div
   data-mspace-sticker-panel="true"
   style={{
-    position: "fixed",
-    left: 0,
-    right: 0,
-    bottom: 0,
+  position: "fixed",
 
-    background: "#fff",
+  left: isDesktop ? "50%" : 0,
 
-          borderTopLeftRadius: 0,
-          borderTopRightRadius: 0,
+  right: isDesktop ? "auto" : 0,
 
-          padding: "8px 0 0 0",
+  bottom: isDesktop ? composerHeight + 20 : 0,
 
-          zIndex: 1999,
+  transform: isDesktop
+    ? "translateX(-50%)"
+    : "none",
 
-          height: "38vh",
+  width: isDesktop ? "600px" : "100%",
 
-          display: "flex",
-          flexDirection: "column",
-        }}
+  maxWidth: isDesktop
+    ? "calc(100vw - 595px)"
+    : "100%",
+
+  background: "#fff",
+
+  borderTopLeftRadius: isDesktop ? 18 : 0,
+  borderTopRightRadius: isDesktop ? 18 : 0,
+
+   boxShadow: isDesktop
+      ? "0 -10px 30px rgba(0,0,0,0.14)"
+      : "0 -8px 24px rgba(0,0,0,0.12)",
+
+  padding: "8px 0 0 0",
+
+  zIndex: isDesktop ? 6000 : 1999,
+
+  height: isDesktop ? "58vh" : "38vh",
+
+  display: "flex",
+  flexDirection: "column",
+}}
       >
 
         {/* Emoji / Sticker tabs */}

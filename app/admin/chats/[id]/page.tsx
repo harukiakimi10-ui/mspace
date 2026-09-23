@@ -23,14 +23,21 @@ import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
 import {
+  Activity,
+  Users,
+  BellDot,
   ChevronLeft,
   MoreVertical,
+  Search,
   Trash2,
   Pin,
 ChevronDown,
 } from "lucide-react";
 
 import DeleteConversationDialog from "@/app/admin/chats/components/DeleteConversationDialog";
+import ConversationList from "@/app/admin/chats/components/ConversationList";
+import Header from "@/app/admin/chats/components/Header";
+import Stats from "../components/Stats";
 import ChatComposer from "@/app/chat/ChatComposer";
 import StickerPanel from "@/app/chat/StickerPanel";
 import AttachmentMenu from "@/app/chat/AttachmentMenu";
@@ -82,6 +89,46 @@ export default function ChatPage() {
 
   const [conversation, setConversation] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [desktopConversations, setDesktopConversations] = useState<any[]>([]);
+
+useEffect(() => {
+  const checkDesktop = () => {
+    setIsDesktop(window.innerWidth >= 1024);
+  };
+
+  checkDesktop();
+
+  window.addEventListener("resize", checkDesktop);
+
+  return () => {
+    window.removeEventListener("resize", checkDesktop);
+  };
+}, []);
+
+useEffect(() => {
+  if (!isDesktop) return;
+
+  try {
+    const cached = localStorage.getItem(
+      "mspace-admin-conversations"
+    );
+
+    if (!cached) return;
+
+    const parsed = JSON.parse(cached);
+
+    if (Array.isArray(parsed)) {
+      setDesktopConversations(parsed);
+    }
+  } catch (error) {
+    console.error(
+      "MSpace desktop conversation cache error:",
+      error
+    );
+  }
+}, [isDesktop]);
 
   const [showMSpaceBrowser, setShowMSpaceBrowser] = useState(false);
   const [mspaceBrowserUrl, setMSpaceBrowserUrl] = useState("");
@@ -169,6 +216,8 @@ useEffect(() => {
     setShowStickerPanel(false);
   }
 }, [showMessageMenu, showStickerPanel]);
+
+const [conversationSearch, setConversationSearch] = useState("");
 
 
 const [showComposer, setShowComposer] = useState(true);
@@ -2969,6 +3018,25 @@ const handleForwardLocation = async (
   }
 };
 
+const filteredDesktopConversations = desktopConversations.filter(
+  (chat) => {
+    const search = conversationSearch.trim().toLowerCase();
+
+    if (!search) return true;
+
+    const name =
+      chat.member?.name?.toLowerCase() || "";
+
+    const memberId =
+      chat.member?.member_id?.toLowerCase() || "";
+
+    return (
+      name.includes(search) ||
+      memberId.includes(search)
+    );
+  }
+);
+
   return (
     <>
 
@@ -3014,6 +3082,7 @@ setTimeout(() => {
 
     <AttachmentMenu
   open={showAttachmentMenu}
+  isDesktop={isDesktop}
   onClose={() => setShowAttachmentMenu(false)}
 
   onCamera={() => {
@@ -3095,38 +3164,376 @@ onVideo={() => {
     minHeight: 0,
     display: "flex",
     flexDirection: "column",
-    background: "#f8f7ff",
+    background: isDesktop ? "#f7f7fb" : "#f8f7ff",
     position: "fixed",
     inset: 0,
     overflow: "hidden",
+        padding: isDesktop ? "0 24px 24px" : 0,
+        boxSizing: "border-box",
+  
   }}
 >
+
+  {isDesktop && (
+  <div
+    style={{
+      flexShrink: 0,
+      width: "100%",
+      height: 60,
+      minHeight: 60,
+      overflow: "hidden",
+      background: "#ffffff",
+      position: "relative",
+      zIndex: 1200,
+    }}
+  >
+    <Header />
+  </div>
+)}
+
+{isDesktop && (
+  <div
+    style={{
+      position: "absolute",
+      top: 68,
+      left: 25,
+      width: 550,
+      height: 84,
+      boxSizing: "border-box",
+      display: "flex",
+      gap: 14,
+      padding: "8px 0",
+      background: "#f7f7fb",
+      zIndex: 1100,
+    }}
+  >
+    {/* ONLINE */}
+    <div
+      style={{
+        flex: 1,
+        borderRadius: 14,
+        padding: "10px 16px",
+        background: "linear-gradient(135deg,#f0fdf4,#dcfce7)",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(255,255,255,.8)",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "#dcfce7",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Activity
+            size={16}
+            color="#16a34a"
+            strokeWidth={2.3}
+          />
+        </div>
+
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#444",
+          }}
+        >
+          Online
+        </span>
+      </div>
+
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: 24,
+          fontWeight: 700,
+          lineHeight: 1,
+          color: "#16a34a",
+          marginTop: 6,
+        }}
+      >
+        {
+          desktopConversations.filter(
+            (chat) => chat.member?.is_online
+          ).length
+        }
+      </div>
+    </div>
+
+    {/* MEMBERS */}
+    <div
+      style={{
+        flex: 1,
+        borderRadius: 14,
+        padding: "10px 16px",
+        background: "linear-gradient(135deg,#eff6ff,#dbeafe)",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(255,255,255,.8)",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "#dbeafe",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Users
+            size={16}
+            color="#2563eb"
+            strokeWidth={2.3}
+          />
+        </div>
+
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#444",
+          }}
+        >
+          Members
+        </span>
+      </div>
+
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: 24,
+          fontWeight: 700,
+          lineHeight: 1,
+          color: "#2563eb",
+          marginTop: 6,
+        }}
+      >
+        {desktopConversations.length}
+      </div>
+    </div>
+
+    {/* UNREAD */}
+    <div
+      style={{
+        flex: 1,
+        borderRadius: 14,
+        padding: "10px 16px",
+        background: "linear-gradient(135deg,#fef2f2,#fee2e2)",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+        border: "1px solid rgba(255,255,255,.8)",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "#fee2e2",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <BellDot
+            size={16}
+            color="#dc2626"
+            strokeWidth={2.3}
+          />
+        </div>
+
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#444",
+          }}
+        >
+          Unread
+        </span>
+      </div>
+
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: 24,
+          fontWeight: 700,
+          lineHeight: 1,
+          color: "#dc2626",
+          marginTop: 6,
+        }}
+      >
+        {
+          desktopConversations.filter(
+            (chat) => (chat.unreadCount ?? 0) > 0
+          ).length
+        }
+      </div>
+    </div>
+  </div>
+)}
+
+  {isDesktop && (
+  <div
+    style={{
+      position: "absolute",
+      left: 25,
+      top: 162,
+      bottom: 0,
+      width: 550,
+      boxSizing: "border-box",
+      background: "#ffffff",
+      borderRight: "1px solid #e9e5f2",
+      display: "flex",
+      flexDirection: "column",
+      zIndex: 1000,
+      overflow: "hidden",
+    }}
+  >
+
+    {/* Search */}
+<div
+  style={{
+    padding: "14px 16px",
+    borderBottom: "1px solid #f0edf5",
+  }}
+>
+  <div
+    style={{
+      height: 40,
+      borderRadius: 12,
+      background: "#f6f4fa",
+      display: "flex",
+      alignItems: "center",
+      padding: "0 14px",
+      color: "#999",
+      fontSize: 14,
+      boxSizing: "border-box",
+    }}
+  >
+    <Search
+      size={18}
+      strokeWidth={2}
+      color="#7c3aed"
+    />
+
+    <input
+      type="text"
+      value={conversationSearch}
+      onChange={(e) =>
+        setConversationSearch(e.target.value)
+      }
+      placeholder="Search conversations"
+      style={{
+        flex: 1,
+        minWidth: 0,
+        height: "100%",
+        marginLeft: 9,
+        border: "none",
+        outline: "none",
+        background: "transparent",
+        fontSize: 14,
+        color: "#333",
+      }}
+    />
+  </div>
+</div>
+
+    {/* Conversation list */}
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: "auto",
+        overflowX: "hidden",
+      }}
+    >
+      <ConversationList
+  conversations={filteredDesktopConversations}
+  selectedConversationId={
+    Array.isArray(id) ? id[0] : id
+  }
+/>
+    </div>
+  </div>
+)}
+
+  
     {/* Header */}
 
 <div
   style={{
-    height: 70,
-    minHeight: 70,
+    height: isDesktop ? 64 : 70,
+    minHeight: isDesktop ? 64 : 70,
+    marginLeft: isDesktop ? 550 : 0,
+    boxSizing: "border-box",
     flexShrink: 0,
     background: "#fff",
     color: "#111",
     display: "flex",
     alignItems: "center",
-    padding: "0 20px",
-    gap: 15,
+    padding: isDesktop ? "0 20px" : "0 20px",
+    gap: isDesktop ? 14 : 15,
+    zIndex: isDesktop ? 1200 : 1000,
 
     filter: "none",
 
   }}
 >
-      <div
-  style={{
-    position: "relative",
-    width: 40,
-    height: 40,
-    flexShrink: 0,
-  }}
->
+      {!isDesktop && (
+  <div
+    style={{
+      position: "relative",
+      width: 40,
+      height: 40,
+      flexShrink: 0,
+    }}
+  >
   <button
     type="button"
     onClick={() => router.push("/admin/chats")}
@@ -3187,6 +3594,7 @@ onVideo={() => {
 )}
 </button>
 </div>
+)}
 
       <ProfileAvatar
   name={
@@ -3196,7 +3604,7 @@ onVideo={() => {
     "Member"
   }
   photoUrl={member?.photo_url}
-  size={45}
+   size={isDesktop ? 40 : 45}
 />
       <div>
   <div
@@ -3327,12 +3735,13 @@ onVideo={() => {
       <div
         style={{
           flexShrink: 0,
+          marginLeft: isDesktop ? 550 : 0,
           display: "flex",
           alignItems: "center",
           gap: "8px",
-          width: "100%",
+          width: isDesktop ? "calc(100% - 550px)" : "100%",
           boxSizing: "border-box",
-          padding: "10px 12px",
+          padding: isDesktop ? "6px 10px" : "10px 12px",
           background: "#ffffff",
           borderBottom: "1px solid #eee",
           boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
@@ -3352,7 +3761,7 @@ onVideo={() => {
           style={{
             minWidth: 0,
             flex: 1,
-            fontSize: "14px",
+            fontSize: isDesktop ? "13px" : "14px",
             lineHeight: 1.4,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
@@ -3389,12 +3798,16 @@ onVideo={() => {
 
     {/* Messages */}
 
-   <div
+<div
   style={{
     flex: 1,
     minHeight: 0,
     position: "relative",
     overflow: "hidden",
+    marginLeft: isDesktop ? 550 : 0,
+    width: isDesktop
+      ? "calc(100% - 550px)"
+      : "100%",
   }}
 >
   <div
@@ -3541,8 +3954,8 @@ setMessageFocus={setMessageFocus}
     ? "calc(25vh + 5px)"
     : 95,
 
-      width: 36,
-      height: 36,
+      width: isDesktop ? 46 : 36,
+      height: isDesktop ? 46 : 36,
 
       borderRadius: "50%",
       border: "none",
@@ -3565,9 +3978,9 @@ setMessageFocus={setMessageFocus}
     }}
   >
     <ChevronDown
-      size={20}
-      strokeWidth={2.8}
-    />
+  size={isDesktop ? 25 : 20}
+  strokeWidth={2.8}
+/>
 
     {newMessageCount > 0 && (
       <span
@@ -3611,13 +4024,18 @@ setMessageFocus={setMessageFocus}
       position: "relative",
       zIndex: 200,
       background: "#ffffff",
+      marginLeft: isDesktop ? 550 : 0,
+      width: isDesktop
+        ? "calc(100% - 550px - 48px)"
+        : "100%",
     }}
   >
 
 
     <ChatComposer
-    composerRef={composerRef}
-    placeholder="Type a message..."
+  composerRef={composerRef}
+  isDesktop={isDesktop}
+  placeholder="Type a message..."
   showComposer={showComposer}
 
   message={reply}
@@ -3763,6 +4181,8 @@ onCloseStickerPanel={() => {
 
 <StickerPanel
   open={showStickerPanel}
+  isDesktop={isDesktop}
+  composerHeight={composerHeight}
   onClose={() => setShowStickerPanel(false)}
   onStickerSelect={(sticker) => {
     sendSticker(sticker);
@@ -4112,6 +4532,7 @@ onCloseStickerPanel={() => {
   open={showImageViewer || showVideoViewer}
   media={conversationMedia}
   initialIndex={viewerMediaIndex}
+  isDesktop={isDesktop}
   onClose={() => {
     setShowImageViewer(false);
     setShowVideoViewer(false);

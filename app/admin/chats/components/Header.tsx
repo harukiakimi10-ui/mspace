@@ -5,8 +5,34 @@ import {
   MessageCircleMore,
   Settings,
   Eye,
+  Bell,
 } from "lucide-react";
+
+import { useEffect, useState } from "react";
 export default function Header() {
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+  if ("Notification" in window) {
+    setNotificationsEnabled(
+      Notification.permission === "granted"
+    );
+  }
+
+  const updateDesktop = () => {
+    setIsDesktop(window.innerWidth >= 768);
+  };
+
+  updateDesktop();
+
+  window.addEventListener("resize", updateDesktop);
+
+  return () => {
+    window.removeEventListener("resize", updateDesktop);
+  };
+}, []);
+
   return (
   <div
     style={{
@@ -119,7 +145,66 @@ export default function Header() {
   Manage
 </>
       </Link>
+   
+   {isDesktop && !notificationsEnabled && (
+  <button
+    type="button"
+    onClick={async () => {
+      if (!("Notification" in window)) {
+        return;
+      }
+
+      const permission =
+        await Notification.requestPermission();
+
+      if (permission === "granted") {
+        setNotificationsEnabled(true);
+      }
+    }}
+    style={{
+  height: 40,
+  padding: "0 20px",
+  border: "none",
+  borderRadius: 10,
+  background: "linear-gradient(135deg,#7c3aed,#a855f7)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 9,
+  fontSize: 15,
+  fontWeight: 700,
+  cursor: "pointer",
+  boxShadow: "0 8px 18px rgba(124,58,237,.25)",
+  whiteSpace: "nowrap",
+
+  animation: "notificationPulse 1.8s ease-in-out infinite",
+}}
+  >
+    <Bell
+      size={19}
+      strokeWidth={2.2}
+    />
+
+    Enable Notifications
+  </button>
+)}
+
     </div>
+
+    <style>{`
+  @keyframes notificationPulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(0.94);
+    }
+  }
+`}</style>
   </div>
+ 
 );
 }

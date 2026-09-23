@@ -9,6 +9,8 @@ import VoiceRecorder from "./VoiceRecorder";
 type ChatComposerProps = {
   composerRef: React.RefObject<HTMLDivElement | null>;
 
+  isDesktop?: boolean;
+
   placeholder: string;
   showComposer?: boolean;
 
@@ -84,6 +86,7 @@ type ChatComposerProps = {
 
 export default function ChatComposer({
   composerRef,
+  isDesktop = false,
   placeholder,
 
   showComposer,
@@ -144,17 +147,21 @@ if (!showComposer) {
       ref={composerRef}
       style={{
         position: "fixed",
-  left: 0,
-  right: 0,
-  bottom: stickerOpen ? "38vh" : 0,
-
+left: isDesktop ? 575 : 0,
+right: 0,
+bottom: isDesktop
+  ? 0
+  : stickerOpen
+    ? "38vh"
+    : 0,
   zIndex: 5000,
         borderTop: "1px solid rgba(0,0,0,.08)",
         background: "#fff",
 
-        paddingTop: "8px",
-        paddingBottom:
-          "max(8px, env(safe-area-inset-bottom))",
+        paddingTop: isDesktop ? "12px" : "8px",
+paddingBottom: isDesktop
+  ? "12px"
+  : "max(8px, env(safe-area-inset-bottom))",
 
         boxShadow: "none",
       }}
@@ -199,6 +206,7 @@ if (!showComposer) {
     
       {voiceState === "idle" ? (
   <MessageInput
+  isDesktop={isDesktop}
     placeholder={placeholder}
     message={message}
     messageInputRef={messageInputRef}

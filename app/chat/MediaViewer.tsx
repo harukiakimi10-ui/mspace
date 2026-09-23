@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type MediaItem = {
   id: string;
@@ -14,6 +15,7 @@ type MediaViewerProps = {
   media: MediaItem[];
   initialIndex: number;
   onClose: () => void;
+  isDesktop?: boolean;
 };
 
 export default function MediaViewer({
@@ -21,6 +23,7 @@ export default function MediaViewer({
   media,
   initialIndex,
   onClose,
+  isDesktop = false,
 }: MediaViewerProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -189,6 +192,84 @@ export default function MediaViewer({
       >
         ×
       </button>
+
+      {isDesktop && currentIndex > 0 && (
+  <button
+    type="button"
+    onClick={() => {
+      const container = scrollRef.current;
+
+      if (!container) return;
+
+      container.scrollTo({
+        left: (currentIndex - 1) * container.clientWidth,
+        behavior: "smooth",
+      });
+    }}
+    aria-label="Previous media"
+    style={{
+      position: "absolute",
+      left: 24,
+      top: "50%",
+      transform: "translateY(-50%)",
+      zIndex: 20,
+      width: 48,
+      height: 48,
+      borderRadius: "50%",
+      border: "none",
+      background: "rgba(255,255,255,0.92)",
+      color: "#111",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      cursor: "pointer",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+      WebkitTapHighlightColor: "transparent",
+    }}
+  >
+    <ChevronLeft size={30} strokeWidth={2.4} />
+  </button>
+)}
+
+{isDesktop && currentIndex < media.length - 1 && (
+  <button
+    type="button"
+    onClick={() => {
+      const container = scrollRef.current;
+
+      if (!container) return;
+
+      container.scrollTo({
+        left: (currentIndex + 1) * container.clientWidth,
+        behavior: "smooth",
+      });
+    }}
+    aria-label="Next media"
+    style={{
+      position: "absolute",
+      right: 24,
+      top: "50%",
+      transform: "translateY(-50%)",
+      zIndex: 20,
+      width: 48,
+      height: 48,
+      borderRadius: "50%",
+      border: "none",
+      background: "rgba(255,255,255,0.92)",
+      color: "#111",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      cursor: "pointer",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+      WebkitTapHighlightColor: "transparent",
+    }}
+  >
+    <ChevronRight size={30} strokeWidth={2.4} />
+  </button>
+)}
 
       {/* MEDIA COUNTER */}
       <div

@@ -12,6 +12,7 @@ import { useLayoutEffect } from "react";
 
 
 type MessageInputProps = {
+  isDesktop?: boolean;
   message: string;
   messageInputRef: React.RefObject<HTMLTextAreaElement | null>;
 
@@ -43,6 +44,8 @@ type MessageInputProps = {
 };
 
 export default function MessageInput({
+  isDesktop = false,
+
   message,
   messageInputRef,
   placeholder,
@@ -77,19 +80,21 @@ export default function MessageInput({
   return (
   <div
     style={{
-      display: "flex",
-      gap: "8px",
-      padding: "0 18px 14px 10px",
-      alignItems: "center",
-    }}
+  display: "flex",
+  gap: isDesktop ? "10px" : "8px",
+  padding: isDesktop
+    ? "0 22px 18px 16px"
+    : "0 18px 14px 10px",
+  alignItems: "center",
+}}
   >
       <button
   onClick={onAttach}
   style={{
     ...premiumButton,
 
-    width: "40px",
-    height: "40px",
+    width: isDesktop ? "48px" : "40px",
+    height: isDesktop ? "48px" : "40px",
 
     background: "#f3f4f6",
     borderRadius: "50%",
@@ -102,7 +107,7 @@ export default function MessageInput({
   }}
 >
   <Plus
-  size={26}
+  size={isDesktop ? 30 : 26}
   strokeWidth={2.4}
   color="#444"
 />
@@ -111,8 +116,8 @@ export default function MessageInput({
       <button
         onClick={onToggleQuickEmoji}
         style={{
-          width: "44px",
-          height: "44px",
+          width: isDesktop ? "50px" : "44px",
+          height: isDesktop ? "50px" : "44px",
           background: "transparent",
           border: "none",
           display: "flex",
@@ -124,16 +129,16 @@ export default function MessageInput({
       >
         {stickerOpen ? (
   <Keyboard
-    size={24}
+    size={isDesktop ? 28 : 24}
     strokeWidth={2.2}
     color="#444"
   />
 ) : (
   <Smile
-  size={26}
-  strokeWidth={2.2}
-  color="#444"
-/>
+    size={isDesktop ? 30 : 26}
+    strokeWidth={2.2}
+    color="#444"
+  />
 )}
       </button>
 
@@ -174,19 +179,21 @@ onFocus={() => {
   rows={1}
         style={{
   flex: 1,
-  minHeight: "38px",
+  minHeight: isDesktop ? "54px" : "38px",
   maxHeight: "140px",
-  padding: "7px 14px",
-  borderRadius: "20px",
+
+  padding: isDesktop ? "10px 18px" : "7px 14px",
+
+  borderRadius: isDesktop ? "27px" : "20px",
   border: "1px solid #ccc",
   outline: "none",
   resize: "none",
   overflowY: "auto",
   fontFamily: "inherit",
-  fontSize: "14px",
-  lineHeight: 1.5,
 
-  // Keep text readable on iPhone Dark Mode
+  fontSize: isDesktop ? "17px" : "14px",
+  lineHeight: isDesktop ? 1.45 : 1.5,
+
   color: "#222222",
   backgroundColor: "#ffffff",
   WebkitTextFillColor: "#222222",
@@ -208,8 +215,8 @@ onFocus={() => {
   }}
   style={{
     ...premiumButton,
-    width: "38px",
-    height: "38px",
+    width: isDesktop ? "48px" : "38px",
+    height: isDesktop ? "48px" : "38px",
     cursor: "pointer",
     opacity: 1,
     flexShrink: 0,
@@ -217,18 +224,18 @@ onFocus={() => {
 >
 
   {message.trim() ? (
-    <SendHorizontal
-      size={17}
-      strokeWidth={2.4}
-      color="#fff"
-    />
-  ) : (
-    <Mic
-      size={18}
-      strokeWidth={2.4}
-      color="#fff"
-    />
-  )}
+  <SendHorizontal
+    size={isDesktop ? 21 : 17}
+    strokeWidth={2.4}
+    color="#fff"
+  />
+) : (
+  <Mic
+    size={isDesktop ? 22 : 18}
+    strokeWidth={2.4}
+    color="#fff"
+  />
+)}
 </button>
     </div>
   );
