@@ -2561,14 +2561,29 @@ async function uploadFile(
 
   console.log("Admin: converting video to MP4/H.264...");
 
-  finalFile = await compressVideo(file);
+const compressionStart = performance.now();
 
-  console.log(
-    "Admin final video:",
-    (finalFile.size / 1024 / 1024).toFixed(2),
-    "MB",
-    finalFile.type
-  );
+finalFile = await compressVideo(file);
+
+const compressionSeconds =
+  (performance.now() - compressionStart) / 1000;
+
+alert(
+  `Video compression took ${compressionSeconds.toFixed(1)} seconds`
+);
+
+console.log(
+  "Admin compression time:",
+  compressionSeconds.toFixed(1),
+  "seconds"
+);
+
+console.log(
+  "Admin final video:",
+  (finalFile.size / 1024 / 1024).toFixed(2),
+  "MB",
+  finalFile.type
+);
 }
 
   try {
@@ -2762,7 +2777,7 @@ async function uploadFile(
 
         finish();
       }
-    }, 5000);
+    }, 15000);
 
     video.load();
   });

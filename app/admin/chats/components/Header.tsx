@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 export default function Header() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 const [isDesktop, setIsDesktop] = useState(false);
+const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
   if ("Notification" in window) {
@@ -23,6 +24,8 @@ const [isDesktop, setIsDesktop] = useState(false);
   const updateDesktop = () => {
     setIsDesktop(window.innerWidth >= 768);
   };
+
+  setIsAndroid(/Android/i.test(navigator.userAgent));
 
   updateDesktop();
 
@@ -90,7 +93,7 @@ const [isDesktop, setIsDesktop] = useState(false);
   style={{
     display: "flex",
     alignItems: "center",
-    gap: "12px",
+    gap: isAndroid ? "4px" : "12px",
   }}
 >
   <button
@@ -104,9 +107,9 @@ const [isDesktop, setIsDesktop] = useState(false);
       background: "#f5edff",
       color: "#6d28d9",
       border: "1px solid #e9d5ff",
-      padding: "7px 10px",
-       borderRadius: "10px",
-      fontSize: "13px",
+      padding: isAndroid ? "6px 8px" : "7px 10px",
+       borderRadius: isAndroid ? "9px" : "10px",
+      fontSize: isAndroid ? "12px" : "13px",
       fontWeight: 700,
       cursor: "pointer",
       boxShadow: "0 2px 8px rgba(109,40,217,0.06)",
@@ -114,7 +117,7 @@ const [isDesktop, setIsDesktop] = useState(false);
       flexShrink: 0,
     }}
   >
-    <Eye size={17} />
+    <Eye size={isAndroid ? 15 : 17} />
     <span>Member View</span>
   </button>
 
@@ -125,11 +128,11 @@ const [isDesktop, setIsDesktop] = useState(false);
   alignItems: "center",
   gap: "5px",
 
-  padding: "7px 10px",
+  padding: isAndroid ? "6px 8px" : "7px 10px",
 
-  borderRadius: "10px",
+  borderRadius: isAndroid ? "9px" : "10px",
 
-  fontSize: "13px",
+  fontSize: isAndroid ? "12px" : "13px",
   fontWeight: 600,
 
   color: "#333",
@@ -141,7 +144,7 @@ const [isDesktop, setIsDesktop] = useState(false);
 }}
       >
         <>
-  <Settings size={16} />
+  <Settings size={isAndroid ? 15 : 16} />
   Manage
 </>
       </Link>

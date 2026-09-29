@@ -105,8 +105,8 @@ export async function compressVideo(file: File): Promise<File> {
     video: {
       codec: "avc",
       bitrate: videoBitrate,
-      forceTranscode: true,
-      hardwareAcceleration: "no-preference",
+      forceTranscode: false,
+      hardwareAcceleration: "prefer-hardware",
     },
 
     audio: {

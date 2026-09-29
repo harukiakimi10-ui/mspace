@@ -18,6 +18,7 @@ export default function RecentVisitorsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [visitors, setVisitors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
     async function checkAdminAndLoad() {
@@ -103,6 +104,12 @@ export default function RecentVisitorsPage() {
 
     checkAdminAndLoad();
   }, []);
+
+  useEffect(() => {
+  setIsAndroid(
+    /Android/i.test(navigator.userAgent)
+  );
+}, []);
 
   function getVisitTime(visitedAt: string) {
     const date = new Date(visitedAt);
@@ -237,21 +244,23 @@ export default function RecentVisitorsPage() {
               window.location.href = "/admin/chats";
             }}
             style={{
-              height: "48px",
-              padding: "0 16px",
-              borderRadius: "16px",
+              height: isAndroid ? "42px" : "48px",
+              padding: isAndroid ? "0 10px" : "0 16px",
+              borderRadius: isAndroid ? "13px" : "16px",
               border: "1px solid #e5e7eb",
               background: "#ffffff",
               color: "#1f2937",
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              fontSize: "15px",
+              gap: isAndroid ? "5px" : "8px",
+              fontSize: isAndroid ? "13px" : "15px",
               fontWeight: 700,
               cursor: "pointer",
             }}
           >
-            <MessageCircleMore size={22} />
+            <MessageCircleMore
+  size={isAndroid ? 19 : 22}
+/>
             Chats
           </button>
 
@@ -261,21 +270,21 @@ export default function RecentVisitorsPage() {
               window.location.href = "/admin/login";
             }}
             style={{
-              height: "48px",
-              padding: "0 16px",
-              borderRadius: "16px",
+              height: isAndroid ? "42px" : "48px",
+              padding: isAndroid ? "0 10px" : "0 16px",
+              borderRadius: isAndroid ? "13px" : "16px",
               border: "none",
               background: "#dc2626",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              fontSize: "15px",
+              gap: isAndroid ? "5px" : "8px",
+              fontSize: isAndroid ? "13px" : "15px",
               fontWeight: 700,
               cursor: "pointer",
             }}
           >
-            <LogOut size={22} />
+            <LogOut size={isAndroid ? 19 : 22} />
             Logout
           </button>
         </div>

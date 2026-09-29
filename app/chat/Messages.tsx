@@ -322,6 +322,9 @@ useEffect(() => {
 
 const longPressTriggeredRef = useRef(false);
 
+const touchStartXRef = useRef(0);
+const touchStartYRef = useRef(0);
+
 const unlockMenuAudio = () => {
   try {
     const AudioContextClass =
@@ -959,7 +962,7 @@ const locationCoordinates = isReplyLocation
   msg.message_type === "video" &&
   msg.sender === currentUser &&
   isAndroid
-    ? "6px 8px"
+    ? "6px 0px"
     : "6px 0px",
 
     position: "relative",
@@ -1010,7 +1013,8 @@ width: "fit-content",
 
 marginRight:
   msg.sender === currentUser &&
-  msg.message_type === "video" &&
+  (msg.message_type === "image" ||
+    msg.message_type === "video") &&
   isAndroid
     ? "16px"
     : "0",
@@ -1104,6 +1108,11 @@ onPointerDownCapture={(e) => {
 
 onTouchStart={(e) => {
   longPressTriggeredRef.current = false;
+
+  if (isAndroid) {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  }
 
   const messageElement =
     e.currentTarget as HTMLElement;
@@ -1207,7 +1216,27 @@ onTouchEnd={(e) => {
 }}
 
 onTouchMove={(e) => {
-  // Allow small natural finger movement
+  if (!isAndroid) return;
+
+  const moveX = e.touches[0].clientX;
+  const moveY = e.touches[0].clientY;
+
+  const deltaX =
+    Math.abs(moveX - touchStartXRef.current);
+
+  const deltaY =
+    Math.abs(moveY - touchStartYRef.current);
+
+  // Small finger movement is allowed.
+  // Once the finger actually starts scrolling,
+  // cancel the long-press timer.
+  if (deltaX > 8 || deltaY > 8) {
+    clearTimeout(
+      (e.currentTarget as any)._pressTimer
+    );
+
+    longPressTriggeredRef.current = true;
+  }
 }}
 
 

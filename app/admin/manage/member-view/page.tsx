@@ -106,6 +106,14 @@ const [videoPreviewFullscreen, setVideoPreviewFullscreen] =
   useState(false);
 const [uploadingVideo, setUploadingVideo] = useState(false);
 
+const [allMediaMuted, setAllMediaMuted] = useState(true);
+
+const [allMediaPlaying, setAllMediaPlaying] =
+  useState<Record<string, boolean>>({});
+
+  const [videoViewerPlaying, setVideoViewerPlaying] =
+  useState<Record<string, boolean>>({});
+
 
 const videoPreviewUrls = useMemo(() => {
   return videoPreviewFiles.map((file) =>
@@ -275,6 +283,7 @@ setActiveAction(null);
 const videoInputRef = useRef<HTMLInputElement | null>(null);
 
 const videoViewerRef = useRef<HTMLDivElement | null>(null);
+const allMediaVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
 
 const fullscreenVideoRefs =
@@ -357,6 +366,14 @@ const [cacheReady, setCacheReady] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState("");
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  const [isAndroid, setIsAndroid] = useState(false);
+
+useEffect(() => {
+  setIsAndroid(
+    /Android/i.test(navigator.userAgent)
+  );
+}, []);
 
   const [selectedIndex, setSelectedIndex] =
   useState<number | null>(null);
@@ -498,6 +515,112 @@ useEffect(() => {
 
   return () => clearTimeout(timer);
 }, [selectedVideoIndex, videoViewerMuted]);
+
+useEffect(() => {
+  const videos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  videos.forEach((video) => {
+    video.muted = allMediaMuted;
+  });
+}, [allMediaMuted]);
+
+useEffect(() => {
+  Object.values(allMediaVideoRefs.current).forEach((video) => {
+    if (!video) return;
+
+    video.muted = allMediaMuted;
+
+    if (!allMediaMuted) {
+      video.play().catch(() => {});
+    }
+  });
+}, [allMediaMuted]);
+
+useEffect(() => {
+  if (activeMediaTab !== "all") return;
+
+  const videos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const video = entry.target as HTMLVideoElement;
+
+        if (entry.isIntersecting) {
+          video.muted = allMediaMuted;
+
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      });
+    },
+    {
+      threshold: 0.6,
+    }
+  );
+
+  videos.forEach((video) => observer.observe(video));
+
+  return () => {
+    observer.disconnect();
+  };
+}, [activeMediaTab, allMediaMuted]);
+
+useEffect(() => {
+  if (activeMediaTab !== "all") return;
+
+  const videos =
+    document.querySelectorAll<HTMLVideoElement>(
+      "#all-media video"
+    );
+
+  if (videos.length === 0) return;
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const video =
+          entry.target as HTMLVideoElement;
+
+        if (entry.isIntersecting) {
+          // Pause every other video
+          videos.forEach((otherVideo) => {
+            if (otherVideo !== video) {
+              otherVideo.pause();
+            }
+          });
+
+          // Apply the current global mute state
+          video.muted = allMediaMuted;
+
+          // Play the currently visible video
+          video.play().catch(() => {});
+        } else {
+          // Stop videos that are no longer visible
+          video.pause();
+        }
+      });
+    },
+    {
+      threshold: 0.7,
+    }
+  );
+
+  videos.forEach((video) => {
+    observer.observe(video);
+  });
+
+  return () => {
+    observer.disconnect();
+  };
+}, [activeMediaTab, allMedia.length, allMediaMuted]);
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [touchStartX, setTouchStartX] = useState(0);
@@ -1231,7 +1354,11 @@ id="member-view-top"
   >
     <span
       style={{
-        fontSize: isMobile ? "17px" : "20px",
+        fontSize: isAndroid
+  ? "15px"
+  : isMobile
+  ? "17px"
+  : "20px",
         fontWeight: 800,
         color: "#111827",
         whiteSpace: "nowrap",
@@ -1279,11 +1406,17 @@ id="member-view-top"
         background: "#f8f8f8",
         color: "#3f3f3f",
         border: "1px solid #e5e5e5",
-        padding: isMobile
-          ? "8px 10px"
-          : "9px 13px",
+        padding: isAndroid
+  ? "7px 7px"
+  : isMobile
+  ? "8px 10px"
+  : "9px 13px",
         borderRadius: "12px",
-        fontSize: isMobile ? "12px" : "13px",
+        fontSize: isAndroid
+  ? "11px"
+  : isMobile
+  ? "12px"
+  : "13px",
         fontWeight: 700,
         cursor: "pointer",
         boxShadow:
@@ -1310,9 +1443,9 @@ id="member-view-top"
     background: "#ffffff",
     color: "#333333",
     border: "1px solid #e5e5e5",
-    padding: "9px 12px",
+    padding: isAndroid ? "7px 7px" : "9px 12px",
     borderRadius: "12px",
-    fontSize: "13px",
+    fontSize: isAndroid ? "11px" : "13px",
     fontWeight: 600,
     cursor: "pointer",
     boxShadow:
@@ -1340,11 +1473,17 @@ id="member-view-top"
         background: "#ef3030",
         color: "#ffffff",
         border: "1px solid #ef3030",
-        padding: isMobile
-          ? "8px 10px"
-          : "9px 13px",
+        padding: isAndroid
+  ? "7px 7px"
+  : isMobile
+  ? "8px 10px"
+  : "9px 13px",
         borderRadius: "12px",
-        fontSize: isMobile ? "12px" : "13px",
+        fontSize: isAndroid
+  ? "11px"
+  : isMobile
+  ? "12px"
+  : "13px",
         fontWeight: 700,
         cursor: "pointer",
         boxShadow:
@@ -2574,7 +2713,11 @@ disabled={savingProfile}
     display: editingProfile ? "none" : "flex",
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: isMobile ? "15px" : "30px",
+    gap: isAndroid
+  ? "3px"
+  : isMobile
+  ? "5px"
+  : "7px",
     justifyContent: "flex-start",
     marginTop: "0px",
     marginBottom: "5px",
@@ -2777,7 +2920,7 @@ boxSizing: "border-box",
     position: "sticky",
 
     top: 0,
-    zIndex: 1000,
+    zIndex: 9999,
     background: "#ffffff",
     paddingTop: "10px",
     paddingBottom: "10px",
@@ -2815,6 +2958,7 @@ boxSizing: "border-box",
   <button
     type="button"
     onClick={() => {
+      setAllMediaMuted(true);
   setActiveMediaTab("photos");
 
   requestAnimationFrame(() => {
@@ -2854,6 +2998,7 @@ boxSizing: "border-box",
   <button
     type="button"
     onClick={() => {
+      setAllMediaMuted(true);
   setActiveMediaTab("videos");
 
   requestAnimationFrame(() => {
@@ -2926,19 +3071,106 @@ boxSizing: "border-box",
             }}
           />
         ) : (
-          <video
-            src={media.url}
-            muted
-            playsInline
-            preload="metadata"
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              display: "block",
-              background: "#000",
-            }}
-          />
+          <div
+  style={{
+    position: "relative",
+    width: "100%",
+    height: "100%",
+  }}
+>
+  {!allMediaPlaying[media.id] && (
+    <img
+      src={media.thumbnail_url}
+      alt=""
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        display: "block",
+        background: "#000",
+        zIndex: 1,
+      }}
+    />
+  )}
+
+  <video
+    ref={(video) => {
+      allMediaVideoRefs.current[media.id] = video;
+    }}
+    src={media.url}
+    poster={media.thumbnail_url}
+    muted={allMediaMuted}
+    playsInline
+    preload="auto"
+    onLoadStart={() => {
+      setAllMediaPlaying((prev) => ({
+        ...prev,
+        [media.id]: false,
+      }));
+    }}
+    onPlaying={(e) => {
+      const video = e.currentTarget;
+
+      if ("requestVideoFrameCallback" in video) {
+        video.requestVideoFrameCallback(() => {
+          setAllMediaPlaying((prev) => ({
+            ...prev,
+            [media.id]: true,
+          }));
+        });
+      } else {
+        requestAnimationFrame(() => {
+          setAllMediaPlaying((prev) => ({
+            ...prev,
+            [media.id]: true,
+          }));
+        });
+      }
+    }}
+    style={{
+      width: "100%",
+      height: "100%",
+      objectFit: "contain",
+      display: "block",
+      background: "#000",
+      opacity: allMediaPlaying[media.id] ? 1 : 0,
+      zIndex: 2,
+    }}
+  />
+
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+
+      setAllMediaMuted((prev) => !prev);
+    }}
+    style={{
+      position: "absolute",
+      bottom: "24px",
+      right: "18px",
+      width: "46px",
+      height: "46px",
+      borderRadius: "50%",
+      border: "none",
+      background: "#fff",
+      color: "#000",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      zIndex: 10,
+    }}
+  >
+    {allMediaMuted ? (
+      <VolumeX size={23} strokeWidth={2.4} />
+    ) : (
+      <Volume2 size={23} strokeWidth={2.4} />
+    )}
+  </button>
+</div>
         )}
       </div>
     ))}
@@ -3807,31 +4039,86 @@ if (videoToPlay) {
           padding: "20px",
         }}
       >
-        <video
-  ref={(el) => {
-    fullscreenVideoRefs.current[index] = el;
+        <div
+  style={{
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   }}
-  playsInline
-  muted={videoViewerMuted}
-  controls={videoViewerControlsVisible === index}
-  onClick={(e) => {
-    e.stopPropagation();
-    setVideoViewerControlsVisible(index);
-  }}
-          style={{
-            width: "100%",
-            height: "100%",
-            maxWidth: "100%",
-            maxHeight: "100%",
-            objectFit: "contain",
-            background: "#000",
-          }}
-        >
-          <source
-            src={video.video_url}
-            type="video/mp4"
-          />
-        </video>
+>
+  {!videoViewerPlaying[video.id] && (
+    <img
+      src={video.thumbnail_url || undefined}
+      alt=""
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        objectFit: "contain",
+        display: "block",
+        zIndex: 1,
+      }}
+    />
+  )}
+
+  <video
+    ref={(el) => {
+      fullscreenVideoRefs.current[index] = el;
+    }}
+    playsInline
+    poster={video.thumbnail_url || undefined}
+    muted={videoViewerMuted}
+    controls={videoViewerControlsVisible === index}
+    onLoadStart={() => {
+      setVideoViewerPlaying((prev) => ({
+        ...prev,
+        [video.id]: false,
+      }));
+    }}
+    onPlaying={(e) => {
+      const videoElement = e.currentTarget;
+
+      if ("requestVideoFrameCallback" in videoElement) {
+        videoElement.requestVideoFrameCallback(() => {
+          setVideoViewerPlaying((prev) => ({
+            ...prev,
+            [video.id]: true,
+          }));
+        });
+      } else {
+        requestAnimationFrame(() => {
+          setVideoViewerPlaying((prev) => ({
+            ...prev,
+            [video.id]: true,
+          }));
+        });
+      }
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+      setVideoViewerControlsVisible(index);
+    }}
+    style={{
+      width: "100%",
+      height: "100%",
+      maxWidth: "100%",
+      maxHeight: "100%",
+      objectFit: "contain",
+      background: "#000",
+      opacity: videoViewerPlaying[video.id] ? 1 : 0,
+      zIndex: 2,
+    }}
+  >
+    <source
+      src={video.video_url}
+      type="video/mp4"
+    />
+  </video>
+</div>
       </div>
     ))}
   </div>

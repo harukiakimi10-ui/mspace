@@ -71,6 +71,10 @@ export default function MessageMenu({
   onDeleteForMe,
   onDeleteForEveryone,
 }: MessageMenuProps) {
+  const isAndroid =
+    typeof navigator !== "undefined" &&
+    /Android/i.test(navigator.userAgent);
+
   if (!open || !selectedMessage) return null;
 
   // Message type
@@ -206,6 +210,7 @@ export default function MessageMenu({
             transition: "0.2s",
             fontWeight: 400,
             fontSize: "14px",
+            color: isAndroid ? "#222222" : undefined,
           }}
         >
           <div
@@ -250,6 +255,7 @@ export default function MessageMenu({
               transition: "0.2s",
               fontWeight: 400,
               fontSize: "14px",
+              color: isAndroid ? "#222222" : undefined,
             }}
           >
             <div
@@ -294,6 +300,7 @@ export default function MessageMenu({
       transition: "0.2s",
       fontWeight: 400,
       fontSize: "14px",
+      color: isAndroid ? "#222222" : undefined,
     }}
   >
     <div
@@ -339,6 +346,7 @@ export default function MessageMenu({
               transition: "0.2s",
               fontWeight: 400,
               fontSize: "14px",
+              color: isAndroid ? "#222222" : undefined,
             }}
           >
             <div
@@ -383,6 +391,7 @@ export default function MessageMenu({
       transition: "0.2s",
       fontWeight: 400,
       fontSize: "14px",
+      color: isAndroid ? "#222222" : undefined,
     }}
   >
     <div
@@ -427,6 +436,7 @@ export default function MessageMenu({
             transition: "0.2s",
             fontWeight: 400,
             fontSize: "14px",
+            color: isAndroid ? "#222222" : undefined,
           }}
         >
           <div

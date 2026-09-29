@@ -20,16 +20,23 @@ export default function Stats({
   unreadCount,
 }: StatsProps) {
   const [mounted, setMounted] = useState(false);
+const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+  setMounted(true);
+  setIsAndroid(/Android/i.test(navigator.userAgent));
+}, []);
 
   const cardStyle = {
-    flex: 1,
+  flex: 1,
 
-    borderRadius: "18px",
+  ...(isAndroid
+    ? {
+        minWidth: 0,
+      }
+    : {}),
 
+  borderRadius: "18px",
     padding: "12px",
 
     minHeight: "78px",
@@ -40,22 +47,38 @@ export default function Stats({
 
     boxSizing: "border-box" as const,
 
+minWidth: isAndroid ? 0 : undefined,
+
     boxShadow: "0 14px 30px rgba(124,58,237,.10)",
 
     border: "1px solid rgba(255,255,255,.7)",
   };
 
   const titleRow = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  };
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+
+  ...(isAndroid
+    ? {
+        minWidth: 0,
+      }
+    : {}),
+};
 
   const labelStyle = {
-    fontSize: "14px",
-    fontWeight: 700,
-    color: "#444",
-  };
+  fontSize: "14px",
+  fontWeight: 700,
+  color: "#444",
+
+  ...(isAndroid
+    ? {
+        whiteSpace: "nowrap" as const,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }
+    : {}),
+};
 
   const numberStyle = {
   textAlign: "center" as const,
@@ -68,14 +91,20 @@ export default function Stats({
 
   return (
     <div
-      style={{
-        display: "flex",
-        gap: "10px",
-        marginTop: "4px",
-        marginBottom: "10px",
-        width: "100%",
-      }}
-    >
+  style={{
+    display: "flex",
+    gap: "10px",
+    marginTop: "4px",
+    marginBottom: "10px",
+    width: "100%",
+    ...(isAndroid
+      ? {
+          minWidth: 0,
+          boxSizing: "border-box",
+        }
+      : {}),
+  }}
+>
       {/* ONLINE */}
 
       <div

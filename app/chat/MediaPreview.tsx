@@ -55,6 +55,8 @@ export default function MediaPreview({
     const [viewerOpen, setViewerOpen] =
   useState(false);
 
+  const [isDesktop, setIsDesktop] = useState(false);
+
 const [viewerIndex, setViewerIndex] =
   useState(0);
 
@@ -62,6 +64,21 @@ const [viewerIndex, setViewerIndex] =
    * Generate a thumbnail from the selected
    * local video.
    */
+
+  useEffect(() => {
+  const checkDesktop = () => {
+    setIsDesktop(window.innerWidth >= 768);
+  };
+
+  checkDesktop();
+
+  window.addEventListener("resize", checkDesktop);
+
+  return () => {
+    window.removeEventListener("resize", checkDesktop);
+  };
+}, []);
+
   useEffect(() => {
     if (!open) {
       setVideoThumbnail(null);
@@ -481,17 +498,32 @@ const [viewerIndex, setViewerIndex] =
     }
   };
 
+
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "#000",
-        display: "flex",
-        flexDirection: "column",
-        zIndex: 9999,
-        overflow: "hidden",
-      }}
+  position: "fixed",
+  inset: 0,
+  background: "#000",
+  display: "flex",
+  flexDirection: "column",
+  zIndex: 9999,
+  overflow: "hidden",
+
+  ...(isDesktop
+    ? {
+        width: "min(900px, calc(100vw - 80px))",
+        height: "min(800px, calc(100vh - 80px))",
+        top: "50%",
+        left: "50%",
+        right: "auto",
+        bottom: "auto",
+        transform: "translate(-50%, -50%)",
+        borderRadius: "18px",
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.35)",
+      }
+    : {}),
+}}
     >
       {/* MEDIA AREA */}
 <div

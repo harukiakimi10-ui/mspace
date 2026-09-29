@@ -78,6 +78,8 @@ async function getCachedMediaUrl(url: string) {
   }
 }
 
+const [isAndroid, setIsAndroid] = useState(false);
+
   const [photos, setPhotos] = useState<any[]>([]);
 
 const [videos, setVideos] = useState<any[]>([]);
@@ -87,6 +89,8 @@ const [profileBio, setProfileBio] = useState("");
 
 const [activeMediaTab, setActiveMediaTab] =
   useState<"all" | "photos" | "videos">("all");
+
+  const [isMediaNavFixed, setIsMediaNavFixed] = useState(false);
 
 
 const [profilePhoto, setProfilePhoto] = useState("");
@@ -146,6 +150,12 @@ const photoViewerRef =
   useRef<HTMLDivElement | null>(null);
 
 const videoViewerRef =
+  useRef<HTMLDivElement | null>(null);
+
+  const mediaNavRef =
+  useRef<HTMLDivElement | null>(null);
+
+const mediaNavPlaceholderRef =
   useRef<HTMLDivElement | null>(null);
 
 const fullscreenPhotoRefs =
@@ -822,6 +832,7 @@ const allMedia = useMemo(() => {
 }, [photos, videos]);
 
 useEffect(() => {
+
   if (selectedIndex === null) return;
 
   setPhotoViewerCurrentIndex(selectedIndex);
@@ -893,6 +904,39 @@ video.muted = activeMedia
 }, [activeMediaTab, allMedia.length, allMediaMuted]);
 
 useEffect(() => {
+  if (!isAndroid) return;
+
+  const mediaNav = mediaNavRef.current;
+
+  if (!mediaNav) return;
+
+  const originalTop =
+    mediaNav.getBoundingClientRect().top +
+    window.scrollY;
+
+  const handleScroll = () => {
+    setIsMediaNavFixed(
+      window.scrollY >= originalTop
+    );
+  };
+
+  handleScroll();
+
+  window.addEventListener(
+    "scroll",
+    handleScroll,
+    { passive: true }
+  );
+
+  return () => {
+    window.removeEventListener(
+      "scroll",
+      handleScroll
+    );
+  };
+}, [isAndroid]);
+
+useEffect(() => {
   const previousScrollRestoration =
     window.history.scrollRestoration;
 
@@ -901,6 +945,8 @@ useEffect(() => {
   const timer = setTimeout(() => {
     window.scrollTo(0, 0);
   }, 100);
+ 
+  setIsAndroid(/Android/i.test(navigator.userAgent));
 
   return () => {
     clearTimeout(timer);
@@ -1309,19 +1355,37 @@ marginRight: "0",
       
       {/* MEDIA NAVIGATION */}
 
+      {isAndroid && (
+  <div
+    ref={mediaNavPlaceholderRef}
+    style={{
+      display: "none",
+      width: "100%",
+      height: 0,
+    }}
+  />
+)}
+
 <div
+ref={isAndroid ? mediaNavRef : undefined}
   style={{
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "60px",
-    marginTop: "14px",
+    marginTop:
+  isAndroid && isMediaNavFixed
+    ? "0px"
+    : "14px",
     marginBottom: "14px",
     width: "100%",
     boxSizing: "border-box",
-    position: "sticky",
+    position:
+  isAndroid && isMediaNavFixed
+    ? "fixed"
+    : "sticky",
     top: 0,
-    zIndex: 1000,
+    zIndex: 9999,
     background: "#ffffff",
     paddingTop: "10px",
     paddingBottom: "10px",
@@ -1329,10 +1393,10 @@ marginRight: "0",
 >
   {/* ALL */}
   <button
-    type="button"
-    onClick={() => {
-      setActiveMediaTab("all");
-    }}
+  type="button"
+  onPointerDown={() => {
+    setActiveMediaTab("all");
+  }}
     style={{
       width: "44px",
       height: "44px",
@@ -1358,31 +1422,9 @@ marginRight: "0",
   {/* PHOTOS */}
   <button
     type="button"
-    onClick={() => {
-  const allVideos =
-    document.querySelectorAll<HTMLVideoElement>(
-      "#all-media video"
-    );
-
-  allVideos.forEach((video) => {
-    video.muted = true;
-    video.pause();
-  });
-
-  setAllMediaMuted((prev) => {
-    const next = { ...prev };
-
-    allMedia.forEach((item) => {
-      if (item.type === "video") {
-        next[item.id] = true;
-      }
-    });
-
-    return next;
-  });
-
+    onPointerDown={() => {
   setActiveMediaTab("photos");
-    }}
+}}
     style={{
       width: "44px",
       height: "44px",
@@ -1408,31 +1450,9 @@ marginRight: "0",
   {/* VIDEOS */}
   <button
     type="button"
-    onClick={() => {
-  const allVideos =
-    document.querySelectorAll<HTMLVideoElement>(
-      "#all-media video"
-    );
-
-  allVideos.forEach((video) => {
-    video.muted = true;
-    video.pause();
-  });
-
-  setAllMediaMuted((prev) => {
-    const next = { ...prev };
-
-    allMedia.forEach((item) => {
-      if (item.type === "video") {
-        next[item.id] = true;
-      }
-    });
-
-    return next;
-  });
-
+    onPointerDown={() => {
   setActiveMediaTab("videos");
-    }}
+}}
     style={{
       width: "44px",
       height: "44px",
