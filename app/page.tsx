@@ -1036,6 +1036,7 @@ onClick={() => {
       fontSize: "16px",
       marginBottom: "10px",
       boxSizing: "border-box",
+      color: "#6b7280",
     }}
   />
 
