@@ -189,6 +189,63 @@ useEffect(() => {
     );
   }
 )
+
+.on(
+  "postgres_changes",
+  {
+    event: "UPDATE",
+    schema: "public",
+    table: "members",
+  },
+  (payload) => {
+    const updatedMember = payload.new as any;
+
+    setConversations((current) => {
+      const updatedConversations = current.map(
+        (conversation) =>
+          conversation.member?.member_id ===
+          updatedMember?.member_id
+            ? {
+                ...conversation,
+                member: {
+                  ...conversation.member,
+                  is_online:
+                    updatedMember.is_online,
+                  online_at:
+                    updatedMember.online_at,
+                  last_seen:
+                    updatedMember.last_seen,
+                },
+              }
+            : conversation
+      );
+
+      const now = Date.now();
+
+      const activeOnlineCount =
+        updatedConversations.filter((conversation) => {
+          if (!conversation.member?.is_online) {
+            return false;
+          }
+
+          if (!conversation.member?.online_at) {
+            return false;
+          }
+
+          const onlineAt = new Date(
+            conversation.member.online_at
+          ).getTime();
+
+          return now - onlineAt < 2 * 60 * 1000;
+        }).length;
+
+      setOnlineCount(activeOnlineCount);
+
+      return updatedConversations;
+    });
+  }
+)
+
     .subscribe();
 
   return () => {

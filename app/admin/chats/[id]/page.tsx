@@ -91,7 +91,28 @@ export default function ChatPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   const [isDesktop, setIsDesktop] = useState(false);
-  const [desktopConversations, setDesktopConversations] = useState<any[]>([]);
+  const [desktopConversations, setDesktopConversations] =
+  useState<any[]>(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    try {
+      const cached = localStorage.getItem(
+        "mspace-admin-conversations"
+      );
+
+      if (!cached) {
+        return [];
+      }
+
+      const parsed = JSON.parse(cached);
+
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 
 useEffect(() => {
   const checkDesktop = () => {
@@ -110,25 +131,177 @@ useEffect(() => {
 useEffect(() => {
   if (!isDesktop) return;
 
-  try {
-    const cached = localStorage.getItem(
-      "mspace-admin-conversations"
-    );
+  let cancelled = false;
 
-    if (!cached) return;
+  const loadDesktopConversations = async () => {
+    try {
+      // Show cached conversations immediately if available
+      try {
+        const cached = localStorage.getItem(
+          "mspace-admin-conversations"
+        );
 
-    const parsed = JSON.parse(cached);
+        if (cached) {
+          const parsed = JSON.parse(cached);
 
-    if (Array.isArray(parsed)) {
-      setDesktopConversations(parsed);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDesktopConversations(parsed);
+          }
+        }
+      } catch (error) {
+        console.error(
+          "MSpace desktop conversation cache error:",
+          error
+        );
+      }
+
+      // Get the latest conversations from Supabase
+      const { data: conversations, error } =
+        await supabase
+          .from("conversations")
+          .select("*")
+          .order("updated_at", {
+            ascending: false,
+          });
+
+      if (error) {
+        console.error(
+          "Desktop conversations load error:",
+          error
+        );
+        return;
+      }
+
+      const result = await Promise.all(
+        (conversations || []).map(
+          async (conversation) => {
+            const [
+              memberResult,
+              unreadResult,
+              lastMessageResult,
+            ] = await Promise.all([
+              supabase
+                .from("members")
+                .select("*")
+                .eq(
+                  "member_id",
+                  conversation.member_id
+                )
+                .maybeSingle(),
+
+              supabase
+                .from("messages")
+                .select("id", {
+                  count: "exact",
+                  head: true,
+                })
+                .eq(
+                  "conversation_id",
+                  conversation.id
+                )
+                .eq("sender", "member")
+                .eq("is_read", false),
+
+              supabase
+                .from("messages")
+                .select("*")
+                .eq(
+                  "conversation_id",
+                  conversation.id
+                )
+                .order("created_at", {
+                  ascending: false,
+                })
+                .limit(1),
+            ]);
+
+            const member = memberResult.data;
+
+            const lastMessage =
+              lastMessageResult.data?.[0] || null;
+
+            const unreadCount =
+              unreadResult.count ?? 0;
+
+            return {
+              ...conversation,
+              member,
+              lastMessage,
+              unreadCount,
+              has_unread: unreadCount > 0,
+            };
+          }
+        )
+      );
+
+      if (cancelled) return;
+
+      result.sort((a, b) => {
+        const aTime = a.lastMessage
+          ? new Date(
+              a.lastMessage.created_at
+            ).getTime()
+          : 0;
+
+        const bTime = b.lastMessage
+          ? new Date(
+              b.lastMessage.created_at
+            ).getTime()
+          : 0;
+
+        return bTime - aTime;
+      });
+
+      setDesktopConversations(result);
+
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(result)
+        );
+      } catch (error) {
+        console.error(
+          "MSpace desktop conversation cache save error:",
+          error
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Desktop conversation load error:",
+        error
+      );
     }
-  } catch (error) {
-    console.error(
-      "MSpace desktop conversation cache error:",
-      error
-    );
-  }
+  };
+
+  loadDesktopConversations();
+
+  return () => {
+    cancelled = true;
+  };
 }, [isDesktop]);
+
+useEffect(() => {
+  if (!isDesktop) return;
+
+  const savedScroll = sessionStorage.getItem(
+    "mspace-conversation-list-scroll"
+  );
+
+  if (savedScroll === null) return;
+
+  const restoreScroll = () => {
+    const list = document.querySelector(
+      '[data-mspace-conversation-scroll="true"]'
+    ) as HTMLElement | null;
+
+    if (!list) return;
+
+    list.scrollTop = Number(savedScroll);
+  };
+
+  requestAnimationFrame(restoreScroll);
+}, [isDesktop]);
+
 
   const [showMSpaceBrowser, setShowMSpaceBrowser] = useState(false);
   const [mspaceBrowserUrl, setMSpaceBrowserUrl] = useState("");
@@ -919,30 +1092,185 @@ setTimeout(() => {
       event: "*",
       schema: "public",
       table: "messages",
-      filter: `conversation_id=eq.${id}`,
     },
     async (payload) => {
 
   if (payload.eventType === "INSERT") {
-    const newMessage = payload.new as any;
+  console.log(
+    "🔥 ADMIN CHAT REALTIME INSERT:",
+    payload.new
+  );
 
-    if (newMessage?.deleted_for !== "admin") {
-      setMessages((currentMessages) => {
-        const alreadyExists = currentMessages.some(
-          (message) => message.id === newMessage.id
-        );
+  const newMessage = payload.new as any;
 
-        if (alreadyExists) {
-          return currentMessages;
-        }
+  if (newMessage?.deleted_for !== "admin") {
+  if (newMessage.conversation_id === id) {
+    setMessages((currentMessages) => {
+      const alreadyExists = currentMessages.some(
+        (message) => message.id === newMessage.id
+      );
 
-        return [
-          ...currentMessages,
-          newMessage,
-        ];
-      });
+      if (alreadyExists) {
+        return currentMessages;
+      }
+
+      return [
+        ...currentMessages,
+        newMessage,
+      ];
+    });
     }
+
+    // Update the desktop conversation list immediately
+    setDesktopConversations((currentConversations) => {
+      const conversationExists = currentConversations.some(
+  (chat) => chat.id === newMessage.conversation_id
+);
+
+
+console.log("🔥 SIDEBAR REALTIME UPDATE:", {
+  incomingConversationId: newMessage.conversation_id,
+  conversationExists,
+  sidebarCount: currentConversations.length,
+});
+
+if (!conversationExists) {
+  void (async () => {
+    const { data: conversation } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("id", newMessage.conversation_id)
+      .maybeSingle();
+
+    if (!conversation) return;
+
+    const { data: member } = await supabase
+      .from("members")
+      .select("*")
+      .eq("member_id", conversation.member_id)
+      .maybeSingle();
+
+    const preview =
+      newMessage.message_type === "text"
+        ? newMessage.content || ""
+        : newMessage.message_type === "image"
+        ? "📷 Photo"
+        : newMessage.message_type === "video"
+        ? "🎥 Video"
+        : newMessage.message_type === "voice"
+        ? "🎤 Voice"
+        : newMessage.message_type === "sticker"
+        ? "🏷️ Sticker"
+        : newMessage.message_type === "location"
+        ? "📍 Location"
+        : newMessage.content || "";
+
+    setDesktopConversations((current) => {
+      if (
+        current.some(
+          (chat) => chat.id === conversation.id
+        )
+      ) {
+        return current;
+      }
+
+      return [
+        {
+          ...conversation,
+          member,
+          lastMessage: {
+            ...newMessage,
+            content: preview,
+          },
+          unreadCount:
+            newMessage.sender === "member" ? 1 : 0,
+          has_unread:
+            newMessage.sender === "member",
+        },
+        ...current,
+      ];
+    });
+  })();
+
+  return currentConversations;
+}
+      const updated = currentConversations.map(
+        (chat) => {
+          if (chat.id !== newMessage.conversation_id) {
+            return chat;
+          }
+
+          let preview = "";
+
+          if (newMessage.message_type === "text") {
+            preview = newMessage.content || "";
+          } else if (
+            newMessage.message_type === "image"
+          ) {
+            preview = "📷 Photo";
+          } else if (
+            newMessage.message_type === "video"
+          ) {
+            preview = "🎥 Video";
+          } else if (
+            newMessage.message_type === "voice"
+          ) {
+            preview = "🎤 Voice";
+          } else if (
+            newMessage.message_type === "sticker"
+          ) {
+            preview = "🏷️ Sticker";
+          } else if (
+            newMessage.message_type === "location"
+          ) {
+            preview = "📍 Location";
+          } else {
+            preview = newMessage.content || "";
+          }
+
+          return {
+            ...chat,
+
+            lastMessage: {
+              ...newMessage,
+              content: preview,
+            },
+
+            unreadCount:
+              newMessage.sender === "member"
+                ? (chat.unreadCount ?? 0) + 1
+                : chat.unreadCount ?? 0,
+
+            has_unread:
+              newMessage.sender === "member"
+                ? true
+                : chat.has_unread,
+          };
+        }
+      );
+
+      // Move the conversation with the new message
+      // to the top of the list.
+      updated.sort((a, b) => {
+        const aTime = a.lastMessage
+          ? new Date(
+              a.lastMessage.created_at
+            ).getTime()
+          : 0;
+
+        const bTime = b.lastMessage
+          ? new Date(
+              b.lastMessage.created_at
+            ).getTime()
+          : 0;
+
+        return bTime - aTime;
+      });
+
+      return updated;
+    });
   }
+}
 
   if (payload.eventType === "UPDATE") {
   const updatedMessage = payload.new as any;
@@ -1004,6 +1332,25 @@ setTimeout(() => {
   (payload) => {
     const updatedMember = payload.new as any;
 
+    // Update the desktop sidebar member status
+    // for any member who changes online status.
+    setDesktopConversations((currentConversations) =>
+      currentConversations.map((chat) =>
+        chat.member?.member_id === updatedMember?.member_id
+          ? {
+              ...chat,
+              member: {
+                ...chat.member,
+                is_online: updatedMember.is_online,
+                online_at: updatedMember.online_at,
+                last_seen: updatedMember.last_seen,
+              },
+            }
+          : chat
+      )
+    );
+
+    // Update the currently open member
     if (
       updatedMember?.member_id !==
       memberIdRef.current
@@ -1016,6 +1363,7 @@ setTimeout(() => {
       {
         name: updatedMember.name,
         is_online: updatedMember.is_online,
+        online_at: updatedMember.online_at,
         last_seen: updatedMember.last_seen,
       }
     );
@@ -1025,6 +1373,7 @@ setTimeout(() => {
       name: updatedMember.name,
       photo_url: updatedMember.photo_url,
       is_online: updatedMember.is_online,
+      online_at: updatedMember.online_at,
       last_seen: updatedMember.last_seen,
     }));
   }
@@ -1039,16 +1388,37 @@ setTimeout(() => {
       table: "conversations",
     },
     (payload) => {
-  if (payload.new?.id !== id) return;
+  const updatedConversation = payload.new as any;
 
-  setConversation((prev: any) => ({
-    ...(prev || {}),
-    ...payload.new,
-  }));
+  // Update the open chat header
+  if (updatedConversation?.id === id) {
+    setConversation((prev: any) => ({
+      ...(prev || {}),
+      ...updatedConversation,
+    }));
+  }
+
+  // Update typing status for any conversation in the desktop sidebar
+  setDesktopConversations((currentConversations) =>
+    currentConversations.map((chat) =>
+      chat.id === updatedConversation?.id
+        ? {
+            ...chat,
+            member_typing:
+              updatedConversation.member_typing,
+          }
+        : chat
+    )
+  );
 }
   )
 
-  .subscribe();
+  .subscribe((status) => {
+  console.log(
+    "🔥 ADMIN CHAT REALTIME STATUS:",
+    status
+  );
+});
 
 const unreadChannel = supabase
   .channel("admin-unread-conversations")
@@ -2049,6 +2419,18 @@ async function markMessagesAsRead() {
     .eq("conversation_id", id)
     .eq("sender", "member")
     .eq("is_read", false);
+
+    setDesktopConversations((currentConversations) =>
+  currentConversations.map((chat) =>
+    chat.id === id
+      ? {
+          ...chat,
+          unreadCount: 0,
+          has_unread: false,
+        }
+      : chat
+  )
+);
 
     // Update the MSpace Home Screen badge
 const { count: unreadCount, error: unreadCountError } =
@@ -3288,10 +3670,18 @@ onVideo={() => {
         }}
       >
         {
-          desktopConversations.filter(
-            (chat) => chat.member?.is_online
-          ).length
-        }
+  desktopConversations.filter((chat) => {
+    if (!chat.member?.is_online) return false;
+
+    if (!chat.member?.online_at) return false;
+
+    const onlineAt = new Date(
+      chat.member.online_at
+    ).getTime();
+
+    return Date.now() - onlineAt < 2 * 60 * 1000;
+  }).length
+}
       </div>
     </div>
 
@@ -3506,13 +3896,26 @@ onVideo={() => {
 
     {/* Conversation list */}
     <div
-      style={{
-        flex: 1,
-        minHeight: 0,
-        overflowY: "auto",
-        overflowX: "hidden",
-      }}
-    >
+  data-mspace-conversation-scroll="true"
+  onClick={(event) => {
+    const target = event.target as HTMLElement;
+
+    if (!target.closest("[data-conversation-id]")) return;
+
+    const list = event.currentTarget;
+
+    sessionStorage.setItem(
+      "mspace-conversation-list-scroll",
+      String(list.scrollTop)
+    );
+  }}
+  style={{
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    overflowX: "hidden",
+  }}
+>
       <ConversationList
   conversations={filteredDesktopConversations}
   selectedConversationId={

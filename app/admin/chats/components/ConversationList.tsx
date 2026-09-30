@@ -71,7 +71,9 @@ export default function ConversationList({
   return colors[Math.abs(hash) % colors.length];
 }
 
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(
+  typeof window !== "undefined"
+);
 
   useEffect(() => {
     setMounted(true);
