@@ -147,12 +147,49 @@ ownerSpace: "黄定襄的",
   const memberId = localStorage.getItem("mspace_member_id");
   console.log("Member ID:", memberId);
 
-  // We already know this browser has a member.
-  if (memberId) {
-    console.log("Already logged in");
+  // Check whether the stored member ID still exists.
+if (memberId) {
+  const supabase = createClient();
+
+  const { data: existingMember, error } = await supabase
+    .from("members")
+    .select("member_id, banned")
+    .eq("member_id", memberId)
+    .maybeSingle();
+
+  console.log("Stored member ID:", memberId);
+  console.log("Stored member lookup:", existingMember);
+  console.log("Stored member lookup error:", error);
+
+  // Database/network error — do not destroy the stored identity.
+  if (error) {
+    console.log(
+      "Could not verify stored member because of a database/network error."
+    );
+    return false;
+  }
+
+  // The browser has a stale member ID.
+  if (!existingMember) {
+    console.log(
+      "Stored member ID no longer exists. Clearing stale ID."
+    );
+
+    localStorage.removeItem("mspace_member_id");
+
+    // Continue through the normal device/account check.
+  } else {
+    // Existing account is banned.
+    if (existingMember.banned) {
+      console.log("Stored member is banned");
+      return true;
+    }
+
+    console.log("Valid member found. Restoring login...");
     router.replace("/members");
     return false;
   }
+}
 
   const deviceId = localStorage.getItem("mspace_device_id");
   console.log("Device ID:", deviceId);

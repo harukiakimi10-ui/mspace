@@ -91,7 +91,6 @@ const [activeMediaTab, setActiveMediaTab] =
   useState<"all" | "photos" | "videos">("all");
 
   const [isMediaNavFixed, setIsMediaNavFixed] = useState(false);
-  const [debugMemberId, setDebugMemberId] = useState("");
 
 
 const [profilePhoto, setProfilePhoto] = useState("");
@@ -128,14 +127,6 @@ const [memberPhoto, setMemberPhoto] = useState("");
     });
   });
 }, [selectedVideoIndex]);
-
-useEffect(() => {
-  const memberId = localStorage.getItem("mspace_member_id");
-
-  if (memberId) {
-    setDebugMemberId(memberId);
-  }
-}, []);
 
   const [photoViewerCurrentIndex, setPhotoViewerCurrentIndex] =
   useState<number | null>(null);
@@ -999,25 +990,6 @@ useEffect(() => {
     visibility: cacheReady ? "visible" : "hidden",
   }}
 >
-{debugMemberId && (
-  <div
-    style={{
-      position: "fixed",
-      bottom: "10px",
-      left: "10px",
-      right: "10px",
-      zIndex: 99999,
-      padding: "12px",
-      background: "#111",
-      color: "#fff",
-      borderRadius: "10px",
-      fontSize: "12px",
-      wordBreak: "break-all",
-    }}
-  >
-    Member ID: {debugMemberId}
-  </div>
-)}
 
   {isOffline && (
   <div
