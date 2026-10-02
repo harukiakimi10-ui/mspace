@@ -38,24 +38,8 @@ export default function AdminChatsPage() {
   
 
 
-const [conversations, setConversations] = useState<any[]>(() => {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const cached =
-      localStorage.getItem(
-        "mspace-admin-conversations"
-      );
-
-    return cached
-      ? JSON.parse(cached)
-      : [];
-  } catch {
-    return [];
-  }
-});
+const [conversations, setConversations] =
+  useState<any[]>([]);
 
 
 const [selectedConversation, setSelectedConversation] = useState<any>(null);

@@ -2893,16 +2893,7 @@ async function uploadFile(
     "Member: converting video to MP4/H.264..."
   );
 
-  const compressionStart = performance.now();
-
-uploadFile = await compressVideo(file);
-
-const compressionSeconds =
-  (performance.now() - compressionStart) / 1000;
-
-alert(
-  `Video compression took ${compressionSeconds.toFixed(1)} seconds`
-);
+  uploadFile = await compressVideo(file);
 
   console.log(
     "Member final video:",

@@ -319,7 +319,7 @@ const finalMemberId = isAdmin
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: "8px",
+          gap: "5px",
 
           border: "none",
 
@@ -328,17 +328,17 @@ const finalMemberId = isAdmin
 
           color: "#fff",
 
-          padding: "13px 20px",
+          padding: "7px 10px",
 
-          borderRadius: "14px",
+          borderRadius: "10px",
 
-          fontSize: "15px",
+          fontSize: "13px",
           fontWeight: 700,
 
           cursor: "pointer",
 
           boxShadow:
-            "0 8px 24px rgba(124,58,237,.35)",
+  "0 2px 8px rgba(124,58,237,.20)",
 
           animation:
             "notificationPulse 1.8s ease-in-out infinite",
@@ -347,8 +347,8 @@ const finalMemberId = isAdmin
         }}
       >
         <Bell
-          size={19}
-          strokeWidth={2.3}
+          size={16}
+          strokeWidth={2.2}
         />
 
         <span>{t.enableNotifications}</span>
