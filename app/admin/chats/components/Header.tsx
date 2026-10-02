@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { useEffect, useState } from "react";
+import NotificationButton from "@/app/NotificationButton";
 export default function Header() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 const [isDesktop, setIsDesktop] = useState(false);
@@ -45,7 +46,7 @@ const [isAndroid, setIsAndroid] = useState(false);
   padding: "10px 12px",
   borderBottom: "1px solid #e5e7eb",
   background: "#fff",
-  position: "sticky",
+  position: "relative",
   top: 0,
   zIndex: 1000,
   flexShrink: 0,
@@ -149,48 +150,16 @@ const [isAndroid, setIsAndroid] = useState(false);
 </>
       </Link>
    
-   {isDesktop && !notificationsEnabled && (
-  <button
-    type="button"
-    onClick={async () => {
-      if (!("Notification" in window)) {
-        return;
-      }
-
-      const permission =
-        await Notification.requestPermission();
-
-      if (permission === "granted") {
-        setNotificationsEnabled(true);
-      }
-    }}
+   {isDesktop && (
+  <div
     style={{
-  height: 40,
-  padding: "0 20px",
-  border: "none",
-  borderRadius: 10,
-  background: "linear-gradient(135deg,#7c3aed,#a855f7)",
-  color: "#fff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 9,
-  fontSize: 15,
-  fontWeight: 700,
-  cursor: "pointer",
-  boxShadow: "0 8px 18px rgba(124,58,237,.25)",
-  whiteSpace: "nowrap",
-
-  animation: "notificationPulse 1.8s ease-in-out infinite",
-}}
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+    }}
   >
-    <Bell
-      size={19}
-      strokeWidth={2.2}
-    />
-
-    Enable Notifications
-  </button>
+    <NotificationButton isAdmin />
+  </div>
 )}
 
     </div>

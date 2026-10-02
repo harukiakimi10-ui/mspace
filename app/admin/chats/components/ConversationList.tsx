@@ -71,10 +71,7 @@ export default function ConversationList({
   return colors[Math.abs(hash) % colors.length];
 }
 
-  const [mounted, setMounted] = useState(
-  typeof window !== "undefined"
-);
-
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -130,8 +127,7 @@ function MessageReadReceipt({
     overflowY: "auto",
   }}
 >
-      {mounted &&
-        conversations.map((chat) => (
+        {conversations.map((chat) => (
         <div
         key={chat.id}
         data-conversation-id={chat.id}

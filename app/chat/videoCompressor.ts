@@ -24,10 +24,17 @@ export async function compressVideo(file: File): Promise<File> {
   });
 
   const videoTrack = await input.getPrimaryVideoTrack();
+  
 
   if (!videoTrack) {
     throw new Error("No video track found.");
   }
+
+  console.log("Source video codec:", await videoTrack.getCodec());
+console.log(
+  "Source average bitrate:",
+  await videoTrack.getAverageBitrate()
+);
 
   const duration = await input.computeDuration();
 
@@ -37,6 +44,28 @@ export async function compressVideo(file: File): Promise<File> {
 
   const width = await videoTrack.getDisplayWidth();
   const height = await videoTrack.getDisplayHeight();
+
+  const maxDimension = 720;
+
+const scale = Math.min(
+  1,
+  maxDimension / Math.max(width, height)
+);
+
+const outputWidth = Math.max(
+  2,
+  Math.floor((width * scale) / 2) * 2
+);
+
+const outputHeight = Math.max(
+  2,
+  Math.floor((height * scale) / 2) * 2
+);
+
+console.log("Output video:", {
+  width: outputWidth,
+  height: outputHeight,
+});
 
   console.log("Original video:", {
     width,
@@ -103,11 +132,15 @@ export async function compressVideo(file: File): Promise<File> {
     tracks: "primary",
 
     video: {
-      codec: "avc",
-      bitrate: videoBitrate,
-      forceTranscode: false,
-      hardwareAcceleration: "prefer-hardware",
-    },
+  codec: "avc",
+  width: outputWidth,
+  height: outputHeight,
+  fit: "contain",
+  frameRate: 15,
+  bitrate: videoBitrate,
+  forceTranscode: false,
+  hardwareAcceleration: "no-preference",
+},
 
     audio: {
       codec: "aac",

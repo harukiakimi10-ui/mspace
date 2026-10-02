@@ -2893,7 +2893,16 @@ async function uploadFile(
     "Member: converting video to MP4/H.264..."
   );
 
-  uploadFile = await compressVideo(file);
+  const compressionStart = performance.now();
+
+uploadFile = await compressVideo(file);
+
+const compressionSeconds =
+  (performance.now() - compressionStart) / 1000;
+
+alert(
+  `Video compression took ${compressionSeconds.toFixed(1)} seconds`
+);
 
   console.log(
     "Member final video:",
@@ -3183,7 +3192,7 @@ if (uploadFile.type.startsWith("video/")) {
 
           finish();
         }
-      }, 5000);
+      }, 15000);
 
       video.load();
     });
@@ -3361,15 +3370,17 @@ return insertedMessage;
 
 
   } catch (error) {
-    console.error("Upload failed:", error);
+  console.error("Upload failed:", error);
 
-    alert(
-      error instanceof Error
-        ? error.message
-        : t.uploadFailed
-    );
+  alert(
+    error instanceof Error
+      ? error.message
+      : t.uploadFailed
+  );
 
-  } finally {
+  throw error;
+
+} finally {
     setUploading(false);
   }
 }
