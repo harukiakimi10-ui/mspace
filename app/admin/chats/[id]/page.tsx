@@ -4604,6 +4604,7 @@ onCloseStickerPanel={() => {
 
 <StickerPanel
   open={showStickerPanel}
+  isAdmin={true}
   isDesktop={isDesktop}
   composerHeight={composerHeight}
   onClose={() => setShowStickerPanel(false)}
