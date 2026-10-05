@@ -141,7 +141,27 @@ ownerSpace: "黄定襄的",
 }[language];
 
   useEffect(() => {
-  async function restoreMember(): Promise<boolean> {
+  let cancelled = false;
+
+  // Never let a slow/unreachable backend keep the entire home page blank.
+  // This is especially important on networks where Supabase may be slow or
+  // temporarily unreachable. The user can still see the page and retry.
+  const withTimeout = async <T,>(promise: PromiseLike<T>, timeoutMs = 8000): Promise<T | null> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<null>((resolve) => {
+          timeoutId = setTimeout(() => resolve(null), timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  };
+
+  async function restoreMember(): Promise<"signup" | "redirect" | "error"> {
   console.log("=== RESTORE START ===");
 
   const memberId = localStorage.getItem("mspace_member_id");
@@ -151,11 +171,20 @@ ownerSpace: "黄定襄的",
 if (memberId) {
   const supabase = createClient();
 
-  const { data: existingMember, error } = await supabase
-    .from("members")
-    .select("member_id, banned")
-    .eq("member_id", memberId)
-    .maybeSingle();
+  const storedMemberResult = await withTimeout(
+    supabase
+      .from("members")
+      .select("member_id, banned")
+      .eq("member_id", memberId)
+      .maybeSingle(),
+  );
+
+  if (!storedMemberResult) {
+    console.warn("Stored member lookup timed out.");
+    return "error";
+  }
+
+  const { data: existingMember, error } = storedMemberResult;
 
   console.log("Stored member ID:", memberId);
   console.log("Stored member lookup:", existingMember);
@@ -166,7 +195,7 @@ if (memberId) {
     console.log(
       "Could not verify stored member because of a database/network error."
     );
-    return false;
+    return "error";
   }
 
   // The browser has a stale member ID.
@@ -182,12 +211,12 @@ if (memberId) {
     // Existing account is banned.
     if (existingMember.banned) {
       console.log("Stored member is banned");
-      return true;
+      return "signup";
     }
 
     console.log("Valid member found. Restoring login...");
     router.replace("/members");
-    return false;
+    return "redirect";
   }
 }
 
@@ -197,17 +226,25 @@ if (memberId) {
   // No device ID means this is a genuinely new visitor.
   if (!deviceId) {
     console.log("No device ID");
-    return true;
+    return "signup";
   }
 
   const supabase = createClient();
 
-  const { data: members, error } = await supabase
-    .from("members")
-    .select("*")
-    .eq("device_id", deviceId)
-    .order("created_at", { ascending: false });
+  const deviceMemberResult = await withTimeout(
+    supabase
+      .from("members")
+      .select("*")
+      .eq("device_id", deviceId)
+      .order("created_at", { ascending: false }),
+  );
 
+  if (!deviceMemberResult) {
+    console.warn("Device member lookup timed out.");
+    return "error";
+  }
+
+  const { data: members, error } = deviceMemberResult;
   const member = members?.[0];
 
   console.log("Supabase error:", error);
@@ -219,20 +256,20 @@ if (memberId) {
     console.log(
       "Could not check member because of a network/database error."
     );
-    return false;
+    return "error";
   }
 
   // Supabase successfully answered and confirmed
   // that this device has no member.
   if (!member) {
     console.log("No member matched this device");
-    return true;
+    return "signup";
   }
 
   // Existing account is banned.
   if (member.banned) {
     console.log("Member is banned");
-    return true;
+    return "signup";
   }
 
   console.log("Restoring login...");
@@ -246,14 +283,29 @@ if (memberId) {
 
   router.replace("/members");
 
-  return false;
+  return "redirect";
 }
 
-  restoreMember().then((shouldShowSignup) => {
-  if (shouldShowSignup) {
+  restoreMember().then((result) => {
+    if (cancelled) return;
+
+    // If we already have a stored member ID, keep the user in the member
+    // area even when Supabase cannot be reached. The members page already
+    // has local caching and handles backend errors without blanking itself.
+    if (result === "error" && localStorage.getItem("mspace_member_id")) {
+      router.replace("/members");
+    }
+
+    // Always release the loading gate. A backend timeout/error must never
+    // leave the entire page permanently blank.
     setRestoring(false);
-  }
-});
+
+    console.log("Restore result:", result);
+  });
+
+  return () => {
+    cancelled = true;
+  };
 }, []);
 
 useEffect(() => {
