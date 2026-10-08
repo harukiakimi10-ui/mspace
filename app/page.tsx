@@ -561,9 +561,6 @@ setLoading(false);
 
 router.push("/members");
   }
-if (!mounted) {
-  return null;
-}
 
 return (
   <>
