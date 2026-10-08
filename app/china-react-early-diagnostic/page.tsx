@@ -57,27 +57,24 @@ export default function ChinaReactEarlyDiagnostic() {
   }
 
   window.addEventListener("error", function (event) {
-    var target = event.target;
+  var filename = event.filename || "unknown file";
 
-    if (target && target.tagName === "SCRIPT") {
-      report(
-        "SCRIPT ERROR: " +
-        (target.src || "unknown script")
-      );
-      return;
-    }
+  try {
+    filename = new URL(filename).pathname.split("/").pop() || filename;
+  } catch (e) {}
 
-    report(
-      "JAVASCRIPT ERROR: " +
-      (event.message || "Unknown error") +
-      " @ " +
-      (event.filename || "unknown file") +
-      ":" +
-      (event.lineno || "?") +
-      ":" +
-      (event.colno || "?")
-    );
-  }, true);
+  report(
+    "JAVASCRIPT ERROR" +
+    "\\nFile: " +
+    filename +
+    "\\nMessage: " +
+    (event.message || "Unknown error") +
+    "\\nLine: " +
+    (event.lineno || "?") +
+    "\\nColumn: " +
+    (event.colno || "?")
+  );
+}, true);
 
   window.addEventListener("unhandledrejection", function (event) {
     report(
