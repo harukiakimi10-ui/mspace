@@ -328,69 +328,39 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  async function loadCounts() {
-  const supabase = createClient();
+  let cancelled = false;
 
-  const { count: photoCount } = await supabase
-    .from("photos")
-    .select("*", { count: "exact", head: true });
+  async function loadHomeData() {
+    try {
+      const response = await fetch("/home-data", {
+        cache: "no-store",
+      });
 
-  const { count: videoCount } = await supabase
-    .from("videos")
-    .select("*", { count: "exact", head: true });
+      if (!response.ok) {
+        throw new Error(`Home data request failed: ${response.status}`);
+      }
 
-  setPhotoCount(photoCount || 0);
-  setVideoCount(videoCount || 0);
-}
+      const data = await response.json();
 
-  loadCounts();
-}, []);
+      if (cancelled) return;
 
-useEffect(() => {
-  async function loadRecentPhotos() {
-  const supabase = createClient();
+      setPhotoCount(data.photoCount ?? 0);
+      setVideoCount(data.videoCount ?? 0);
+      setRecentPhotos(data.recentPhotos ?? []);
+      setLatestVideo(data.latestVideo ?? "");
+      setLatestThumbnail(data.latestThumbnail ?? "");
 
-  const { data, error } = await supabase
-    .from("photos")
-    .select("image_url")
-    .order("id", { ascending: false })
-    .limit(2);
-
-  if (error) {
-    console.log(error);
-    return;
+      console.log("HOME DATA:", data);
+    } catch (error) {
+      console.error("Failed to load home data:", error);
+    }
   }
 
-  console.log(data);
+  loadHomeData();
 
-  setRecentPhotos(
-    data?.map(photo => photo.image_url) || []
-  );
-}
-
-  loadRecentPhotos();
-}, []);
-
-
-
-useEffect(() => {
-  async function loadLatestVideo() {
-    const supabase = createClient();
-
-    const { data } = await supabase
-      .from("videos")
-      .select("*")
-      .order("id", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!data) return;
-
-    setLatestVideo(data.video_url);
-    setLatestThumbnail(data.thumbnail_url);
-  }
-
-  loadLatestVideo();
+  return () => {
+    cancelled = true;
+  };
 }, []);
 
 const installApp = async () => {
