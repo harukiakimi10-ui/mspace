@@ -332,9 +332,9 @@ useEffect(() => {
 
   async function loadHomeData() {
     try {
-      const response = await fetch("/home-data", {
-        cache: "no-store",
-      });
+      const response = await fetch(`/home-data?t=${Date.now()}`, {
+  cache: "no-store",
+});
 
       if (!response.ok) {
         throw new Error(`Home data request failed: ${response.status}`);
