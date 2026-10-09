@@ -69,12 +69,14 @@ const [language, setLanguage] =
 }, []);
 
 useEffect(() => {
-  if (
-    typeof navigator !== "undefined" &&
-    navigator.language.startsWith("zh")
-  ) {
-    setLanguage("zh");
-  }
+  const browserLanguage =
+    navigator.languages?.[0] || navigator.language || "en";
+
+  setLanguage(
+    browserLanguage.toLowerCase().startsWith("zh")
+      ? "zh"
+      : "en"
+  );
 }, []);
 
 useEffect(() => {
