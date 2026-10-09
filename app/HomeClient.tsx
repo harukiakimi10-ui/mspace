@@ -1298,7 +1298,7 @@ onClick={() => {
   </button>
   
 )}
-{languageDiagnostic && (
+{(
   <div
     style={{
       position: "fixed",
@@ -1318,13 +1318,13 @@ onClick={() => {
   >
     <strong>MSpace Language Diagnostic</strong>
     <p style={{ margin: "6px 0" }}>
-      Browser language: {languageDiagnostic.browserLanguage}
+      Browser language: {languageDiagnostic?.browserLanguage ?? "Diagnostic state is empty"}
     </p>
     <p style={{ margin: "6px 0" }}>
-      Preferred languages: {languageDiagnostic.browserLanguages.join(", ") || "(none)"}
+      Preferred languages: {languageDiagnostic?.browserLanguages.join(", ") ?? "(none)"}
     </p>
     <p style={{ margin: "6px 0" }}>
-      MSpace selected: {languageDiagnostic.detectedLanguage}
+      MSpace selected: {languageDiagnostic?.detectedLanguage ?? language}
     </p>
   </div>
 )}
