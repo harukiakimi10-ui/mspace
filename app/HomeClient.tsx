@@ -65,7 +65,7 @@ const [deferredPrompt, setDeferredPrompt] =
   const router = useRouter();
 
 const [language, setLanguage] =
-  useState<"en" | "zh">("en");
+  useState<"en" | "zh">("zh");
   
   const [languageDiagnostic, setLanguageDiagnostic] = useState<{
   browserLanguages: string[];
