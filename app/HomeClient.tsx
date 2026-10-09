@@ -99,6 +99,12 @@ useEffect(() => {
         : "en"
       : "zh";
 
+      console.log("[MSpace language diagnostic]", {
+  browserLanguages,
+  browserLanguage,
+  primaryLanguage,
+  detectedLanguage,
+});
   setLanguage(detectedLanguage);
 
   setLanguageDiagnostic({
