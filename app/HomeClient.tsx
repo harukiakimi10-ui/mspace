@@ -78,21 +78,32 @@ const [language, setLanguage] =
 }, []);
 
 useEffect(() => {
-  const browserLanguages = Array.from(navigator.languages || []);
-  const browserLanguage = navigator.language || "en";
+  const browserLanguages =
+    typeof navigator !== "undefined"
+      ? Array.from(navigator.languages || [])
+      : [];
+
+  const browserLanguage =
+    typeof navigator !== "undefined"
+      ? navigator.language || ""
+      : "";
+
+  // Prefer the browser's primary language.
+  const primaryLanguage =
+    browserLanguages[0] || browserLanguage;
 
   const detectedLanguage: "zh" | "en" =
-    browserLanguages.some((lang) =>
-      lang.toLowerCase().startsWith("zh")
-    ) || browserLanguage.toLowerCase().startsWith("zh")
-      ? "zh"
-      : "en";
+    primaryLanguage
+      ? primaryLanguage.toLowerCase().startsWith("zh")
+        ? "zh"
+        : "en"
+      : "zh";
 
   setLanguage(detectedLanguage);
 
   setLanguageDiagnostic({
     browserLanguages,
-    browserLanguage,
+    browserLanguage: primaryLanguage || "(not detected)",
     detectedLanguage,
   });
 }, []);
