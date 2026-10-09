@@ -409,160 +409,178 @@ const installApp = async () => {
 };
 
 async function joinMSpace() {
+  if (loading) return;
+
   setLoading(true);
 
-  if (!name.trim()) {
-    alert(t.enterNameAlert);
+  try {
+    // 1. Validate the name inside MSpace.
+    const trimmedName = name.trim();
 
-    setLoading(false);
-    return;
-  }
+    if (!trimmedName) {
+      alert(t.enterNameAlert);
+      return;
+    }
 
+    // 2. Create or restore this device's MSpace ID.
     const supabase = createClient();
-    let deviceId =
-  localStorage.getItem("mspace_device_id");
 
-if (!deviceId) {
-  deviceId = createId();
+    let deviceId = localStorage.getItem("mspace_device_id");
 
-  localStorage.setItem(
-    "mspace_device_id",
-    deviceId
-  );
-}
-   
+    if (!deviceId) {
+      deviceId = createId();
+      localStorage.setItem("mspace_device_id", deviceId);
+    }
 
-  const { data: bannedDevices } = await supabase
-  .from("banned_devices")
-  .select("*");
+    // 3. Check banned devices and handle database errors.
+    const {
+      data: bannedDevices,
+      error: bannedDevicesError,
+    } = await supabase
+      .from("banned_devices")
+      .select("device_id");
 
-console.log(
-  "ALL BANNED DEVICES:",
-  bannedDevices
-);
+    if (bannedDevicesError) {
+      console.error("Banned-device check failed:", bannedDevicesError);
+      alert(`${t.error}: ${bannedDevicesError.message}`);
+      return;
+    }
 
-console.log(
-  "CURRENT DEVICE:",
-  deviceId
-);
+    const isBanned = bannedDevices?.some(
+      (device) => device.device_id === deviceId
+    );
 
-const bannedDevice = bannedDevices?.find(
-  (d) => d.device_id === deviceId
-);
+    if (isBanned) {
+      alert(t.blockedDevice);
+      return;
+    }
 
-if (bannedDevice) {
-  alert(t.blockedDevice);
+    // 4. Check whether this name belongs to a banned account.
+    const {
+      data: existingMember,
+      error: nameCheckError,
+    } = await supabase
+      .from("members")
+      .select("member_id, name, banned")
+      .eq("name", trimmedName)
+      .maybeSingle();
 
-  setLoading(false);
-  return;
-}
+    if (nameCheckError) {
+      console.error("Name check failed:", nameCheckError);
+      alert(`${t.error}: ${nameCheckError.message}`);
+      return;
+    }
 
- const { data: existingMember } = await supabase
-  .from("members")
-  .select("*")
-  .eq("name", name)
-  .single();
+    if (existingMember?.banned) {
+      alert(t.bannedAccount);
+      return;
+    }
 
-if (existingMember?.banned) {
-  alert(t.bannedAccount);
+    // 5. Restore an existing account on this device.
+    const {
+      data: deviceMember,
+      error: deviceCheckError,
+    } = await supabase
+      .from("members")
+      .select("member_id, name, banned")
+      .eq("device_id", deviceId)
+      .maybeSingle();
 
-  setLoading(false);
-  return;
-}
+    if (deviceCheckError) {
+      console.error("Device account check failed:", deviceCheckError);
+      alert(`${t.error}: ${deviceCheckError.message}`);
+      return;
+    }
 
-// Check whether this device already has an MSpace account
-const { data: deviceMember } = await supabase
-  .from("members")
-  .select("member_id, name, banned")
-  .eq("device_id", deviceId)
-  .maybeSingle();
+    if (deviceMember) {
+      if (deviceMember.banned) {
+        alert(t.bannedAccount);
+        return;
+      }
 
-if (deviceMember) {
-  if (deviceMember.banned) {
-    alert(t.bannedAccount);
-    setLoading(false);
-    return;
-  }
-
-  console.log(
-    "Existing account found for this device:",
-    deviceMember
-  );
-
-  localStorage.setItem(
-    "mspace_member_id",
-    deviceMember.member_id
-  );
-
-  setLoading(false);
-
-  router.push("/members");
-  return;
-}
-
-// No account exists for this device — create one
-
-   const memberId = createId();
-
-   let photoUrl = "";
-
-if (photoFile) {
-  const { data, error: uploadError } =
-    await supabase.storage
-      .from("avatars")
-      .upload(
-        `${Date.now()}.jpg`,
-        photoFile,
-        {
-          upsert: true,
-        }
+      localStorage.setItem(
+        "mspace_member_id",
+        deviceMember.member_id
       );
 
-  console.log("PATH:", data?.path);
-  console.log("UPLOAD ERROR:", uploadError);
+      router.push("/members");
+      return;
+    }
 
-  if (uploadError) {
-  alert(JSON.stringify(uploadError, null, 2));
-  setLoading(false);
-  return;
-}
-  photoUrl =
-  `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/${data.path}`;
+    // 6. Upload the optional profile photo.
+    let photoUrl = "";
 
-console.log("PHOTO URL:", photoUrl);
-}
+    if (photoFile) {
+      const extension =
+        photoFile.name.split(".").pop()?.toLowerCase() || "jpg";
 
+      const filePath = `${createId()}.${extension}`;
 
-  const { error } = await supabase
-  .from("members")
-  .insert([
-    {
-      member_id: memberId,
-      name,
-      photo_url: photoUrl,
-      device_id: deviceId,
-    },
-  ]);
+      const { data: uploadedFile, error: uploadError } =
+        await supabase.storage
+          .from("avatars")
+          .upload(filePath, photoFile, {
+            upsert: false,
+          });
 
-if (error) {
-    alert(`${t.error}: ${error.message}`);
+      if (uploadError) {
+        console.error("Profile photo upload failed:", uploadError);
+        alert(`${t.error}: ${uploadError.message}`);
+        return;
+      }
 
-  setLoading(false);
-  return;
-}
+      if (!uploadedFile?.path) {
+        alert(t.error);
+        return;
+      }
 
+      const { data: publicUrlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(uploadedFile.path);
 
-localStorage.setItem(
-  "mspace_member_id",
-  memberId
-);
+      photoUrl = publicUrlData.publicUrl;
+    }
 
-setName("");
+    // 7. Create the new MSpace account.
+    const memberId = createId();
 
-setLoading(false);
+    const { error: insertError } = await supabase
+      .from("members")
+      .insert({
+        member_id: memberId,
+        name: trimmedName,
+        photo_url: photoUrl,
+        device_id: deviceId,
+      });
 
-router.push("/members");
+    if (insertError) {
+      console.error("Account creation failed:", insertError);
+      alert(`${t.error}: ${insertError.message}`);
+      return;
+    }
+
+    // 8. Save the account locally and open the members page.
+    localStorage.setItem("mspace_member_id", memberId);
+
+    setName("");
+    setPhotoFile(null);
+    setFileName("");
+
+    router.push("/members");
+  } catch (error) {
+    console.error("MSpace signup failed:", error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Please check your connection and try again.";
+
+    alert(`${t.error}: ${message}`);
+  } finally {
+    // Always release the Join button, including on failure.
+    setLoading(false);
   }
+}
 
 return (
   <>
@@ -1157,9 +1175,14 @@ onClick={() => {
   setPhotoFile(file);
   setFileName(file?.name || "");
 }}
-    style={{
-      display: "none",
-    }}
+   style={{
+  display: "block",
+  width: "1px",
+  height: "1px",
+  opacity: 0,
+  position: "absolute",
+  left: "-9999px",
+}}
   />
 </label>
 
