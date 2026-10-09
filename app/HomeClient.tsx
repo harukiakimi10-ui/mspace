@@ -4,11 +4,14 @@ import "./home.css";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { Play,WifiOff } from "lucide-react";
-import ImageIcon from "@mui/icons-material/Image";
-import VideoLibraryIcon from "@mui/icons-material/Videocam";
-import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
-import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
+import {
+  Play,
+  WifiOff,
+  Image,
+  Video,
+  ImagePlus,
+  UserRoundPlus,
+} from "lucide-react";
 import { createId } from "@/lib/createId";
 
 
@@ -725,12 +728,7 @@ onClick={() => {
         boxShadow: "0 8px 20px rgba(124,58,237,.25)",
       }}
     >
-      <ImageIcon
-  sx={{
-    fontSize: 24,
-    color: "#fff",
-  }}
-/>
+      <Image size={24} color="#ffffff" />
     </div>
 
     <div>
@@ -788,12 +786,7 @@ onClick={() => {
         boxShadow: "0 8px 20px rgba(124,58,237,.25)",
       }}
     >
-      <VideoLibraryIcon
-  sx={{
-    fontSize: 30,
-    color: "#fff",
-  }}
-/>
+      <Video size={30} color="#ffffff" />
     </div>
 
     <div>
@@ -1082,12 +1075,7 @@ onClick={() => {
     marginBottom: "4px",
   }}
 >
-  <AddPhotoAlternateOutlinedIcon
-    sx={{
-      fontSize: 56,
-      color: "#7c3aed",
-    }}
-  />
+  <ImagePlus size={56} color="#7c3aed" />
 </div>
 
 
@@ -1202,7 +1190,7 @@ onClick={() => {
         gap: "8px",
       }}
     >
-      <PersonAddAlt1RoundedIcon sx={{ fontSize: 22 }} />
+      <UserRoundPlus size={22} />
       {t.join}
     </span>
   )}
