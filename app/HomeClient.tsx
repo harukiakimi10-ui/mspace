@@ -66,6 +66,7 @@ const [deferredPrompt, setDeferredPrompt] =
 
 const [language, setLanguage] =
   useState<"en" | "zh">("en");
+  
 
   useEffect(() => {
   setMounted(true);
@@ -75,11 +76,12 @@ useEffect(() => {
   const browserLanguage =
     navigator.languages?.[0] || navigator.language || "en";
 
-  setLanguage(
+  const detectedLanguage: "zh" | "en" =
     browserLanguage.toLowerCase().startsWith("zh")
       ? "zh"
-      : "en"
-  );
+      : "en";
+
+  setLanguage(detectedLanguage);
 }, []);
 
 useEffect(() => {
