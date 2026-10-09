@@ -67,21 +67,34 @@ const [deferredPrompt, setDeferredPrompt] =
 const [language, setLanguage] =
   useState<"en" | "zh">("en");
   
+  const [languageDiagnostic, setLanguageDiagnostic] = useState<{
+  browserLanguages: string[];
+  browserLanguage: string;
+  detectedLanguage: "zh" | "en";
+} | null>(null);
 
   useEffect(() => {
   setMounted(true);
 }, []);
 
 useEffect(() => {
-  const browserLanguage =
-    navigator.languages?.[0] || navigator.language || "en";
+  const browserLanguages = Array.from(navigator.languages || []);
+  const browserLanguage = navigator.language || "en";
 
   const detectedLanguage: "zh" | "en" =
-    browserLanguage.toLowerCase().startsWith("zh")
+    browserLanguages.some((lang) =>
+      lang.toLowerCase().startsWith("zh")
+    ) || browserLanguage.toLowerCase().startsWith("zh")
       ? "zh"
       : "en";
 
   setLanguage(detectedLanguage);
+
+  setLanguageDiagnostic({
+    browserLanguages,
+    browserLanguage,
+    detectedLanguage,
+  });
 }, []);
 
 useEffect(() => {
@@ -1283,6 +1296,37 @@ onClick={() => {
   >
     📱 {t.addApp}
   </button>
+  
+)}
+{languageDiagnostic && (
+  <div
+    style={{
+      position: "fixed",
+      bottom: "10px",
+      right: "10px",
+      zIndex: 10000,
+      background: "#fffbe6",
+      color: "#111827",
+      border: "2px solid #d97706",
+      borderRadius: "10px",
+      padding: "12px",
+      maxWidth: "90vw",
+      fontSize: "13px",
+      overflowWrap: "anywhere",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    }}
+  >
+    <strong>MSpace Language Diagnostic</strong>
+    <p style={{ margin: "6px 0" }}>
+      Browser language: {languageDiagnostic.browserLanguage}
+    </p>
+    <p style={{ margin: "6px 0" }}>
+      Preferred languages: {languageDiagnostic.browserLanguages.join(", ") || "(none)"}
+    </p>
+    <p style={{ margin: "6px 0" }}>
+      MSpace selected: {languageDiagnostic.detectedLanguage}
+    </p>
+  </div>
 )}
 </main>
 
