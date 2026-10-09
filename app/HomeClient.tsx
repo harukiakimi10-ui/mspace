@@ -1316,51 +1316,7 @@ onClick={() => {
   >
     📱 {t.addApp}
   </button>
-  
-)}
-{(
-  <div
-    style={{
-      position: "fixed",
-      bottom: "10px",
-      right: "10px",
-      zIndex: 10000,
-      background: "#fffbe6",
-      color: "#111827",
-      border: "2px solid #d97706",
-      borderRadius: "10px",
-      padding: "12px",
-      maxWidth: "90vw",
-      fontSize: "13px",
-      overflowWrap: "anywhere",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-    }}
-  >
-    <strong>MSpace Language Diagnostic</strong>
-    <p>
-  Browser language:{" "}
-  {languageDiagnostic?.browserLanguage ?? "Diagnostic state is empty"}
-</p>
 
-<p>
-  Preferred languages:{" "}
-  {languageDiagnostic?.browserLanguages.join(", ") ?? "(none)"}
-</p>
-
-<p>
-  Primary language:{" "}
-  {languageDiagnostic?.primaryLanguage ?? "(not detected)"}
-</p>
-
-<p>
-  Detected language:{" "}
-  {languageDiagnostic?.detectedLanguage ?? "(not detected)"}
-</p>
-
-<p>
-  MSpace selected: {language}
-</p>
-  </div>
 )}
 </main>
 
