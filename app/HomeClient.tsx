@@ -70,6 +70,7 @@ const [language, setLanguage] =
   const [languageDiagnostic, setLanguageDiagnostic] = useState<{
   browserLanguages: string[];
   browserLanguage: string;
+  primaryLanguage: string;
   detectedLanguage: "zh" | "en";
 } | null>(null);
 
@@ -99,17 +100,19 @@ useEffect(() => {
         : "en"
       : "zh";
 
-      console.log("[MSpace language diagnostic]", {
-  browserLanguages,
-  browserLanguage,
-  primaryLanguage,
-  detectedLanguage,
-});
+  console.log("[MSpace language diagnostic]", {
+    browserLanguages,
+    browserLanguage,
+    primaryLanguage,
+    detectedLanguage,
+  });
+
   setLanguage(detectedLanguage);
 
   setLanguageDiagnostic({
     browserLanguages,
-    browserLanguage: primaryLanguage || "(not detected)",
+    browserLanguage: browserLanguage || "(not detected)",
+    primaryLanguage: primaryLanguage || "(not detected)",
     detectedLanguage,
   });
 }, []);
@@ -1334,15 +1337,29 @@ onClick={() => {
     }}
   >
     <strong>MSpace Language Diagnostic</strong>
-    <p style={{ margin: "6px 0" }}>
-      Browser language: {languageDiagnostic?.browserLanguage ?? "Diagnostic state is empty"}
-    </p>
-    <p style={{ margin: "6px 0" }}>
-      Preferred languages: {languageDiagnostic?.browserLanguages.join(", ") ?? "(none)"}
-    </p>
-    <p style={{ margin: "6px 0" }}>
-      MSpace selected: {languageDiagnostic?.detectedLanguage ?? language}
-    </p>
+    <p>
+  Browser language:{" "}
+  {languageDiagnostic?.browserLanguage ?? "Diagnostic state is empty"}
+</p>
+
+<p>
+  Preferred languages:{" "}
+  {languageDiagnostic?.browserLanguages.join(", ") ?? "(none)"}
+</p>
+
+<p>
+  Primary language:{" "}
+  {languageDiagnostic?.primaryLanguage ?? "(not detected)"}
+</p>
+
+<p>
+  Detected language:{" "}
+  {languageDiagnostic?.detectedLanguage ?? "(not detected)"}
+</p>
+
+<p>
+  MSpace selected: {language}
+</p>
   </div>
 )}
 </main>
