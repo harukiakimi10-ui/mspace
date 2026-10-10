@@ -79,52 +79,43 @@ const [language, setLanguage] =
 }, []);
 
 useEffect(() => {
-  try {
-    let browserLanguages: string[] = [];
-    let browserLanguage = "";
+  const browserLanguages =
+    typeof navigator !== "undefined"
+      ? Array.from(navigator.languages || [])
+      : [];
 
-    if (typeof navigator !== "undefined") {
-      if (navigator.languages) {
-        try {
-          browserLanguages = Array.from(navigator.languages);
-        } catch (_) {
-          browserLanguages = [navigator.language];
-        }
-      } else {
-        browserLanguages = [navigator.language || (navigator as any).userLanguage || ""];
-      }
-      browserLanguage = navigator.language || (navigator as any).userLanguage || "";
-    }
+  const browserLanguage =
+    typeof navigator !== "undefined"
+      ? navigator.language || ""
+      : "";
 
-    // Safely verify if it's reading pure text data before running string operations
-    const primaryLangArrayOrString = browserLanguages.length > 0 ? browserLanguages[0] : browserLanguage;
-    const primaryLanguage = Array.isArray(primaryLangArrayOrString) ? primaryLangArrayOrString[0] : primaryLangArrayOrString;
+  // Prefer the browser's primary language.
+  const primaryLanguage =
+    browserLanguages[0] || browserLanguage;
 
-    const detectedLanguage: "zh" | "en" =
-      primaryLanguage && typeof primaryLanguage === "string" && primaryLanguage.toLowerCase().startsWith("zh")
+  const detectedLanguage: "zh" | "en" =
+    primaryLanguage
+      ? primaryLanguage.toLowerCase().startsWith("zh")
         ? "zh"
-        : "en";
+        : "en"
+      : "zh";
 
-    setLanguage(detectedLanguage);
+  console.log("[MSpace language diagnostic]", {
+    browserLanguages,
+    browserLanguage,
+    primaryLanguage,
+    detectedLanguage,
+  });
 
-    setLanguageDiagnostic({
-      browserLanguages: Array.isArray(browserLanguages) ? browserLanguages : [browserLanguages],
-      browserLanguage: browserLanguage || "(not detected)",
-      primaryLanguage: typeof primaryLanguage === "string" ? primaryLanguage : "(not detected)",
-      detectedLanguage,
-    });
-  } catch (error) {
-    // Failsafe configuration to bypass sandbox restrictions on the strict network
-    setLanguage("zh");
-    setLanguageDiagnostic({
-      browserLanguages: ["zh"],
-      browserLanguage: "(sandboxed)",
-      primaryLanguage: "zh",
-      detectedLanguage: "zh",
-    });
-  }
+  setLanguage(detectedLanguage);
+
+  setLanguageDiagnostic({
+    browserLanguages,
+    browserLanguage: browserLanguage || "(not detected)",
+    primaryLanguage: primaryLanguage || "(not detected)",
+    detectedLanguage,
+  });
 }, []);
-
 
 useEffect(() => {
   const updateOnlineStatus = () => {
@@ -660,12 +651,14 @@ return (
 
 <button
 onClick={() => {
-  document
-    .getElementById("join-form")
-    ?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+  const joinForm = document.getElementById("join-form");
+
+  if (!joinForm) return;
+
+  joinForm.scrollIntoView({
+    behavior: "auto",
+    block: "start",
+  });
 }}
   style={{
     background:
@@ -1162,38 +1155,44 @@ onClick={() => {
 >
   {t.optional}
 </p>
-    <label
-  style={{
-    display: "inline-block",
-    marginTop: "5px",
-    padding: "8px 18px",
-    background: "#7c3aed",
-    color: "#fff",
-    borderRadius: "10px",
-    cursor: "pointer",
-    fontWeight: "600",
-  }}
->
-  {t.choosePhoto}
 
   <input
-    type="file"
-    accept="image/*"
-    onChange={(e) => {
-  const file = e.target.files?.[0] || null;
-  setPhotoFile(file);
-  setFileName(file?.name || "");
-}}
-   style={{
-  display: "block",
-  width: "1px",
-  height: "1px",
-  opacity: 0,
-  position: "absolute",
-  left: "-9999px",
-}}
-  />
-</label>
+      id="mspace-profile-photo"
+      type="file"
+      accept="image/*"
+      onChange={(e) => {
+        const file = e.target.files?.[0] || null;
+        setPhotoFile(file);
+        setFileName(file?.name || "");
+      }}
+      style={{
+        position: "absolute",
+        width: "1px",
+        height: "1px",
+        padding: 0,
+        margin: "-1px",
+        overflow: "hidden",
+        clip: "rect(0, 0, 0, 0)",
+        whiteSpace: "nowrap",
+        border: 0,
+      }}
+    />
+
+    <label
+      htmlFor="mspace-profile-photo"
+      style={{
+        display: "inline-block",
+        marginTop: "5px",
+        padding: "8px 18px",
+        background: "#7c3aed",
+        color: "#fff",
+        borderRadius: "10px",
+        cursor: "pointer",
+        fontWeight: "600",
+      }}
+    >
+      {t.choosePhoto}
+    </label>
 
 {fileName && (
   <p
