@@ -55,14 +55,7 @@ const [videoCount, setVideoCount] = useState(
 
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(true);
-  const [mounted, setMounted] = useState(false);
-  const [showInstallButton, setShowInstallButton] =
-  useState(false);
-  const [isOffline, setIsOffline] = useState(false);
-
-const [deferredPrompt, setDeferredPrompt] =
-  useState<any>(null);
-  const router = useRouter();
+  const [mounted, setMounted] = useState(false);const [isOffline, setIsOffline] = useState(false);const router = useRouter();
 
 
   useEffect(() => {
@@ -254,38 +247,6 @@ if (memberId) {
   };
 }, []);
 
-useEffect(() => {
-  const handler = (e: any) => {
-    e.preventDefault();
-    setDeferredPrompt(e);
-    setShowInstallButton(true);
-  };
-
-  window.addEventListener(
-    "beforeinstallprompt",
-    handler
-  );
-
-  return () =>
-    window.removeEventListener(
-      "beforeinstallprompt",
-      handler
-    );
-}, []);
-
-
-const installApp = async () => {
-  if (!deferredPrompt) return;
-
-  deferredPrompt.prompt();
-
-  const result =
-    await deferredPrompt.userChoice;
-
-  if (result.outcome === "accepted") {
-    setShowInstallButton(false);
-  }
-};
 
 async function joinMSpace() {
   if (loading) return;
