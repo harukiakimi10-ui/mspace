@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,12 +12,18 @@ export default function ReactDiagnosticClient() {
   }, []);
 
   return (
-    <div style={{ marginTop: 30 }}>
-      <h3>React status</h3>
+    <section
+      style={{
+        marginTop: 24,
+        padding: 16,
+        border: "1px solid #ddd",
+        borderRadius: 12,
+      }}
+    >
+      <h3>React execution test</h3>
 
       <p>
-        <strong>React mounted:</strong>{" "}
-        {mounted ? "YES" : "NO"}
+        <strong>React mounted:</strong> {mounted ? "YES" : "NO"}
       </p>
 
       <p>
@@ -24,6 +31,7 @@ export default function ReactDiagnosticClient() {
       </p>
 
       <button
+        type="button"
         onClick={() => setClicks((value) => value + 1)}
         style={{
           padding: "15px 25px",
@@ -31,10 +39,12 @@ export default function ReactDiagnosticClient() {
           borderRadius: 10,
           border: "none",
           cursor: "pointer",
+          background: "#1769e0",
+          color: "#fff",
         }}
       >
         TAP ME
       </button>
-    </div>
+    </section>
   );
 }
