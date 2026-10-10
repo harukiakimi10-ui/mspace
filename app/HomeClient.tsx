@@ -64,58 +64,11 @@ const [deferredPrompt, setDeferredPrompt] =
   useState<any>(null);
   const router = useRouter();
 
-const [language, setLanguage] =
-  useState<"en" | "zh">("zh");
-  
-  const [languageDiagnostic, setLanguageDiagnostic] = useState<{
-  browserLanguages: string[];
-  browserLanguage: string;
-  primaryLanguage: string;
-  detectedLanguage: "zh" | "en";
-} | null>(null);
 
   useEffect(() => {
   setMounted(true);
 }, []);
 
-useEffect(() => {
-  const browserLanguages =
-    typeof navigator !== "undefined"
-      ? Array.from(navigator.languages || [])
-      : [];
-
-  const browserLanguage =
-    typeof navigator !== "undefined"
-      ? navigator.language || ""
-      : "";
-
-  // Prefer the browser's primary language.
-  const primaryLanguage =
-    browserLanguages[0] || browserLanguage;
-
-  const detectedLanguage: "zh" | "en" =
-    primaryLanguage
-      ? primaryLanguage.toLowerCase().startsWith("zh")
-        ? "zh"
-        : "en"
-      : "zh";
-
-  console.log("[MSpace language diagnostic]", {
-    browserLanguages,
-    browserLanguage,
-    primaryLanguage,
-    detectedLanguage,
-  });
-
-  setLanguage(detectedLanguage);
-
-  setLanguageDiagnostic({
-    browserLanguages,
-    browserLanguage: browserLanguage || "(not detected)",
-    primaryLanguage: primaryLanguage || "(not detected)",
-    detectedLanguage,
-  });
-}, []);
 
 useEffect(() => {
   const updateOnlineStatus = () => {
@@ -132,80 +85,6 @@ useEffect(() => {
     window.removeEventListener("offline", updateOnlineStatus);
   };
 }, []);
-
-const t = {
-en: {
-join: "Join MSpace",
-joinDesc: "Join and start connecting",
-name: "Name",
-enterName: "Enter your name",
-profilePhoto: "Profile Photo",
-uploadPhoto: "Upload Profile Photo",
-choosePhoto: "Choose Photo",
-selected: "Selected",
-connecting: "Connecting…",
-addApp: "Add App",
-recentPhotos: "Recent Photos",
-latestVideo: "Latest Video",
-photos: "Photos",
-videos: "Videos",
-welcomeTo: "Welcome to",
-personalSpace: "Personal Space",
-personalDesc:
-"A place where I share my life moments and connect with friends.",
-
-optional: "JPG, PNG or WebP • Optional",
-termsText: "By joining, you agree to our",
-terms: "Terms of Service",
-privacy: "Privacy Policy",
-enterNameAlert: "Please enter your name",
-blockedDevice: "This device has been blocked.",
-bannedAccount: "Your MSpace account has been banned.",
-error: "Error",
-copyright: "All Rights Reserved",
-appName: "MSpace",
-offline: "No internet connection",
-ownerSpace: "Huang Dingxiang's",
-
-
-},
-
-zh: {
-join: "加入星域",
-joinDesc: "加入并开始交流",
-name: "姓名",
-enterName: "请输入您的姓名",
-profilePhoto: "头像照片",
-uploadPhoto: "上传头像照片",
-choosePhoto: "选择照片",
-selected: "已选择",
-connecting: "连接中…",
-addApp: "安装星域",
-recentPhotos: "最新照片",
-latestVideo: "最新视频",
-photos: "照片",
-videos: "视频",
-welcomeTo: "欢迎来到",
-personalSpace: "个人空间",
-personalDesc:
-"这是我分享生活点滴并与朋友交流的地方。",
-
-optional: "JPG、PNG 或 WebP • 可选",
-termsText: "加入即表示您同意我们的",
-terms: "服务条款",
-privacy: "隐私政策",
-enterNameAlert: "请输入您的姓名",
-blockedDevice: "此设备已被封锁。",
-bannedAccount: "您的星域账户已被封禁。",
-error: "错误",
-copyright: "版权所有",
-appName: "星域",
-offline: "网络不可用，请检查网络",
-ownerSpace: "黄定襄的",
-
-
-},
-}[language];
 
   useEffect(() => {
   let cancelled = false;
@@ -418,7 +297,7 @@ async function joinMSpace() {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      alert(t.enterNameAlert);
+      alert("请输入您的姓名");
       return;
     }
 
@@ -442,7 +321,7 @@ async function joinMSpace() {
 
     if (bannedDevicesError) {
       console.error("Banned-device check failed:", bannedDevicesError);
-      alert(`${t.error}: ${bannedDevicesError.message}`);
+      alert(`${"错误"}: ${bannedDevicesError.message}`);
       return;
     }
 
@@ -451,7 +330,7 @@ async function joinMSpace() {
     );
 
     if (isBanned) {
-      alert(t.blockedDevice);
+      alert("此设备已被封锁。");
       return;
     }
 
@@ -467,12 +346,12 @@ async function joinMSpace() {
 
     if (nameCheckError) {
       console.error("Name check failed:", nameCheckError);
-      alert(`${t.error}: ${nameCheckError.message}`);
+      alert(`${"错误"}: ${nameCheckError.message}`);
       return;
     }
 
     if (existingMember?.banned) {
-      alert(t.bannedAccount);
+      alert("您的星域账户已被封禁。");
       return;
     }
 
@@ -488,13 +367,13 @@ async function joinMSpace() {
 
     if (deviceCheckError) {
       console.error("Device account check failed:", deviceCheckError);
-      alert(`${t.error}: ${deviceCheckError.message}`);
+      alert(`${"错误"}: ${deviceCheckError.message}`);
       return;
     }
 
     if (deviceMember) {
       if (deviceMember.banned) {
-        alert(t.bannedAccount);
+        alert("您的星域账户已被封禁。");
         return;
       }
 
@@ -525,12 +404,12 @@ async function joinMSpace() {
 
       if (uploadError) {
         console.error("Profile photo upload failed:", uploadError);
-        alert(`${t.error}: ${uploadError.message}`);
+        alert(`${"错误"}: ${uploadError.message}`);
         return;
       }
 
       if (!uploadedFile?.path) {
-        alert(t.error);
+        alert("错误");
         return;
       }
 
@@ -555,7 +434,7 @@ async function joinMSpace() {
 
     if (insertError) {
       console.error("Account creation failed:", insertError);
-      alert(`${t.error}: ${insertError.message}`);
+      alert(`${"错误"}: ${insertError.message}`);
       return;
     }
 
@@ -575,7 +454,7 @@ async function joinMSpace() {
         ? error.message
         : "Please check your connection and try again.";
 
-    alert(`${t.error}: ${message}`);
+    alert(`${"错误"}: ${message}`);
   } finally {
     // Always release the Join button, including on failure.
     setLoading(false);
@@ -612,7 +491,7 @@ return (
         }}
       />
 
-      <span>{t.offline}</span>
+      <span>网络不可用，请检查网络</span>
     </div>
   )}
 
@@ -639,7 +518,7 @@ return (
  <img
  suppressHydrationWarning
   src="/MSpace-logo.jpg.jpeg"
-  alt={t.appName}
+  alt="星域"
   style={{
     height: "55px",
     width: "auto",
@@ -670,7 +549,7 @@ onClick={() => {
     cursor: "pointer",
   }}
 >
-  {t.join}
+  加入星域
 </button>
   </div>
 
@@ -716,7 +595,7 @@ onClick={() => {
         marginBottom: "10px",
       }}
     >
-      {t.welcomeTo}
+      欢迎来到
     </p>
 
     <h2
@@ -729,9 +608,9 @@ onClick={() => {
         color: "#111827",
       }}
     >
-      {t.ownerSpace}
+      黄定襄的
 <br />
-{t.personalSpace}
+个人空间
     </h2>
 
     <p
@@ -741,7 +620,7 @@ onClick={() => {
         lineHeight: "1.7",
       }}
     >
-      {t.personalDesc}
+      这是我分享生活点滴并与朋友交流的地方。
     </p>
 
   </div>
@@ -805,7 +684,7 @@ onClick={() => {
           marginTop: "4px",
         }}
       >
-        {t.photos}
+        照片
       </div>
     </div>
   </div>
@@ -863,7 +742,7 @@ onClick={() => {
           marginTop: "4px",
         }}
       >
-        {t.videos}
+        视频
       </div>
     </div>
   </div>
@@ -917,7 +796,7 @@ onClick={() => {
       marginBottom: "18px",
     }}
   >
-    {t.recentPhotos}
+    最新照片
   </h3>
 
   <div
@@ -968,7 +847,7 @@ onClick={() => {
       color: "#111827",
     }}
   >
-    {t.latestVideo}
+    最新视频
   </h2>
 
   <div
@@ -1058,7 +937,7 @@ onClick={() => {
       color: "#111827",
     }}
   >
-    {t.join}
+    加入星域
   </h2>
 
   <p
@@ -1069,7 +948,7 @@ onClick={() => {
       fontSize: "18px",
     }}
   >
-    {t.joinDesc}
+    加入并开始交流
   </p>
 
   <label
@@ -1081,12 +960,12 @@ onClick={() => {
     color: "#111827",
   }}
 >
-  {t.name}
+  姓名
 </label>
 
   <input
     type="text"
-    placeholder={t.enterName}
+    placeholder="请输入您的姓名"
     value={name}
     onChange={(e) => setName(e.target.value)}
     style={{
@@ -1110,7 +989,7 @@ onClick={() => {
     color: "#111827",
   }}
 >
-  {t.profilePhoto}
+  头像照片
 </label>
 
   <div
@@ -1142,7 +1021,7 @@ onClick={() => {
     marginBottom: "5px",
   }}
 >
-  {t.uploadPhoto}
+  上传头像照片
 </p>
 
 <p
@@ -1153,7 +1032,7 @@ onClick={() => {
     marginBottom: "10px",
   }}
 >
-  {t.optional}
+  JPG、PNG 或 WebP • 可选
 </p>
 
   <input
@@ -1191,7 +1070,7 @@ onClick={() => {
         fontWeight: "600",
       }}
     >
-      {t.choosePhoto}
+      选择照片
     </label>
 
 {fileName && (
@@ -1204,7 +1083,7 @@ onClick={() => {
       wordBreak: "break-all",
     }}
   >
-    {t.selected}: {fileName}
+    已选择: {fileName}
   </p>
 )}
   </div>
@@ -1245,7 +1124,7 @@ onClick={() => {
           verticalAlign: "middle",
         }}
       />
-      {t.connecting}
+      连接中…
     </>
   ) : (
     <span
@@ -1257,7 +1136,7 @@ onClick={() => {
       }}
     >
       <UserRoundPlus size={22} />
-      {t.join}
+      加入星域
     </span>
   )}
 </>
@@ -1272,17 +1151,17 @@ onClick={() => {
     lineHeight: "1.4",
   }}
 >
-  {t.termsText}
+  加入即表示您同意我们的
   <span
     style={{
       color: "#7c3aed",
       fontWeight: "600",
     }}
   >
-    {" "}{t.terms}
+    {" "}服务条款
   </span>
   {" "}
-  {language === "zh" ? "和" : "and"}
+  和
   {" "}
   <span
     style={{
@@ -1290,7 +1169,7 @@ onClick={() => {
       fontWeight: "600",
     }}
   >
-    {t.privacy}
+    隐私政策
   </span>
   .
 </p>
@@ -1314,7 +1193,7 @@ onClick={() => {
     fontSize: "16px",
   }}
 >
-  {t.appName}
+  星域
 </h3>
 
   <p
@@ -1323,32 +1202,9 @@ onClick={() => {
     fontSize: "13px",
   }}
 >
- ©️ 2026 {language === "zh" ? "黄定襄" : "Huang Dingxiang"}. {t.copyright}
+ ©️ 2026 黄定襄. 版权所有
 </p>
 </footer>
-{showInstallButton && (
-  <button
-    onClick={installApp}
-    style={{
-      position: "fixed",
-      bottom: "20px",
-      left: "20px",
-      zIndex: 9999,
-      padding: "10px 16px",
-      borderRadius: "999px",
-      border: "none",
-      background: "#7c3aed",
-      color: "#fff",
-      fontWeight: "600",
-      cursor: "pointer",
-      boxShadow:
-        "0 4px 12px rgba(0,0,0,0.2)",
-    }}
-  >
-    📱 {t.addApp}
-  </button>
-
-)}
 </main>
 
 </>
