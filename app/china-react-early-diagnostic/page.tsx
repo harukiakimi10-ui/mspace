@@ -1,3 +1,4 @@
+
 import ReactDiagnosticClient from "./ReactDiagnosticClient";
 
 export default function ChinaReactEarlyDiagnostic() {
@@ -20,18 +21,17 @@ export default function ChinaReactEarlyDiagnostic() {
         }}
       >
         <h1>Early React Error Diagnostic</h1>
-
         <p>
-          This page checks for JavaScript errors that happen before React
-          mounts.
+          This page checks whether the live homepage JavaScript files
+          can be discovered and downloaded.
         </p>
 
-        <h3>Early browser report</h3>
-
+        <h3>Asset report</h3>
         <pre
           id="early-diag"
           style={{
             whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
             background: "#111",
             color: "#0f0",
             padding: 15,
@@ -39,111 +39,86 @@ export default function ChinaReactEarlyDiagnostic() {
             minHeight: 150,
           }}
         >
-          Starting early diagnostic...
+          Starting asset diagnostic...
         </pre>
 
         <ReactDiagnosticClient />
       </div>
 
       <script
-  dangerouslySetInnerHTML={{
-    __html: `
+        dangerouslySetInnerHTML={{
+          __html: `
 (function () {
   var output = document.getElementById("early-diag");
 
   function report(message) {
-    if (!output) return;
-    output.textContent += "\\n" + message;
+    if (output) output.textContent += "\\n" + message;
   }
 
   window.addEventListener("error", function (event) {
-    var filename = event.filename || "unknown file";
-
-    try {
-      filename = new URL(filename).pathname.split("/").pop() || filename;
-    } catch (e) {}
-
     report(
-      "JAVASCRIPT ERROR" +
-      "\\nFile: " +
-      filename +
-      "\\nMessage: " +
+      "JAVASCRIPT ERROR: " +
       (event.message || "Unknown error") +
-      "\\nLine: " +
-      (event.lineno || "?") +
-      "\\nColumn: " +
-      (event.colno || "?")
+      "\\nFile: " + (event.filename || "unknown") +
+      "\\nLine: " + (event.lineno || "?") +
+      "\\nColumn: " + (event.colno || "?")
     );
   }, true);
 
   window.addEventListener("unhandledrejection", function (event) {
-    report(
-      "UNHANDLED PROMISE: " +
-      String(event.reason || "Unknown rejection")
-    );
+    report("UNHANDLED PROMISE: " + String(event.reason || "Unknown"));
   });
 
-  window.addEventListener("load", function () {
-    report("WINDOW LOAD: completed");
-  });
+  report("Diagnostic script running.");
+  report("Reading homepage HTML...");
 
-  report("EARLY SCRIPT: running");
-
-  var chunk =
-    "/_next/static/chunks/12ocn8f7kpxf5.js";
-
-  report("FETCHING CHUNK...");
-  report("File: 12ocn8f7kpxf5.js");
-
-  fetch(chunk, {
-    cache: "no-store"
-  })
+  fetch("/", { cache: "no-store" })
     .then(function (response) {
-      report("FETCH STATUS: " + response.status);
-
-      if (!response.ok) {
-        throw new Error(
-          "HTTP " + response.status
-        );
-      }
-
-      return response.arrayBuffer();
+      report("HOMEPAGE STATUS: " + response.status);
+      if (!response.ok) throw new Error("Homepage HTTP " + response.status);
+      return response.text();
     })
-    .then(function (buffer) {
-      report("BYTE LENGTH: " + buffer.byteLength);
+    .then(function (html) {
+      var doc = new DOMParser().parseFromString(html, "text/html");
+      var scripts = Array.from(doc.querySelectorAll("script[src]"))
+        .map(function (script) {
+          return script.getAttribute("src");
+        })
+        .filter(function (src) {
+          return src && src.indexOf("/_next/") === 0 &&
+            /\\.js(?:\\?|$)/.test(src);
+        });
 
-      if (!window.crypto || !window.crypto.subtle) {
-        report("SHA-256: Web Crypto unavailable");
+      scripts = Array.from(new Set(scripts));
+      report("JAVASCRIPT FILES FOUND: " + scripts.length);
+
+      if (!scripts.length) {
+        report("No Next.js JavaScript files found in homepage HTML.");
         return;
       }
 
-      return window.crypto.subtle.digest(
-        "SHA-256",
-        buffer
-      );
-    })
-    .then(function (hash) {
-      if (!hash) return;
-
-      var bytes = new Uint8Array(hash);
-      var hex = "";
-
-      for (var i = 0; i < bytes.length; i++) {
-        hex += bytes[i].toString(16).padStart(2, "0");
-      }
-
-      report("SHA-256: " + hex);
+      return Promise.all(scripts.map(function (src) {
+        return fetch(src, { cache: "no-store" })
+          .then(function (response) {
+            report(
+              (response.ok ? "OK " : "FAIL ") +
+              response.status + " " + src +
+              " | " +
+              (response.headers.get("content-type") || "no content type")
+            );
+          })
+          .catch(function (error) {
+            report("FETCH ERROR " + src + " | " + String(error));
+          });
+      }));
     })
     .catch(function (error) {
-      report(
-        "FETCH/HASH ERROR: " +
-        String(error)
-      );
+      report("DIAGNOSTIC ERROR: " + String(error));
     });
 })();
-    `,
-  }}
-/>
+          `,
+        }}
+      />
     </main>
   );
 }
