@@ -79,43 +79,52 @@ const [language, setLanguage] =
 }, []);
 
 useEffect(() => {
-  const browserLanguages =
-    typeof navigator !== "undefined"
-      ? Array.from(navigator.languages || [])
-      : [];
+  try {
+    let browserLanguages: string[] = [];
+    let browserLanguage = "";
 
-  const browserLanguage =
-    typeof navigator !== "undefined"
-      ? navigator.language || ""
-      : "";
+    if (typeof navigator !== "undefined") {
+      if (navigator.languages) {
+        try {
+          browserLanguages = Array.from(navigator.languages);
+        } catch (_) {
+          browserLanguages = [navigator.language];
+        }
+      } else {
+        browserLanguages = [navigator.language || (navigator as any).userLanguage || ""];
+      }
+      browserLanguage = navigator.language || (navigator as any).userLanguage || "";
+    }
 
-  // Prefer the browser's primary language.
-  const primaryLanguage =
-    browserLanguages[0] || browserLanguage;
+    // Safely verify if it's reading pure text data before running string operations
+    const primaryLangArrayOrString = browserLanguages.length > 0 ? browserLanguages[0] : browserLanguage;
+    const primaryLanguage = Array.isArray(primaryLangArrayOrString) ? primaryLangArrayOrString[0] : primaryLangArrayOrString;
 
-  const detectedLanguage: "zh" | "en" =
-    primaryLanguage
-      ? primaryLanguage.toLowerCase().startsWith("zh")
+    const detectedLanguage: "zh" | "en" =
+      primaryLanguage && typeof primaryLanguage === "string" && primaryLanguage.toLowerCase().startsWith("zh")
         ? "zh"
-        : "en"
-      : "zh";
+        : "en";
 
-  console.log("[MSpace language diagnostic]", {
-    browserLanguages,
-    browserLanguage,
-    primaryLanguage,
-    detectedLanguage,
-  });
+    setLanguage(detectedLanguage);
 
-  setLanguage(detectedLanguage);
-
-  setLanguageDiagnostic({
-    browserLanguages,
-    browserLanguage: browserLanguage || "(not detected)",
-    primaryLanguage: primaryLanguage || "(not detected)",
-    detectedLanguage,
-  });
+    setLanguageDiagnostic({
+      browserLanguages: Array.isArray(browserLanguages) ? browserLanguages : [browserLanguages],
+      browserLanguage: browserLanguage || "(not detected)",
+      primaryLanguage: typeof primaryLanguage === "string" ? primaryLanguage : "(not detected)",
+      detectedLanguage,
+    });
+  } catch (error) {
+    // Failsafe configuration to bypass sandbox restrictions on the strict network
+    setLanguage("zh");
+    setLanguageDiagnostic({
+      browserLanguages: ["zh"],
+      browserLanguage: "(sandboxed)",
+      primaryLanguage: "zh",
+      detectedLanguage: "zh",
+    });
+  }
 }, []);
+
 
 useEffect(() => {
   const updateOnlineStatus = () => {
