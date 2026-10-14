@@ -20,8 +20,9 @@ self.addEventListener("push", (event) => {
     icon: data.icon || "/mspace-notification-icon.jpeg",
     badge: data.badge || "/mspace-notification-icon.jpeg",
     data: {
-      url: data.url || "/members",
-    },
+  url: data.url || "/members",
+  conversationId: data.conversationId || null,
+},
   };
 
   event.waitUntil(
@@ -110,13 +111,29 @@ self.addEventListener("message", (event) => {
   );
 });
 
+
 self.addEventListener("message", (event) => {
   if (!event.data) return;
 
-  if (event.data.type !== "MSPACE_SET_OPEN_CONVERSATION") {
+  if (event.data.type === "MSPACE_SET_OPEN_CONVERSATION") {
+    self.mspaceOpenConversationId =
+      event.data.conversationId || null;
     return;
   }
 
-  self.mspaceOpenConversationId =
-    event.data.conversationId || null;
+  if (event.data.type === "MSPACE_CLOSE_READ_NOTIFICATIONS") {
+    const conversationId = event.data.conversationId;
+
+    event.waitUntil(
+      self.registration.getNotifications().then((notifications) => {
+        for (const notification of notifications) {
+          if (
+            notification.data?.conversationId === conversationId
+          ) {
+            notification.close();
+          }
+        }
+      })
+    );
+  }
 });

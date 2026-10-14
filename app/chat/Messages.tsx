@@ -11,6 +11,7 @@ import {
   MapPin,
   LoaderCircle,
   Pin,
+  ChevronDown,
 } from "lucide-react";
 import VoiceMessage from "./VoiceMessage";
 import VideoMessage from "./VideoMessage";
@@ -255,6 +256,10 @@ onCancelUpload,
   typeof navigator !== "undefined" &&
   /Android/i.test(navigator.userAgent);
 
+  const isDesktop =
+  typeof window !== "undefined" &&
+  window.matchMedia("(min-width: 1024px)").matches;
+
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(
   new Set()
 );
@@ -265,6 +270,9 @@ const [locationViewer, setLocationViewer] = useState<{
 } | null>(null);
 
 const [messageFocusOffset, setMessageFocusOffset] = useState(0);
+
+const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 const uploadRingStartTimesRef = useRef<
@@ -675,7 +683,7 @@ const handleMessageLongPress = (
 
   setSelectedMessage(msg);
   setMessageFocus(true);
-  if (!isAndroid) {
+  if (!isAndroid && !isDesktop) {
   setShowComposer(false);
 }
 
@@ -917,6 +925,17 @@ const locationCoordinates = isReplyLocation
     messageRefs.current[msg.id] = el;
   }}
 
+  onMouseEnter={() => {
+  if (currentUser === "admin" && isDesktop) {
+    setHoveredMessageId(String(msg.id));
+  }
+}}
+onMouseLeave={() => {
+  if (currentUser === "admin" && isDesktop) {
+    setHoveredMessageId(null);
+  }
+}}
+
   onClick={(e) => {
   if (longPressTriggeredRef.current) {
     e.preventDefault();
@@ -927,12 +946,16 @@ const locationCoordinates = isReplyLocation
 }}
 
   onContextMenu={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  if (currentUser === "admin" && isDesktop) {
+    return;
+  }
 
-    if (isAndroid) {
-  return;
-}
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (isAndroid) {
+    return;
+  }
 
 
 
@@ -967,9 +990,12 @@ const locationCoordinates = isReplyLocation
 
     position: "relative",
 
-    WebkitTouchCallout: "none",
-    WebkitUserSelect: "none",
-    userSelect: "none",
+    WebkitTouchCallout:
+  currentUser === "admin" && isDesktop ? "default" : "none",
+WebkitUserSelect:
+  currentUser === "admin" && isDesktop ? "text" : "none",
+userSelect:
+  currentUser === "admin" && isDesktop ? "text" : "none",
 
     zIndex: isFocused ? 6000 : 1,
 
@@ -1155,7 +1181,7 @@ playMenuSound(true);
 
   setSelectedMessage(msg);
   setMessageFocus(true);
-  if (!isAndroid) {
+  if (!isAndroid && !isDesktop) {
   setShowComposer(false);
 }
 
@@ -1619,7 +1645,7 @@ msg.reply_preview === "🎤 Voice message" ? (
   {emojiCount > 0 && (
     <div
       style={{
-        marginTop: 2,
+      marginTop: emojiCount === 1 ? 35 : 2, 
         padding: "3px 8px",
         borderRadius: 12,
 
@@ -2344,7 +2370,71 @@ decoding="sync"
           
 
 
-          </div>
+                    </div>
+
+          {currentUser === "admin" &&
+            isDesktop &&
+            hoveredMessageId === String(msg.id) && (
+              <button
+                type="button"
+                aria-label="Open message menu"
+                title="Message options"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  const messageElement =
+                    messageRefs.current[msg.id];
+
+                  if (messageElement) {
+                    handleMessageLongPress(
+                      msg,
+                      messageElement
+                    );
+                  }
+                }}
+                style={{
+  position: "absolute",
+top: "4px",
+right:
+  msg.sender === currentUser
+    ? "58px"
+    : undefined,
+left:
+  msg.sender !== currentUser
+    ? "calc(30% + 8px)"
+    : undefined,
+width: "36px",
+height: "36px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "none",
+                  borderRadius: "50%",
+background: "rgba(255, 255, 255, 0.72)",
+color: "#444444",
+boxShadow: "0 1px 5px rgba(0,0,0,0.14)",
+backdropFilter: "blur(4px)",
+                  cursor: "pointer",
+                  zIndex: 7000,
+                  padding: 0,
+                }}
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            )}
 
           {msg.sender === currentUser && (
   <div

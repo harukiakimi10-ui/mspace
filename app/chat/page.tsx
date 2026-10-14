@@ -1647,7 +1647,23 @@ if (unreadCountError) {
 }
 }
 
-  await loadMessages(id);
+  
+try {
+  const registration = await navigator.serviceWorker.ready;
+
+  registration.active?.postMessage({
+    type: "MSPACE_CLOSE_READ_NOTIFICATIONS",
+    conversationId: id,
+  });
+} catch (error) {
+  console.error(
+    "MSpace member close notifications error:",
+    error
+  );
+}
+
+await loadMessages(id);
+
 console.log("Finished updating read status");
 }
 
@@ -3817,23 +3833,44 @@ return (
 }}
 
 
+
+
+
 onDeleteForMe={async () => {
   if (!selectedMessage) return;
 
-  await supabase
+  const { error } = await supabase
     .from("messages")
     .update({
       deleted_for: "member",
     })
     .eq("id", selectedMessage.id);
 
+  if (error) {
+    console.error("Member Delete for me failed:", error);
+    setMessageFocus(false);
+    setShowMessageMenu(false);
+    return;
+  }
+
+  // Remove the message from the live chat immediately.
+  setMessages((currentMessages) =>
+    currentMessages.filter(
+      (msg: any) => msg.id !== selectedMessage.id
+    )
+  );
+
   setMessageFocus(false);
   setShowMessageMenu(false);
   setShowComposer(true);
+
   if (conversationId) {
     await loadMessages(conversationId);
   }
 }}
+
+
+
 onDeleteForEveryone={async () => {
   if (!selectedMessage) return;
 

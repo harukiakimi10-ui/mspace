@@ -91,6 +91,8 @@ export default function ChatPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   const [isDesktop, setIsDesktop] = useState(false);
+  const [screenSizeReady, setScreenSizeReady] = useState(false);
+
   const [desktopConversations, setDesktopConversations] =
   useState<any[]>(() => {
     if (typeof window === "undefined") {
@@ -117,6 +119,7 @@ export default function ChatPage() {
 useEffect(() => {
   const checkDesktop = () => {
     setIsDesktop(window.innerWidth >= 1024);
+    setScreenSizeReady(true);
   };
 
   checkDesktop();
@@ -203,22 +206,25 @@ useEffect(() => {
                 .eq("is_read", false),
 
               supabase
-                .from("messages")
-                .select("*")
-                .eq(
-                  "conversation_id",
-                  conversation.id
-                )
-                .order("created_at", {
-                  ascending: false,
-                })
-                .limit(1),
+  .from("messages")
+  .select("*")
+  .eq(
+    "conversation_id",
+    conversation.id
+  )
+  .order("created_at", {
+  ascending: false,
+})
+.limit(50),
             ]);
 
             const member = memberResult.data;
 
-            const lastMessage =
-              lastMessageResult.data?.[0] || null;
+            
+           const lastMessage =
+  lastMessageResult.data?.find(
+    (msg: any) => msg.deleted_for !== "admin"
+  ) || null;
 
             const unreadCount =
               unreadResult.count ?? 0;
@@ -1272,20 +1278,39 @@ if (!conversationExists) {
   }
 }
 
+  
   if (payload.eventType === "UPDATE") {
-  const updatedMessage = payload.new as any;
+    const updatedMessage = payload.new as any;
 
-  setMessages((currentMessages) =>
-    currentMessages.map((message) =>
-      message.id === updatedMessage.id
-        ? {
-            ...message,
-            ...updatedMessage,
-          }
-        : message
-    )
-  );
-}
+    // Update the message inside the open chat.
+    setMessages((currentMessages) =>
+      currentMessages.map((message) =>
+        message.id === updatedMessage.id
+          ? {
+              ...message,
+              ...updatedMessage,
+            }
+          : message
+      )
+    );
+
+    // Update the conversation-list preview immediately.
+    setDesktopConversations((currentConversations) =>
+      currentConversations.map((chat) =>
+        chat.id === updatedMessage.conversation_id &&
+        chat.lastMessage?.id === updatedMessage.id
+          ? {
+              ...chat,
+              lastMessage: {
+                ...chat.lastMessage,
+                ...updatedMessage,
+              },
+            }
+          : chat
+      )
+    );
+  }
+
 
   if (
     document.visibilityState === "visible" &&
@@ -2453,10 +2478,17 @@ if (unreadCountError) {
     const registration =
       await navigator.serviceWorker.ready;
 
-    registration.active?.postMessage({
-      type: "MSPACE_UPDATE_BADGE",
-      count: unreadCount ?? 0,
-    });
+    
+registration.active?.postMessage({
+  type: "MSPACE_UPDATE_BADGE",
+  count: unreadCount ?? 0,
+});
+
+registration.active?.postMessage({
+  type: "MSPACE_CLOSE_READ_NOTIFICATIONS",
+  conversationId: id,
+});
+
   } catch (error) {
     console.error(
       "MSpace service worker badge update error:",
@@ -3443,6 +3475,10 @@ const filteredDesktopConversations = desktopConversations.filter(
     );
   }
 );
+
+if (!screenSizeReady) {
+  return null;
+}
 
   return (
     <>
@@ -5177,11 +5213,65 @@ onSave={async () => {
     .eq("id", selectedMessage.id)
     .select();
 
+  
   console.log("Delete for me:", { data, error });
+
+  if (error) {
+    console.error("Delete for me failed:", error);
+    setShowMessageMenu(false);
+    return;
+  }
+
+  
+  const { data: recentMessages, error: previewError } =
+    await supabase
+      .from("messages")
+      .select(
+        "id, content, message_type, sender, created_at, file_duration, is_deleted, is_read, deleted_for"
+      )
+      .eq("conversation_id", selectedMessage.conversation_id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+  if (previewError) {
+    console.error(
+      "Conversation preview refresh failed:",
+      previewError
+    );
+  } else {
+    const lastMessage =
+      recentMessages?.find(
+        (msg: any) => msg.deleted_for !== "admin"
+      ) || null;
+
+    setDesktopConversations((current) => {
+      const updated = current.map((chat) =>
+        chat.id === selectedMessage.conversation_id
+          ? { ...chat, lastMessage }
+          : chat
+      );
+
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updated)
+        );
+      } catch (error) {
+        console.error(
+          "Conversation preview cache update failed:",
+          error
+        );
+      }
+
+      return updated;
+    });
+  }
+
 
   setShowMessageMenu(false);
 
   await loadMessages();
+
 }}
   onDeleteForEveryone={async () => {
   if (!selectedMessage) return;

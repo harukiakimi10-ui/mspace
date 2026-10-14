@@ -46,9 +46,25 @@ export default function NotificationButton({
   isAdmin = false,
 }: NotificationButtonProps) {
 
-  const isWeChat =
-    typeof navigator !== "undefined" &&
-    /MicroMessenger/i.test(navigator.userAgent);
+
+const isWeChat =
+  typeof navigator !== "undefined" &&
+  /MicroMessenger/i.test(navigator.userAgent);
+
+const isIOS =
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" &&
+      navigator.maxTouchPoints > 1));
+
+const isStandalone =
+  typeof window !== "undefined" &&
+  (window.matchMedia("(display-mode: standalone)").matches ||
+    ("standalone" in window.navigator &&
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true));
+
+const hideNotificationButton = isIOS && !isStandalone;
+
   // IMPORTANT:
   // Always start with "default" so server and client
   // render the same HTML.
@@ -305,13 +321,13 @@ const finalMemberId = isAdmin
   };
 
   // Prevent server/client mismatch.
-  if (!mounted || isWeChat) {
+  if (!mounted || isWeChat || hideNotificationButton) {
   return null;
 }
 
  return (
   <>
-    {(!checking || isAdmin) && !saved && (
+    {!checking && !saved && (
       <button
         type="button"
         onClick={enableNotifications}

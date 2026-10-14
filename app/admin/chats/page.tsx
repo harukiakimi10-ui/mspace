@@ -21,20 +21,22 @@ import {
 export default function AdminChatsPage() {
 
   const [isDesktop, setIsDesktop] = useState(false);
+const [screenSizeReady, setScreenSizeReady] = useState(false);
 
   useEffect(() => {
-    const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 1024);
-    };
+  const checkDesktop = () => {
+    setIsDesktop(window.innerWidth >= 1024);
+    setScreenSizeReady(true);
+  };
 
-    checkDesktop();
+  checkDesktop();
 
-    window.addEventListener("resize", checkDesktop);
+  window.addEventListener("resize", checkDesktop);
 
-    return () => {
-      window.removeEventListener("resize", checkDesktop);
-    };
-  }, []);
+  return () => {
+    window.removeEventListener("resize", checkDesktop);
+  };
+}, []);
 
 
 
@@ -136,7 +138,11 @@ useEffect(() => {
       payload.eventType
     );
 
-    scheduleConversationRefresh();
+        scheduleConversationRefresh();
+
+    if (payload.eventType === "UPDATE") {
+      void loadConversations();
+    }
 
     if (
   selectedConversation &&
@@ -433,15 +439,19 @@ await Promise.all(
       .eq("sender", "member")
       .eq("is_read", false);
 
-   const { data: lastMessage } = await supabase
+   const { data: recentMessages } = await supabase
   .from("messages")
   .select(
-    "content, message_type, sender, created_at, file_duration, is_deleted, is_read"
+    "id, content, message_type, sender, created_at, file_duration, is_deleted, is_read, deleted_for"
   )
-      .eq("conversation_id", conversation.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+  .eq("conversation_id", conversation.id)
+  .order("created_at", { ascending: false })
+  .limit(50);
+
+const lastMessage =
+  recentMessages?.find(
+    (msg: any) => msg.deleted_for !== "admin"
+  ) || null;
 
     result.push({
       ...conversation,
@@ -556,7 +566,11 @@ console.log("Inserted admin message:", data);
   loadConversations();
 }
 
-  return isDesktop ? (
+  if (!screenSizeReady) {
+  return null;
+}
+
+return isDesktop ? (
   /* =========================
      DESKTOP ADMIN CHAT LIST
      ========================= */

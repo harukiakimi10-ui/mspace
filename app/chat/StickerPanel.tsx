@@ -61,7 +61,26 @@ export default function StickerPanel({
       ? 42
       : 42;
 
-  const emojiPerLine = isDesktop ? 14 : 8;
+
+const isTablet =
+  /iPad/i.test(userAgent) ||
+  (navigator.platform === "MacIntel" &&
+    navigator.maxTouchPoints > 1) ||
+  (/Android/i.test(userAgent) &&
+    !/Mobile/i.test(userAgent));
+
+const isSmallIPhone =
+  /iPhone/i.test(userAgent) &&
+  window.matchMedia("(max-width: 375px)").matches;
+
+const emojiPerLine = isDesktop
+  ? 14
+  : isTablet
+    ? 10
+    : isSmallIPhone
+      ? 7
+      : 8;
+
 
   const emojiButtonSizeValue = isDesktop
   ? 48
@@ -237,7 +256,7 @@ export default function StickerPanel({
             }}
           >
             <Smile
-              size={26}
+              size={isDesktop ? 26 : 22}
               strokeWidth={2.2}
             />
           </button>
@@ -262,7 +281,7 @@ export default function StickerPanel({
             }}
           >
             <Sticker
-              size={26}
+              size={isDesktop ? 26 : 22}
               strokeWidth={2.2}
             />
           </button>
@@ -350,8 +369,8 @@ export default function StickerPanel({
                     stickerType === "static"
                       ? "#6d28d9"
                       : "#777",
-                  padding: "12px 0",
-                  fontSize: "15px",
+                  padding: isDesktop ? "12px 0" : "7px 0",
+                  fontSize: isDesktop ? "15px" : "13px",
                   fontWeight:
                     stickerType === "static"
                       ? 700
@@ -389,8 +408,8 @@ export default function StickerPanel({
                     stickerType === "animated"
                       ? "#6d28d9"
                       : "#777",
-                  padding: "12px 0",
-                  fontSize: "15px",
+                  padding: isDesktop ? "12px 0" : "7px 0",
+                  fontSize: isDesktop ? "15px" : "13px",
                   fontWeight:
                     stickerType === "animated"
                       ? 700

@@ -2839,7 +2839,18 @@ disabled={savingProfile}
 >
   {photos.length}
 </div>
-      </div>
+
+<div
+  style={{
+    fontSize: "13px",
+    color: "#555",
+    fontWeight: "600",
+    marginTop: "4px",
+  }}
+>
+  {t.photos}
+</div>
+</div>
 
       <div style={{ textAlign: "center" }}>
         <div
@@ -2855,7 +2866,18 @@ disabled={savingProfile}
 >
   {videos.length}
 </div>
-      </div>
+
+<div
+  style={{
+    fontSize: "13px",
+    color: "#555",
+    fontWeight: "600",
+    marginTop: "4px",
+  }}
+>
+  {t.videos}
+</div>
+</div>
     </div>
 
     <button
