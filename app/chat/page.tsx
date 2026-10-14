@@ -2889,19 +2889,22 @@ async function uploadFile(
     "MB"
   );
 
-  console.log(
-    "Member: converting video to MP4/H.264..."
-  );
+  if (file.size > 10 * 1024 * 1024) {
+    console.log("Member: video exceeds 10 MiB; converting to MP4/H.264...");
 
-  uploadFile = await compressVideo(file);
+    uploadFile = await compressVideo(file);
 
-  console.log(
-    "Member final video:",
-    (uploadFile.size / 1024 / 1024).toFixed(2),
-    "MB",
-    uploadFile.type
-  );
+    console.log(
+      "Member final video:",
+      (uploadFile.size / 1024 / 1024).toFixed(2),
+      "MB",
+      uploadFile.type
+    );
+  } else {
+    console.log("Member: video is 10 MiB or smaller; uploading original file.");
+  }
 }
+
 
     /*
      * Upload the FINAL file.
@@ -3298,6 +3301,8 @@ console.log(
 if (error) {
   throw new Error(error.message);
 }
+
+
 
 
 /*
@@ -4697,7 +4702,7 @@ paddingBottom: showStickerPanel
       position: "absolute",
       inset: 0,
 
-      background: "rgba(0, 0, 0, 0.18)",
+      background: "transparent",
 
 
       zIndex: 0,

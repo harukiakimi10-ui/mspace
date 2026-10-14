@@ -106,3 +106,59 @@
     transform: rotate(360deg);
   }
 }
+
+@media (max-width: 767px) {
+  #join-form #signup {
+    margin-top: 0 !important;
+    margin-bottom: 24px;
+  }
+
+  #join-form {
+    margin-bottom: 24px;
+  }
+
+  footer {
+    margin-top: 20px !important;
+  }
+}
+
+/* Signup profile photo preview */
+.signup-photo-preview {
+  width: 104px;
+  height: 104px;
+}
+
+@media (max-width: 767px) {
+  .signup-photo-preview {
+    width: 88px;
+    height: 88px;
+  }
+}
+
+/* Install App button visibility */
+.desktop-install-button {
+  display: flex;
+}
+
+@media (max-width: 767px) {
+  .desktop-install-button {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobile-install-button {
+    display: none !important;
+  }
+}
+
+/* Show the header Join button only on mobile */
+.mobile-header-join-button {
+  display: inline-flex;
+}
+
+@media (min-width: 768px) {
+  .mobile-header-join-button {
+    display: none !important;
+  }
+}

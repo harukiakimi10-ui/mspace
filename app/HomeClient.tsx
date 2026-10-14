@@ -10,6 +10,7 @@ import {
   Image,
   Video,
   ImagePlus,
+  Download,
   UserRoundPlus,
 } from "lucide-react";
 import { createId } from "@/lib/createId";
@@ -55,12 +56,100 @@ const [videoCount, setVideoCount] = useState(
 
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(true);
-  const [mounted, setMounted] = useState(false);const [isOffline, setIsOffline] = useState(false);const router = useRouter();
 
+  const [mounted, setMounted] = useState(false);
+const [isOffline, setIsOffline] = useState(false);
+const [showInstallButton, setShowInstallButton] = useState(false);
+const [showInstallHelp, setShowInstallHelp] = useState(false);
+const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+const [language, setLanguage] = useState<"en" | "zh">("zh");
+const router = useRouter();
 
   useEffect(() => {
   setMounted(true);
 }, []);
+
+useEffect(() => {
+  const browserLanguages = Array.from(navigator.languages || []);
+  const browserLanguage = navigator.language || "";
+  const primaryLanguage = browserLanguages[0] || browserLanguage;
+
+  const detectedLanguage: "zh" | "en" = primaryLanguage
+    ? primaryLanguage.toLowerCase().startsWith("zh")
+      ? "zh"
+      : "en"
+    : "zh";
+
+  setLanguage(detectedLanguage);
+}, []);
+
+const t = {
+  en: {
+    join: "Join MSpace",
+    joinDesc: "Join MSpace and start connecting",
+    name: "Name",
+    enterName: "Enter your name",
+    profilePhoto: "Profile Photo",
+    tapToUpload: "Tap to upload profile photo",
+    selected: "Selected",
+    connecting: "Connecting…",
+    addApp: "Install App",
+    installApp: "Install App",
+    recentPhotos: "Recent Photos",
+    latestVideo: "Latest Video",
+    photos: "Photos",
+    videos: "Videos",
+    welcomeTo: "Welcome to",
+    personalSpace: "Personal Space",
+    personalDesc:
+      "A place where I share my life moments and connect with friends.",
+    optional: "JPG, PNG or WebP • Optional",
+    termsText: "By joining, you agree to our",
+    terms: "Terms of Service",
+    termsAnd: "and",
+    privacy: "Privacy Policy",
+    enterNameAlert: "Please enter your name",
+    blockedDevice: "This device has been blocked.",
+    bannedAccount: "Your MSpace account has been banned.",
+    error: "Error",
+    copyright: "All Rights Reserved",
+    appName: "MSpace",
+    offline: "No internet connection",
+    ownerSpace: "Happiness's",
+  },
+  zh: {
+    join: "加入星域",
+    joinDesc: "加入星域并开始交流",
+    name: "姓名",
+    enterName: "请输入您的姓名",
+    profilePhoto: "头像照片",
+    tapToUpload: "点击上传头像",
+    selected: "已选择",
+    connecting: "连接中…",
+    addApp: "安装应用",
+    installApp: "安装应用",
+    recentPhotos: "最新照片",
+    latestVideo: "最新视频",
+    photos: "照片",
+    videos: "视频",
+    welcomeTo: "欢迎来到",
+    personalSpace: "个人空间",
+    personalDesc: "这是我分享生活点滴并与朋友交流的地方。",
+    optional: "JPG、PNG 或 WebP • 可选",
+    termsText: "加入即表示您同意我们的",
+    terms: "服务条款",
+    termsAnd: "和",
+    privacy: "隐私政策",
+    enterNameAlert: "请输入您的姓名",
+    blockedDevice: "此设备已被封锁。",
+    bannedAccount: "您的星域账户已被封禁。",
+    error: "错误",
+    copyright: "版权所有",
+    appName: "星域",
+    offline: "网络不可用，请检查网络",
+    ownerSpace: "幸福的",
+  },
+}[language];
 
 
 useEffect(() => {
@@ -226,27 +315,97 @@ if (memberId) {
 }
 
   restoreMember().then((result) => {
-    if (cancelled) return;
+  if (cancelled) return;
 
-    // If we already have a stored member ID, keep the user in the member
-    // area even when Supabase cannot be reached. The members page already
-    // has local caching and handles backend errors without blanking itself.
-    if (result === "error" && localStorage.getItem("mspace_member_id")) {
-      router.replace("/members");
-    }
+  console.log("Restore result:", result);
 
-    // Always release the loading gate. A backend timeout/error must never
-    // leave the entire page permanently blank.
-    setRestoring(false);
+  // Keep the homepage hidden while redirecting a returning member.
+  if (result === "redirect") {
+    return;
+  }
 
-    console.log("Restore result:", result);
-  });
+  // If Supabase is unavailable but this device has a saved member ID,
+  // continue to the members page without revealing the signup page.
+  if (result === "error" && localStorage.getItem("mspace_member_id")) {
+    router.replace("/members");
+    return;
+  }
+
+  // Only show the homepage after confirming this is a new visitor
+  // or when no redirect is required.
+  setRestoring(false);
+});
 
   return () => {
     cancelled = true;
   };
 }, []);
 
+
+useEffect(() => {
+  const isStandalone = () =>
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  const isIPhoneOrIPad =
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+  if (isStandalone()) {
+    setShowInstallButton(false);
+    return;
+  }
+
+  if (isIPhoneOrIPad) {
+    setShowInstallButton(true);
+  } else {
+    setShowInstallButton(false);
+  }
+
+  const handler = (event: Event) => {
+    event.preventDefault();
+
+    setDeferredPrompt(
+      event as Event & {
+        prompt: () => Promise<void>;
+        userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+      }
+    );
+
+    setShowInstallButton(true);
+  };
+
+  window.addEventListener("beforeinstallprompt", handler);
+
+  const handleInstalled = () => {
+    setShowInstallButton(false);
+    setDeferredPrompt(null);
+  };
+
+  window.addEventListener("appinstalled", handleInstalled);
+
+  return () => {
+    window.removeEventListener("beforeinstallprompt", handler);
+    window.removeEventListener("appinstalled", handleInstalled);
+  };
+}, []);
+
+
+const installApp = async () => {
+  if (!deferredPrompt) {
+    setShowInstallHelp(true);
+    return;
+  }
+
+  await deferredPrompt.prompt();
+
+  const result = await deferredPrompt.userChoice;
+
+  if (result.outcome === "accepted") {
+    setShowInstallButton(false);
+    setDeferredPrompt(null);
+  }
+};
 
 async function joinMSpace() {
   if (loading) return;
@@ -258,7 +417,7 @@ async function joinMSpace() {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      alert("请输入您的姓名");
+      alert(t.enterNameAlert);
       return;
     }
 
@@ -282,7 +441,7 @@ async function joinMSpace() {
 
     if (bannedDevicesError) {
       console.error("Banned-device check failed:", bannedDevicesError);
-      alert(`${"错误"}: ${bannedDevicesError.message}`);
+      alert(`${t.error}: ${bannedDevicesError.message}`);
       return;
     }
 
@@ -291,7 +450,7 @@ async function joinMSpace() {
     );
 
     if (isBanned) {
-      alert("此设备已被封锁。");
+      alert(t.blockedDevice);
       return;
     }
 
@@ -307,12 +466,12 @@ async function joinMSpace() {
 
     if (nameCheckError) {
       console.error("Name check failed:", nameCheckError);
-      alert(`${"错误"}: ${nameCheckError.message}`);
+      alert(`${t.error}: ${nameCheckError.message}`);
       return;
     }
 
     if (existingMember?.banned) {
-      alert("您的星域账户已被封禁。");
+      alert(t.bannedAccount);
       return;
     }
 
@@ -328,13 +487,13 @@ async function joinMSpace() {
 
     if (deviceCheckError) {
       console.error("Device account check failed:", deviceCheckError);
-      alert(`${"错误"}: ${deviceCheckError.message}`);
+      alert(`${t.error}: ${deviceCheckError.message}`);
       return;
     }
 
     if (deviceMember) {
       if (deviceMember.banned) {
-        alert("您的星域账户已被封禁。");
+        alert(t.bannedAccount);
         return;
       }
 
@@ -365,12 +524,12 @@ async function joinMSpace() {
 
       if (uploadError) {
         console.error("Profile photo upload failed:", uploadError);
-        alert(`${"错误"}: ${uploadError.message}`);
+        alert(`${t.error}: ${uploadError.message}`);
         return;
       }
 
       if (!uploadedFile?.path) {
-        alert("错误");
+        alert(t.error);
         return;
       }
 
@@ -395,7 +554,7 @@ async function joinMSpace() {
 
     if (insertError) {
       console.error("Account creation failed:", insertError);
-      alert(`${"错误"}: ${insertError.message}`);
+      alert(`${t.error}: ${insertError.message}`);
       return;
     }
 
@@ -415,16 +574,20 @@ async function joinMSpace() {
         ? error.message
         : "Please check your connection and try again.";
 
-    alert(`${"错误"}: ${message}`);
+    alert(`${t.error}: ${message}`);
   } finally {
     // Always release the Join button, including on failure.
     setLoading(false);
   }
 }
 
+if (!mounted || restoring) {
+  return null;
+}
+
 return (
   <>
-    
+
   {isOffline && (
     <div
       style={{
@@ -452,7 +615,7 @@ return (
         }}
       />
 
-      <span>网络不可用，请检查网络</span>
+      <span>{t.offline}</span>
     </div>
   )}
 
@@ -479,7 +642,7 @@ return (
  <img
  suppressHydrationWarning
   src="/MSpace-logo.jpg.jpeg"
-  alt="星域"
+  alt={t.appName}
   style={{
     height: "55px",
     width: "auto",
@@ -490,6 +653,7 @@ return (
 </div>
 
 <button
+className="mobile-header-join-button"
 onClick={() => {
   const joinForm = document.getElementById("join-form");
 
@@ -510,8 +674,34 @@ onClick={() => {
     cursor: "pointer",
   }}
 >
-  加入星域
+  {t.join}
 </button>
+
+{showInstallButton && (
+  <button
+  className="desktop-install-button"
+   onClick={installApp}
+    style={{
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  background: "linear-gradient(90deg, #7c3aed, #9333ea)",
+  color: "white",
+  border: "none",
+  padding: "12px 24px",
+  borderRadius: "10px",
+  cursor: "pointer",
+  fontWeight: "600",
+  fontSize: "16px",
+  whiteSpace: "nowrap",
+}}
+  >
+    <Download size={20} />
+    {t.addApp}
+  </button>
+)}
+
   </div>
 
   <main
@@ -526,7 +716,7 @@ onClick={() => {
 >
   <div className="hero-section">
 
-    <div className="left-panel"> 
+    <div className="left-panel">
 
       {/* OWNER PROFILE */}
 
@@ -556,7 +746,7 @@ onClick={() => {
         marginBottom: "10px",
       }}
     >
-      欢迎来到
+      {t.welcomeTo}
     </p>
 
     <h2
@@ -569,9 +759,9 @@ onClick={() => {
         color: "#111827",
       }}
     >
-      幸福的
+      {t.ownerSpace}
 <br />
-个人空间
+{t.personalSpace}
     </h2>
 
     <p
@@ -581,7 +771,7 @@ onClick={() => {
         lineHeight: "1.7",
       }}
     >
-      这是我分享生活点滴并与朋友交流的地方。
+      {t.personalDesc}
     </p>
 
   </div>
@@ -645,7 +835,7 @@ onClick={() => {
           marginTop: "4px",
         }}
       >
-        照片
+        {t.photos}
       </div>
     </div>
   </div>
@@ -703,7 +893,7 @@ onClick={() => {
           marginTop: "4px",
         }}
       >
-        视频
+        {t.videos}
       </div>
     </div>
   </div>
@@ -757,7 +947,7 @@ onClick={() => {
       marginBottom: "18px",
     }}
   >
-    最新照片
+    {t.recentPhotos}
   </h3>
 
   <div
@@ -794,7 +984,7 @@ onClick={() => {
   borderRadius: "24px",
   padding: "20px 20px 10px",
   boxShadow: "0 12px 35px rgba(15,23,42,0.08)",
-  
+
   display: "flex",
   flexDirection: "column",
 }}
@@ -808,7 +998,7 @@ onClick={() => {
       color: "#111827",
     }}
   >
-    最新视频
+    {t.latestVideo}
   </h2>
 
   <div
@@ -866,7 +1056,7 @@ onClick={() => {
   </div>
 </div>
 
-  
+
   </div>
 
 </div>
@@ -889,28 +1079,81 @@ onClick={() => {
     border: "1px solid #f1f1f1",
   }}
 >
-  <h2
-    style={{
-      textAlign: "center",
-      fontSize: "24px",
-      fontWeight: "700",
-      marginBottom: "8px",
-      color: "#111827",
-    }}
-  >
-    加入星域
-  </h2>
 
   <p
     style={{
       textAlign: "center",
-      color: "#6b7280",
+      color: "#111827",
       marginBottom: "10px",
       fontSize: "18px",
     }}
   >
-    加入并开始交流
+    {t.joinDesc}
   </p>
+
+  <div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "8px",
+  }}
+>
+  <div
+  className="signup-photo-preview"
+  style={{
+    borderRadius: "50%",
+      overflow: "hidden",
+      background: "#f3f0ff",
+      border: "2px solid #e5e7eb",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    {photoFile ? (
+      <img
+        src={URL.createObjectURL(photoFile)}
+        alt="Profile photo preview"
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+      />
+
+
+    ) : (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#ede9fe",
+        }}
+      >
+        <svg
+          width="44"
+          height="44"
+          viewBox="0 0 48 48"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-label="Default profile avatar"
+          role="img"
+        >
+          <circle cx="24" cy="15" r="8" fill="#6d28d9" />
+          <path
+            d="M7 40C7 31.7 13.7 26 24 26C34.3 26 41 31.7 41 40V42H7V40Z"
+            fill="#6d28d9"
+          />
+        </svg>
+      </div>
+    )}
+
+
+  </div>
+</div>
 
   <label
   style={{
@@ -921,12 +1164,12 @@ onClick={() => {
     color: "#111827",
   }}
 >
-  姓名
+  {t.name}
 </label>
 
   <input
     type="text"
-    placeholder="请输入您的姓名"
+    placeholder={t.enterName}
     value={name}
     onChange={(e) => setName(e.target.value)}
     style={{
@@ -950,14 +1193,16 @@ onClick={() => {
     color: "#111827",
   }}
 >
-  头像照片
+  {t.profilePhoto}
 </label>
 
   <div
+   onClick={() => document.getElementById("mspace-profile-photo")?.click()}
     style={{
-      border: "2px dashed #d1d5db",
+      border: "2px dashed #c4b5fd",
       borderRadius: "16px",
-      padding: "5px 10px",
+      background: "#f5f3ff",
+      padding: "4px 10px",
       textAlign: "center",
       marginBottom: "5px",
       cursor: "pointer",
@@ -970,7 +1215,7 @@ onClick={() => {
     marginBottom: "4px",
   }}
 >
-  <ImagePlus size={56} color="#7c3aed" />
+  <ImagePlus size={36} color="#7c3aed" />
 </div>
 
 
@@ -979,10 +1224,10 @@ onClick={() => {
     textAlign: "center",
     color: "#7c3aed",
     fontWeight: "600",
-    marginBottom: "5px",
+    marginBottom: "2px",
   }}
 >
-  上传头像照片
+  {t.tapToUpload}
 </p>
 
 <p
@@ -990,10 +1235,10 @@ onClick={() => {
     textAlign: "center",
     color: "#6b7280",
     fontSize: "14px",
-    marginBottom: "10px",
+    marginBottom: "4px",
   }}
 >
-  JPG、PNG 或 WebP • 可选
+  {t.optional}
 </p>
 
   <input
@@ -1017,38 +1262,7 @@ onClick={() => {
         border: 0,
       }}
     />
-
-    <label
-      htmlFor="mspace-profile-photo"
-      style={{
-        display: "inline-block",
-        marginTop: "5px",
-        padding: "8px 18px",
-        background: "#7c3aed",
-        color: "#fff",
-        borderRadius: "10px",
-        cursor: "pointer",
-        fontWeight: "600",
-      }}
-    >
-      选择照片
-    </label>
-
-{fileName && (
-  <p
-    style={{
-      marginTop: "15px",
-      color: "#6b7280",
-      fontSize: "14px",
-      textAlign: "center",
-      wordBreak: "break-all",
-    }}
-  >
-    已选择: {fileName}
-  </p>
-)}
   </div>
-  
 
   <button
   onClick={joinMSpace}
@@ -1085,7 +1299,7 @@ onClick={() => {
           verticalAlign: "middle",
         }}
       />
-      连接中…
+      {t.connecting}
     </>
   ) : (
     <span
@@ -1097,7 +1311,7 @@ onClick={() => {
       }}
     >
       <UserRoundPlus size={22} />
-      加入星域
+      {t.join}
     </span>
   )}
 </>
@@ -1112,25 +1326,23 @@ onClick={() => {
     lineHeight: "1.4",
   }}
 >
-  加入即表示您同意我们的
+  {t.termsText}
   <span
     style={{
       color: "#7c3aed",
       fontWeight: "600",
     }}
   >
-    {" "}服务条款
+    {" "}{t.terms}
   </span>
-  {" "}
-  和
-  {" "}
+  {" "}{t.termsAnd}{" "}
   <span
     style={{
       color: "#7c3aed",
       fontWeight: "600",
     }}
   >
-    隐私政策
+    {t.privacy}
   </span>
   .
 </p>
@@ -1154,7 +1366,7 @@ onClick={() => {
     fontSize: "16px",
   }}
 >
-  星域
+  {t.appName}
 </h3>
 
   <p
@@ -1163,13 +1375,201 @@ onClick={() => {
     fontSize: "13px",
   }}
 >
- ©️ 2026 幸福. 版权所有
+ ©️ 2026 {language === "zh" ? "幸福" : "Happiness"}. {t.copyright}
 </p>
 </footer>
+
+{showInstallButton && (
+  <button
+   className="mobile-install-button"
+    onClick={installApp}
+    style={{
+      position: "fixed",
+      bottom: "20px",
+      left: "20px",
+      zIndex: 9999,
+      padding: "10px 16px",
+      borderRadius: "999px",
+      border: "none",
+      background: "#7c3aed",
+      color: "#fff",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    }}
+  >
+    📱 {t.installApp}
+  </button>
+)}
+{showInstallHelp && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 10000,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+    }}
+    onClick={() => setShowInstallHelp(false)}
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="install-help-title"
+      onClick={(event) => event.stopPropagation()}
+      style={{
+        width: "100%",
+        maxWidth: "360px",
+        background: "#fff",
+        color: "#222",
+        borderRadius: "16px",
+        padding: "24px",
+        boxSizing: "border-box",
+        boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+      }}
+    >
+
+      <h2
+  id="install-help-title"
+  style={{
+    marginTop: 0,
+    textAlign: "center",
+    fontWeight: 600,
+  }}
+>
+  {language === "zh" ? "安装星域" : "Install MSpace"}
+</h2>
+
+
+{(/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) ? (
+
+  <>
+    <p style={{ margin: "12px 0", textAlign: "left" }}>
+      {language === "zh"
+         ? "在 iPhone 或 iPad 上使用 Safari 安装星域："
+         : "To install MSpace using Safari on your iPhone or iPad:"}
+    </p>
+
+    <ol
+  style={{
+    margin: "12px 0",
+    lineHeight: 1.7,
+    textAlign: "left",
+    listStylePosition: "outside",
+  }}
+>
+      <li>
+        {language === "zh"
+          ? "在 Safari 中打开 星域。"
+          : "Open MSpace in Safari."}
+      </li>
+      <li>
+        {language === "zh" ? (
+          <>点击 Safari 的<strong>分享</strong>按钮（带向上箭头的方框）。</>
+        ) : (
+          <>Tap Safari&apos;s <strong>Share</strong> button (the square with an upward arrow).</>
+        )}
+      </li>
+      <li>
+        {language === "zh" ? (
+          <>向下滚动并选择<strong>添加到主屏幕</strong>。</>
+        ) : (
+          <>Scroll down and choose <strong>Add to Home Screen</strong>.</>
+        )}
+      </li>
+      <li>
+        {language === "zh" ? (
+          <>点击右上角的<strong>添加</strong>。</>
+        ) : (
+          <>Tap <strong>Add</strong> in the top-right corner.</>
+        )}
+      </li>
+      <li>
+        {language === "zh"
+          ? "在主屏幕上找到 星域 图标并打开。"
+          : "Find the MSpace icon on your Home Screen and open it."}
+      </li>
+    </ol>
+
+    <p
+  style={{
+    fontSize: "13px",
+    color: "#666",
+    margin: "12px 0",
+    textAlign: "left",
+  }}
+>
+      {language === "zh"
+        ? "如果找不到“添加到主屏幕”，请检查 Safari 分享菜单中的可用选项。菜单可能因 iOS 版本而异。"
+        : "If you cannot find Add to Home Screen, check the available options in Safari's Share menu. The menu may vary by iOS version."}
+    </p>
+  </>
+) : (
+  <>
+    <p>
+      {language === "zh"
+        ? "在 Android 手机上将 星域 添加到主屏幕："
+        : "To add MSpace to your Android home screen:"}
+    </p>
+
+    <ol style={{ paddingLeft: "22px", lineHeight: 1.8 }}>
+      <li>
+        {language === "zh"
+          ? "在 Google Chrome 中打开 星域。"
+          : "Open MSpace in Google Chrome."}
+      </li>
+      <li>
+        {language === "zh"
+          ? "点击 Chrome 的三点菜单。"
+          : "Tap Chrome's three-dot menu."}
+      </li>
+      <li>
+        {language === "zh" ? (
+          <>如果有<strong>安装应用</strong>或<strong>添加到主屏幕</strong>选项，请选择其中一个。</>
+        ) : (
+          <>Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>, if available.</>
+        )}
+      </li>
+      <li>
+        {language === "zh"
+          ? "按照屏幕上的提示操作。"
+          : "Follow the on-screen instructions."}
+      </li>
+    </ol>
+
+    <p style={{ fontSize: "13px", color: "#666" }}>
+      {language === "zh"
+        ? "如果这两个选项都没有出现，可能是浏览器目前不支持安装。"
+        : "If neither option appears, the browser may not currently allow installation."}
+    </p>
+  </>
+)}
+
+   <button
+  type="button"
+  onClick={() => setShowInstallHelp(false)}
+  style={{
+    width: "100%",
+    padding: "12px",
+    marginTop: "8px",
+    border: "none",
+    borderRadius: "10px",
+    background: "#7c3aed",
+    color: "#fff",
+    fontWeight: "600",
+    cursor: "pointer",
+  }}
+>
+  {language === "zh" ? "知道了" : "Got it"}
+</button>
+    </div>
+  </div>
+)}
 </main>
-
 </>
-
 );
 }
-

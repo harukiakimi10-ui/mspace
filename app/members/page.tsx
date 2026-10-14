@@ -101,7 +101,7 @@ const [memberPhoto, setMemberPhoto] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState("");
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
   const [selectedIndex, setSelectedIndex] =
   useState<number | null>(null);
   const [selectedVideoIndex, setSelectedVideoIndex] =
@@ -317,6 +317,26 @@ const t = {
       handler
     );
 }, []);
+
+
+useEffect(() => {
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as any).standalone === true;
+
+  const isIOS =
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" &&
+      navigator.maxTouchPoints > 1);
+
+  if (isStandalone) {
+    setShowInstallButton(false);
+    setShowInstallInstructions(false);
+  } else if (isIOS) {
+    setShowInstallButton(true);
+  }
+}, []);
+
 
 useEffect(() => {
   const checkScreen = () => {
@@ -1839,27 +1859,154 @@ ref={isAndroid ? mediaNavRef : undefined}
   </div>
 )}
 
+
 {showInstallButton && (
   <button
-  onClick={installApp}
+    onClick={() => {
+      if (
+        /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" &&
+          navigator.maxTouchPoints > 1)
+      ) {
+        setShowInstallInstructions(true);
+      } else {
+        installApp();
+      }
+    }}
+    style={{
+      position: "fixed",
+      bottom: "20px",
+      left: "20px",
+      zIndex: 9999,
+      padding: "10px 16px",
+      borderRadius: "999px",
+      border: "none",
+      background: "#7c3aed",
+      color: "#fff",
+      fontWeight: "600",
+      cursor: "pointer",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    }}
+  >
+    📱 {t.install}
+  </button>
+)}
+
+
+{/* INSTALL APP INSTRUCTIONS */}
+
+{showInstallInstructions && (
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="member-install-title"
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 100000,
+      background: "rgba(0,0,0,0.55)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+    }}
+  >
+    <div
   style={{
-    position: "fixed",
-    bottom: "20px",
-    left: "20px",
-    zIndex: 9999,
-    padding: "10px 16px",
-    borderRadius: "999px",
-    border: "none",
-    background: "#7c3aed",
-    color: "#fff",
-    fontWeight: "600",
-    cursor: "pointer",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+    width: "100%",
+    maxWidth: "420px",
+    maxHeight: "85vh",
+    overflowY: "auto",
+    background: "#fff",
+    color: "#222",
+    borderRadius: "16px",
+    padding: "22px",
+    boxSizing: "border-box",
+    textAlign: "left",
   }}
 >
-  📱 {t.install}
-</button>
+
+      <h2
+  id="member-install-title"
+  style={{
+    marginTop: 0,
+    textAlign: "center",
+    fontWeight: 600,
+  }}
+>
+        {language === "zh" ? "安装星域" : "Install MSpace"}
+      </h2>
+
+      <p style={{ textAlign: "left" }}>
+        {language === "zh"
+          ? "在 iPhone 或 iPad 上使用 Safari 安装星域："
+          : "To install MSpace using Safari on your iPhone or iPad:"}
+      </p>
+
+      <ol
+  style={{
+    paddingLeft: "0",
+    marginLeft: "0",
+    marginRight: "0",
+    lineHeight: 1.8,
+    textAlign: "left",
+    listStylePosition: "inside",
+  }}
+>
+        <li>
+          {language === "zh"
+            ? "在 Safari 中打开星域。"
+            : "Open MSpace in Safari."}
+        </li>
+        <li>
+          {language === "zh"
+            ? "点击 Safari 的分享按钮（带向上箭头的方框）。"
+            : "Tap Safari's Share button (the square with an upward arrow)."}
+        </li>
+        <li>
+          {language === "zh"
+            ? "向下滚动并选择“添加到主屏幕”。"
+            : "Scroll down and choose Add to Home Screen."}
+        </li>
+        <li>
+          {language === "zh"
+            ? "点击右上角的“添加”。"
+            : "Tap Add in the top-right corner."}
+        </li>
+        <li>
+          {language === "zh"
+            ? "在主屏幕上找到星域图标并打开。"
+            : "Find the MSpace icon on your Home Screen and open it."}
+        </li>
+      </ol>
+
+      <p style={{ fontSize: "13px", color: "#666", textAlign: "left" }}>
+        {language === "zh"
+          ? "如果找不到“添加到主屏幕”，请检查 Safari 分享菜单中的可用选项。菜单可能因 iOS 版本而异。"
+          : "If you cannot find Add to Home Screen, check the available options in Safari's Share menu. The menu may vary by iOS version."}
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setShowInstallInstructions(false)}
+        style={{
+          width: "100%",
+          padding: "12px",
+          border: "none",
+          borderRadius: "10px",
+          background: "#7c3aed",
+          color: "#fff",
+          fontWeight: "600",
+          cursor: "pointer",
+        }}
+      >
+        {language === "zh" ? "知道了" : "Got it"}
+      </button>
+    </div>
+  </div>
 )}
+
+
 
 
  {/* FULLSCREEN PHOTO VIEWER */}

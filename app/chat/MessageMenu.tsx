@@ -180,7 +180,7 @@ export default function MessageMenu({
           boxShadow:
             "0 18px 45px rgba(124,58,237,.18)",
 
-          backdropFilter: "blur(16px)",
+          backdropFilter: "none",
 
           padding: "8px",
 

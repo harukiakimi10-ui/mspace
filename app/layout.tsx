@@ -20,10 +20,10 @@ export const metadata: Metadata = {
   title: "MSpace",
   description: "MSpace Social Platform",
   manifest: "/manifest.json",
-  icons: {
-  icon: "/mspace-notification-icon.jpeg",
-  apple: "/mspace-notification-icon.jpeg",
-},
+    icons: {
+    icon: "/mspace-favicon.png",
+    apple: "/mspace-icon.png",
+  },
 };
 
 export const viewport = {

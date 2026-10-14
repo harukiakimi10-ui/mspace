@@ -3,6 +3,7 @@
 import Header from "./components/Header";
 import Stats from "./components/Stats";
 import ConversationList from "./components/ConversationList";
+import InstallAppButton from "./components/InstallAppButton";
 import {
   Search,
   Activity,
@@ -35,7 +36,7 @@ export default function AdminChatsPage() {
     };
   }, []);
 
-  
+
 
 
 const [conversations, setConversations] =
@@ -50,7 +51,7 @@ const [conversationSearch, setConversationSearch] = useState("");
 const conversationRefreshTimeout =
   useRef<ReturnType<typeof setTimeout> | null>(null);
 
-const conversationListRef = useRef<HTMLDivElement>(null);  
+const conversationListRef = useRef<HTMLDivElement>(null);
 
 const totalMembers = conversations.length;
 const filteredConversations = conversations.filter((chat) => {
@@ -117,6 +118,7 @@ useEffect(() => {
     return;
   }
 
+    restoreCachedConversations();
   loadConversations();
 
   const channel = supabase
@@ -351,6 +353,49 @@ useEffect(() => {
     body.style.overscrollBehavior = previousBodyOverscroll;
   };
 }, []);
+
+
+function restoreCachedConversations() {
+  try {
+    const cached = localStorage.getItem(
+      "mspace-admin-conversations"
+    );
+
+    if (!cached) return false;
+
+    const parsed = JSON.parse(cached);
+
+    if (!Array.isArray(parsed)) return false;
+
+    setConversations(parsed);
+
+    const now = Date.now();
+
+    setOnlineCount(
+      parsed.filter((c: any) => {
+        if (!c.member?.is_online || !c.member?.online_at) {
+          return false;
+        }
+
+        const onlineAt = new Date(
+          c.member.online_at
+        ).getTime();
+
+        return now - onlineAt < 2 * 60 * 1000;
+      }).length
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "MSpace conversation cache restore error:",
+      error
+    );
+
+    return false;
+  }
+}
+
 
 async function loadConversations() {
   console.time("loadConversations");
@@ -900,17 +945,29 @@ console.log("Inserted admin message:", data);
           }}
         />
 
-        {!isDesktop && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              padding: "8px 0 4px",
-            }}
-          >
-            <NotificationButton isAdmin={true} />
-          </div>
-        )}
+
+
+{!isDesktop && (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "8px",
+      padding: "10px 0 4px",
+      width: "100%",
+      boxSizing: "border-box",
+    }}
+  >
+    <InstallAppButton />
+
+    <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+      <NotificationButton isAdmin={true} />
+    </div>
+  </div>
+)}
+
+
       </div>
 
       <div

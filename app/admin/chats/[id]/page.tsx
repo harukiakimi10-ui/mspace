@@ -2580,6 +2580,16 @@ setReply("");
 setReplyMessage(null);
 setReplyPreview("");
 
+requestAnimationFrame(() => {
+  const textarea = document.querySelector<HTMLTextAreaElement>(
+    'textarea[placeholder="Type a message..."]'
+  );
+
+  if (textarea) {
+    textarea.style.height = "auto";
+  }
+});
+
   if (!conversation?.member_id) {
   console.error(
     "Cannot send media push: conversation member_id is missing"
@@ -4281,7 +4291,7 @@ paddingBottom: showStickerPanel
     style={{
       position: "absolute",
       inset: 0,
-      background: "rgba(0, 0, 0, 0.18)",
+      background: "transparent",
       zIndex: 0,
       pointerEvents: "none",
       transition: "opacity 0.2s ease",
@@ -4557,6 +4567,9 @@ onCloseStickerPanel={() => {
 
   onInput={(e) => {
   const value = e.target.value;
+
+  e.target.style.height = "0px";
+  e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
 
   // Update the textarea immediately
   setReply(value);

@@ -311,7 +311,7 @@ const finalMemberId = isAdmin
 
  return (
   <>
-    {!checking && !saved && (
+    {(!checking || isAdmin) && !saved && (
       <button
         type="button"
         onClick={enableNotifications}

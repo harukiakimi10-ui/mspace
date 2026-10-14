@@ -2,10 +2,18 @@
   "name": "myspace",
   "version": "0.1.0",
   "private": true,
+  "browserslist": [
+    "chrome >= 83",
+    "edge >= 83",
+    "firefox >= 78",
+    "safari >= 15.8",
+    "ios_saf >= 15.8",
+    "android >= 10"
+  ],
   "overrides": {},
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --experimental-https --experimental-https-key \"./192.168.1.43+2-key.pem\" --experimental-https-cert \"./192.168.1.43+2.pem\"",
-    "build": "next build --webpack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
@@ -24,7 +32,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^1.28.0",
     "mediabunny": "^1.53.0",
-    "next": "16.2.9",
+    "next": "^15.5.27",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tus-js-client": "^4.3.1",
@@ -37,7 +45,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "^15.5.27",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { stickerPacks } from "./StickerData";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Smile, Sticker, Image, Play } from "lucide-react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -27,6 +27,71 @@ export default function StickerPanel({
   onEmojiSelect,
 }: StickerPanelProps) {
   const [panelTab, setPanelTab] = useState<"emoji" | "sticker">("emoji");
+
+    const emojiContainerRef = useRef<HTMLDivElement>(null);
+  const [emojiContainerWidth, setEmojiContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const element = emojiContainerRef.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setEmojiContainerWidth(entry.contentRect.width);
+    });
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
+
+  const userAgent =
+    typeof navigator !== "undefined" ? navigator.userAgent : "";
+
+
+  const isAndroidDevice = /Android/i.test(userAgent);
+
+  const isIPhoneDevice = /iPhone|iPad|iPod/i.test(userAgent);
+
+
+  const targetEmojiButtonSize = isDesktop
+  ? 48
+  : isIPhoneDevice
+    ? 50
+    : isAndroidDevice
+      ? 42
+      : 42;
+
+  const emojiPerLine = isDesktop ? 14 : 8;
+
+  const emojiButtonSizeValue = isDesktop
+  ? 48
+  : isIPhoneDevice
+    ? 50
+    : emojiContainerWidth > 0
+      ? Math.max(
+          20,
+          Math.min(
+            targetEmojiButtonSize,
+            Math.floor(emojiContainerWidth / emojiPerLine) - 2
+          )
+        )
+      : isAndroidDevice
+        ? 42
+        : 42;
+
+  const emojiSizeValue = isDesktop
+    ? 36
+    : isAndroidDevice
+      ? Math.min(28, Math.floor(emojiButtonSizeValue * 0.75))
+      : Math.min(36, Math.floor(emojiButtonSizeValue * 0.86));
+
+  const panelHeight = isDesktop
+    ? "58vh"
+    : isAndroidDevice
+      ? "38vh"
+      : "38vh";
+
+
 
   const [stickerType, setStickerType] = useState<
     "static" | "animated"
@@ -116,10 +181,10 @@ export default function StickerPanel({
             ? "translateX(-50%)"
             : "none",
 
-          width: isDesktop ? "600px" : "100%",
+          width: isDesktop ? "700px" : "100%",
 
           maxWidth: isDesktop
-            ? "calc(100vw - 595px)"
+            ? "min(700px, calc(100vw - 40px))"
             : "100%",
 
           background: "#fff",
@@ -135,7 +200,7 @@ export default function StickerPanel({
 
           zIndex: isDesktop ? 6000 : 1999,
 
-          height: isDesktop ? "58vh" : "38vh",
+          height: panelHeight,
 
           display: "flex",
           flexDirection: "column",
@@ -209,6 +274,7 @@ export default function StickerPanel({
 
         {panelTab === "emoji" && (
           <div
+           ref={emojiContainerRef}
             style={{
               flex: 1,
               width: "100%",
@@ -227,7 +293,9 @@ export default function StickerPanel({
               previewPosition="none"
               skinTonePosition="none"
               dynamicWidth={false}
-              perLine={18}
+              perLine={emojiPerLine}
+              emojiSize={emojiSizeValue}
+              emojiButtonSize={emojiButtonSizeValue}
               style={{
                 width: "100%",
                 minWidth: "100%",
@@ -366,16 +434,21 @@ export default function StickerPanel({
         key={category.id}
         onClick={() => setStickerCategory(category.id)}
         style={{
-  flexShrink: 0,
+  minWidth: 0,
+  width: "100%",
+  boxSizing: "border-box",
   border: "none",
   borderRadius: 18,
-  padding: isDesktop ? "8px 13px" : "7px 11px",
-          background: active ? "#6d28d9" : "#f3f3f5",
-          color: active ? "#ffffff" : "#666666",
-          fontSize: 13,
-          fontWeight: active ? 600 : 500,
-          cursor: "pointer",
-        }}
+  padding: isDesktop ? "8px 6px" : "7px 3px",
+  background: active ? "#6d28d9" : "#f3f3f5",
+  color: active ? "#ffffff" : "#666666",
+  fontSize: 13,
+  fontWeight: active ? 600 : 500,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+}}
       >
         {category.label}
       </button>
@@ -393,8 +466,7 @@ export default function StickerPanel({
                 overflowY: "auto",
 
                 display: "grid",
-                gridTemplateColumns:
-                  "repeat(4, 1fr)",
+gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
 
                 gap: 10,
 

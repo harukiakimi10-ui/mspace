@@ -29,6 +29,9 @@ export default function Header() {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
+    const [installAvailable, setInstallAvailable] =
+  useState(false);
+
   const [isInstalled, setIsInstalled] =
     useState(false);
 
@@ -67,6 +70,8 @@ export default function Header() {
     ) => {
       event.preventDefault();
 
+      setInstallAvailable(true);
+
       setInstallPrompt(
         event as BeforeInstallPromptEvent
       );
@@ -75,6 +80,7 @@ export default function Header() {
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setInstallPrompt(null);
+      setInstallAvailable(false);
     };
 
     window.addEventListener(
@@ -124,6 +130,7 @@ export default function Header() {
   const showInstallButton =
     (isDesktop || isAndroid) &&
     !isInstalled &&
+    installAvailable &&
     !!installPrompt;
 
   return (
@@ -181,25 +188,22 @@ export default function Header() {
         </h1>
       </div>
 
-      <div
+<div
   style={{
     display: "flex",
     alignItems: "center",
     gap: isAndroid ? "4px" : "12px",
   }}
 >
-  {isDesktop && (
-    <div
-      style={{
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-      }}
-    >
-      <NotificationButton isAdmin />
-    </div>
-  )}
 
+  <div
+  style={{
+    width: isDesktop ? 112 : "auto",
+    flexShrink: 0,
+    display: isDesktop ? "flex" : "none",
+    justifyContent: "flex-start",
+  }}
+>
   {showInstallButton && (
     <button
       type="button"
@@ -229,7 +233,8 @@ export default function Header() {
       />
       <span>Install App</span>
     </button>
-  )}
+    )}
+</div>
 
   <button
     onClick={() => {
