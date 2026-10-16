@@ -175,22 +175,38 @@ useEffect(() => {
         return;
       }
 
+      const memberIds = [
+  ...new Set(
+    (conversations || [])
+      .map((conversation) => conversation.member_id)
+      .filter(Boolean)
+  ),
+];
+
+const { data: membersData, error: membersError } =
+  await supabase
+    .from("members")
+    .select("*")
+    .in("member_id", memberIds);
+
+if (membersError) {
+  console.error("Desktop member lookup error:", membersError);
+}
+
+const membersById = new Map(
+  (membersData || []).map((member) => [
+    member.member_id,
+    member,
+  ])
+);
+
       const result = await Promise.all(
         (conversations || []).map(
           async (conversation) => {
             const [
-              memberResult,
-              unreadResult,
-              lastMessageResult,
+             unreadResult,
+             lastMessageResult,
             ] = await Promise.all([
-              supabase
-                .from("members")
-                .select("*")
-                .eq(
-                  "member_id",
-                  conversation.member_id
-                )
-                .maybeSingle(),
 
               supabase
                 .from("messages")
@@ -218,7 +234,8 @@ useEffect(() => {
 .limit(50),
             ]);
 
-            const member = memberResult.data;
+            const member =
+  membersById.get(conversation.member_id) ?? null;
 
             
            const lastMessage =
@@ -279,10 +296,22 @@ useEffect(() => {
     }
   };
 
-  loadDesktopConversations();
+    loadDesktopConversations();
+
+ const handleReturnToAdmin = () => {
+  if (document.visibilityState === "visible") {
+    void loadDesktopConversations();
+  }
+};
+  window.addEventListener("focus", handleReturnToAdmin);
+  window.addEventListener("pageshow", handleReturnToAdmin);
+  document.addEventListener("visibilitychange", handleReturnToAdmin);
 
   return () => {
     cancelled = true;
+    window.removeEventListener("focus", handleReturnToAdmin);
+    window.removeEventListener("pageshow", handleReturnToAdmin);
+    document.removeEventListener("visibilitychange", handleReturnToAdmin);
   };
 }, [isDesktop]);
 
@@ -316,6 +345,7 @@ useEffect(() => {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [initialMessagesPositioned, setInitialMessagesPositioned] = useState(false);
 
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [showForwardLocationDialog, setShowForwardLocationDialog] =
@@ -822,7 +852,9 @@ const [locationPreview, setLocationPreview] = useState<{
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const memberTypingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoScrolled = useRef(false);
+  const autoScrollConversationId = useRef<string | null>(null);
   const memberIdRef = useRef<string | null>(null);
 
   const [recording, setRecording] = useState(false);
@@ -1060,11 +1092,10 @@ const handleVisibility = async () => {
   await updateAdminOnlineStatus(active);
 
   if (active) {
-    await loadMessages();
-
-    setTimeout(async () => {
-      await markMessagesAsRead();
-    }, 200);
+    await Promise.all([
+      loadConversation(),
+      loadMessages(),
+    ]);
   }
 };
 
@@ -1107,25 +1138,48 @@ setTimeout(() => {
     payload.new
   );
 
+  console.log("📩 REALTIME MESSAGE RECEIVED AT:", new Date().toLocaleTimeString());
+
+  console.log(
+  "ADMIN REALTIME INSERT TIME:",
+  new Date().toLocaleTimeString()
+);
+
   const newMessage = payload.new as any;
-
   if (newMessage?.deleted_for !== "admin") {
-  if (newMessage.conversation_id === id) {
-    setMessages((currentMessages) => {
-      const alreadyExists = currentMessages.some(
-        (message) => message.id === newMessage.id
-      );
+if (newMessage.conversation_id === id) {
+  const container = messagesRef.current;
 
-      if (alreadyExists) {
-        return currentMessages;
-      }
+  const wasAtBottom =
+    !!container &&
+    container.scrollHeight -
+      container.scrollTop -
+      container.clientHeight < 80;
 
-      return [
-        ...currentMessages,
-        newMessage,
-      ];
-    });
+  setMessages((currentMessages) => {
+    const alreadyExists = currentMessages.some(
+      (message) => message.id === newMessage.id
+    );
+    if (alreadyExists) {
+      return currentMessages;
     }
+    return [...currentMessages, newMessage];
+  });
+
+  if (wasAtBottom) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = messagesRef.current;
+        if (!el) return;
+
+        el.scrollTo({
+          top: el.scrollHeight,
+          behavior: "auto",
+        });
+      });
+    });
+  }
+}
 
     // Update the desktop conversation list immediately
     setDesktopConversations((currentConversations) => {
@@ -1311,19 +1365,12 @@ if (!conversationExists) {
     );
   }
 
-
-  if (
-    document.visibilityState === "visible" &&
-    document.hasFocus()
-  ) {
-    await markMessagesAsRead();
-  }
-
   // Badge when a new member message arrives
       if (
-        payload.eventType === "INSERT" &&
-        (payload.new as any).sender === "member"
-      ) {
+  payload.eventType === "INSERT" &&
+  (payload.new as any).sender === "member" &&
+  (payload.new as any).conversation_id === id
+) {
 
         await loadUnreadConversationCount();
 
@@ -1415,12 +1462,29 @@ if (!conversationExists) {
     (payload) => {
   const updatedConversation = payload.new as any;
 
-  // Update the open chat header
+    // Update the open chat header and expire stale member typing status.
   if (updatedConversation?.id === id) {
+    if (memberTypingTimeout.current) {
+      clearTimeout(memberTypingTimeout.current);
+      memberTypingTimeout.current = null;
+    }
+
     setConversation((prev: any) => ({
       ...(prev || {}),
       ...updatedConversation,
     }));
+
+    if (updatedConversation.member_typing) {
+      memberTypingTimeout.current = setTimeout(() => {
+        setConversation((prev: any) =>
+          prev?.id === id
+            ? { ...prev, member_typing: false }
+            : prev
+        );
+
+        memberTypingTimeout.current = null;
+      }, 5000);
+    }
   }
 
   // Update typing status for any conversation in the desktop sidebar
@@ -1462,6 +1526,10 @@ const unreadChannel = supabase
   .subscribe();
 
 return () => {
+    if (memberTypingTimeout.current) {
+    clearTimeout(memberTypingTimeout.current);
+    memberTypingTimeout.current = null;
+  }
   updateAdminOnlineStatus(false);
 
   window.removeEventListener(
@@ -2258,16 +2326,20 @@ async function updateAdminOnlineStatus(online: boolean) {
         (msg: any) => msg.deleted_for !== "admin"
       );
 
-      setMessages(visibleCachedMessages);
+            setMessages(visibleCachedMessages);
 
-      requestAnimationFrame(() => {
-        if (messagesRef.current) {
-          messagesRef.current.scrollTo({
-            top: messagesRef.current.scrollHeight,
-            behavior: "auto",
-          });
-        }
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const el = messagesRef.current;
+
+    if (el) {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: "auto",
       });
+    }
+  });
+});
     } catch (error) {
       console.error(
         "MSpace message cache error:",
@@ -2286,6 +2358,9 @@ async function updateAdminOnlineStatus(online: boolean) {
       .order("created_at", { ascending: true });
 
     const el = messagesRef.current;
+
+const isNewConversation =
+  autoScrollConversationId.current !== id;
 
 const wasNearBottom =
   !!el &&
@@ -2315,11 +2390,15 @@ requestAnimationFrame(() => {
   requestAnimationFrame(() => {
     if (!messagesRef.current) return;
 
-    if (wasNearBottom) {
+    if (isNewConversation || wasNearBottom || !hasAutoScrolled.current) {
       messagesRef.current.scrollTo({
         top: messagesRef.current.scrollHeight,
         behavior: "auto",
       });
+
+      hasAutoScrolled.current = true;
+      autoScrollConversationId.current = typeof id === "string" ? id : null;
+      setInitialMessagesPositioned(true);
     }
   });
 });
@@ -4293,23 +4372,33 @@ onVideo={() => {
   if (showAttachmentMenu) {
   setShowAttachmentMenu(false);
 }
-
 }}
-  onScroll={(e) => {
+onScroll={(e) => {
     const el = e.currentTarget;
 
     const distanceFromBottom =
       el.scrollHeight -
       el.scrollTop -
       el.clientHeight;
+    const isAtBottom = distanceFromBottom < 80;
 
-    setShowScrollButton(distanceFromBottom > 80);
+    setShowScrollButton(!isAtBottom);
+
+    if (
+  isAtBottom &&
+  document.visibilityState === "visible" &&
+  document.hasFocus()
+) {
+  setNewMessageCount(0);
+  void markMessagesAsRead();
+}
   }}
   style={{
     height: "100%",
     minHeight: 0,
     overflowY: "auto",
     overflowX: "hidden",
+    visibility: initialMessagesPositioned ? "visible" : "hidden",
     WebkitOverflowScrolling: "touch",
     
     paddingTop: 0,

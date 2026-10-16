@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import LanguageManifest from "./LanguageManifest";
+
 import Script from "next/script";
 import ServiceWorkerRegister from "./ServiceWorkerRegister";
 
@@ -19,7 +21,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MSpace",
   description: "MSpace Social Platform",
-  manifest: "/manifest.json",
     icons: {
     icon: "/mspace-favicon.png",
     apple: "/mspace-icon.png",
@@ -48,7 +49,8 @@ export default function RootLayout({
 >
   <body className="min-h-full flex flex-col">
  
-  <ServiceWorkerRegister />
+  <LanguageManifest />
+<ServiceWorkerRegister />
   {children}
 
 </body>

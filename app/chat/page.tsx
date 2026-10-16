@@ -347,6 +347,8 @@ const videoInputRef = useRef<HTMLInputElement | null>(null);
 
 const cameraInputRef = useRef<HTMLInputElement>(null);
 const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+const adminTypingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 const typingActiveRef = useRef(false);
 const hasAutoScrolled = useRef(false);
 const loadingConversationRef = useRef(false);
@@ -1067,17 +1069,36 @@ useEffect(() => {
     table: "conversations",
     filter: `id=eq.${conversationId}`,
   },
-  async (payload) => {
-  console.log(
-    "CONVERSATION UPDATE ADMIN TYPING:",
-    payload.new?.admin_typing
-  );
+  (payload) => {
+    const updatedConversation = payload.new as any;
 
-  setConversation((prev: any) => ({
-    ...prev,
-    ...payload.new,
-  }));
-}
+    console.log(
+      "CONVERSATION UPDATE ADMIN TYPING:",
+      updatedConversation?.admin_typing
+    );
+
+    if (adminTypingTimeout.current) {
+      clearTimeout(adminTypingTimeout.current);
+      adminTypingTimeout.current = null;
+    }
+
+    setConversation((prev: any) => ({
+      ...prev,
+      ...updatedConversation,
+    }));
+
+    if (updatedConversation?.admin_typing === true) {
+      adminTypingTimeout.current = setTimeout(() => {
+        setConversation((prev: any) =>
+          prev?.id === conversationId
+            ? { ...prev, admin_typing: false }
+            : prev
+        );
+
+        adminTypingTimeout.current = null;
+      }, 5000);
+    }
+  }
 )
     .subscribe((status) => {
   console.log("MEMBER CONVERSATION CHANNEL STATUS:", status);
@@ -1166,23 +1187,47 @@ useEffect(() => {
     table: "conversations",
     filter: `id=eq.${conversationId}`,
   },
-  (payload) => {
-    console.log("MEMBER CONVERSATION UPDATE REALTIME:", {
-  conversationId: payload.new?.id,
-  admin_typing: payload.new?.admin_typing,
-});
+    (payload) => {
+    const updatedConversation = payload.new as any;
 
-setConversation((prev: any) => ({
-  ...prev,
-  ...payload.new,
-}));
+    console.log("MEMBER CONVERSATION UPDATE REALTIME:", {
+      conversationId: updatedConversation?.id,
+      admin_typing: updatedConversation?.admin_typing,
+    });
+
+    if (adminTypingTimeout.current) {
+      clearTimeout(adminTypingTimeout.current);
+      adminTypingTimeout.current = null;
+    }
+
+    setConversation((prev: any) => ({
+      ...prev,
+      ...updatedConversation,
+    }));
+
+    if (updatedConversation?.admin_typing === true) {
+      adminTypingTimeout.current = setTimeout(() => {
+        setConversation((prev: any) =>
+          prev?.id === conversationId
+            ? { ...prev, admin_typing: false }
+            : prev
+        );
+
+        adminTypingTimeout.current = null;
+      }, 5000);
+    }
   }
 )
 .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
-    };
+  if (adminTypingTimeout.current) {
+    clearTimeout(adminTypingTimeout.current);
+    adminTypingTimeout.current = null;
+  }
+
+  supabase.removeChannel(channel);
+};
   }, [conversationId]);
 
 useEffect(() => {
@@ -4660,7 +4705,7 @@ overscrollBehavior: "none",
     e.stopPropagation();
   }}
 
-  onScroll={(e) => {
+    onScroll={(e) => {
     const el = e.currentTarget;
 
     const distanceFromBottom =
@@ -4668,10 +4713,20 @@ overscrollBehavior: "none",
       el.scrollTop -
       el.clientHeight;
 
-    setShowScrollButton(distanceFromBottom > 80);
+    const isAtBottom = distanceFromBottom <= 80;
 
-    if (distanceFromBottom <= 80) {
+    setShowScrollButton(!isAtBottom);
+
+    if (isAtBottom) {
       setNewMessageCount(0);
+
+      if (
+        conversation?.id &&
+        document.visibilityState === "visible" &&
+        document.hasFocus()
+      ) {
+        void markMessagesAsRead(conversation.id);
+      }
     }
   }}
     style={{
@@ -4829,14 +4884,35 @@ setMessageFocus={setMessageFocus}
   onTouchStart={(e) => {
     e.preventDefault();
   }}
-  onClick={() => {
-  setNewMessageCount(0);
+    onClick={() => {
+    setNewMessageCount(0);
 
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "smooth",
-  });
-}}
+    messagesRef.current?.scrollTo({
+      top: messagesRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+
+    if (
+      conversation?.id &&
+      document.visibilityState === "visible" &&
+      document.hasFocus()
+    ) {
+      setTimeout(() => {
+        const el = messagesRef.current;
+
+        if (!el) return;
+
+        const distanceFromBottom =
+          el.scrollHeight -
+          el.scrollTop -
+          el.clientHeight;
+
+        if (distanceFromBottom <= 80) {
+          void markMessagesAsRead(conversation.id);
+        }
+      }, 400);
+    }
+  }}
   style={{
     position: "relative",
 

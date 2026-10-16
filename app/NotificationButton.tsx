@@ -9,17 +9,26 @@ const language =
     ? "zh"
     : "en";
 
+
 const t = {
   en: {
     enableNotifications: "Enable Notifications",
     notificationsEnabled:
       "Notifications are enabled successfully.",
+    notificationsNotSupported:
+      "Notifications are not supported on this device.",
+    serviceWorkerNotSupported:
+      "Service Worker is not supported by this browser.",
   },
 
   zh: {
     enableNotifications: "启用通知",
     notificationsEnabled:
       "通知已成功启用。",
+    notificationsNotSupported:
+      "此设备不支持通知。",
+    serviceWorkerNotSupported:
+      "此浏览器不支持 Service Worker。",
   },
 }[language];
 
@@ -160,16 +169,12 @@ const [checking, setChecking] = useState(true);
   const enableNotifications = async () => {
     try {
       if (!("Notification" in window)) {
-        alert(
-          "Notifications are not supported on this device."
-        );
+        alert(t.notificationsNotSupported);
         return;
       }
 
       if (!("serviceWorker" in navigator)) {
-        alert(
-          "Service Worker is not supported by this browser."
-        );
+        alert(t.serviceWorkerNotSupported);
         return;
       }
 
