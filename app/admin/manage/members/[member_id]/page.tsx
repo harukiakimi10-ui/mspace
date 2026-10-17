@@ -61,14 +61,16 @@ export default function MemberDetailsPage() {
     async function checkAdminAndLoad() {
       const supabase = createClient();
 
-      const storedAdmin = localStorage.getItem("mspace_admin");
+      const response = await fetch("/api/admin/session", {
+  cache: "no-store",
+});
 
-      if (storedAdmin !== "true") {
-        window.location.href = "/admin/login";
-        return;
-      }
+if (!response.ok) {
+  window.location.replace("/admin/login");
+  return;
+}
 
-      setIsAdmin(true);
+setIsAdmin(true);
 
       const { data: memberData, error: memberError } =
         await supabase
@@ -240,10 +242,16 @@ export default function MemberDetailsPage() {
           </button>
 
           <button
-            onClick={() => {
-              localStorage.removeItem("mspace_admin");
-              window.location.href = "/admin/login";
-            }}
+            onClick={async () => {
+  try {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+    });
+  } finally {
+    localStorage.removeItem("mspace_admin");
+    window.location.href = "/admin/login";
+  }
+}}
             style={{
               height: "48px",
               padding: "0 16px",

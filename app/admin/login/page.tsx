@@ -4,19 +4,44 @@ import { useState, useEffect } from "react";
 
 export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem("mspace_admin") === "true") {
-      window.location.replace("/admin/chats");
-    }
+    fetch("/api/admin/session")
+      .then((response) => {
+        if (response.ok) {
+          window.location.replace("/admin/chats");
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  function login() {
-    if (password === "MSPACE2026") {
-      localStorage.setItem("mspace_admin", "true");
+  async function login() {
+    if (loading) return;
+
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "Login failed.");
+        return;
+      }
+
       window.location.replace("/admin/chats");
-    } else {
-      alert("Wrong password");
+    } catch {
+      alert("Unable to connect. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -32,9 +57,12 @@ export default function AdminLoginPage() {
 
       <input
         type="password"
-        placeholder="Enter password"
+        placeholder="Enter Admin password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(event) => setPassword(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") void login();
+        }}
         style={{
           width: "100%",
           padding: "12px",
@@ -43,16 +71,17 @@ export default function AdminLoginPage() {
       />
 
       <button
-        onClick={login}
+        onClick={() => void login()}
+        disabled={loading}
         style={{
           padding: "12px 20px",
           background: "#2e8b57",
           color: "white",
           border: "none",
-          cursor: "pointer",
+          cursor: loading ? "wait" : "pointer",
         }}
       >
-        Login
+        {loading ? "Logging in..." : "Login"}
       </button>
     </div>
   );

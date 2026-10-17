@@ -1408,6 +1408,28 @@ console.log("ADMIN STATUS:", data);
 
 if (!data) return;
 
+if (data.hidden === true) {
+  setAdmin(null);
+
+  const cached = localStorage.getItem(CHAT_CACHE_KEY);
+
+  if (cached) {
+    try {
+      const header = JSON.parse(cached);
+      delete header.admin;
+
+      localStorage.setItem(
+        CHAT_CACHE_KEY,
+        JSON.stringify(header)
+      );
+    } catch (error) {
+      console.error("Admin cache cleanup failed:", error);
+    }
+  }
+
+  return;
+}
+
   // Update React state
   setAdmin(data);
 

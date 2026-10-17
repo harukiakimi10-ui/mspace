@@ -2293,21 +2293,27 @@ try {
 setLoadingProfile(false);
 }
 
+
 async function updateAdminOnlineStatus(online: boolean) {
-  const { error } = await supabase
-    .from("admins")
-    .update({
-      is_online: online,
-      last_seen: new Date().toISOString(),
-    })
-    .eq("id", "11111111-1111-1111-1111-111111111111");
+  try {
+    const response = await fetch("/api/admin/presence", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ online }),
+      keepalive: !online,
+    });
 
- if (error) {
-  console.error("Admin status error");
-  console.log(error);
-  console.log(JSON.stringify(error, null, 2));
- }
-
+    if (!response.ok) {
+      console.error(
+        "Admin status update failed:",
+        response.status
+      );
+    }
+  } catch (error) {
+    console.error("Admin status network error:", error);
+  }
 }
   async function loadMessages() {
   console.log("loadMessages() called");

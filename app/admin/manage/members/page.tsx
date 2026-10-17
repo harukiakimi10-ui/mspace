@@ -20,24 +20,44 @@ export default function MembersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
-
   useEffect(() => {
-    const admin =
-      localStorage.getItem("mspace_admin") === "true";
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
 
-    if (!admin) {
-      window.location.replace("/admin/login");
-      return;
+    async function verifyAdminSession() {
+      try {
+        const response = await fetch("/api/admin/session", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (!cancelled) {
+            window.location.replace("/admin/login");
+          }
+          return;
+        }
+
+        if (cancelled) return;
+
+        setIsAdmin(true);
+        void loadMembers();
+
+        interval = setInterval(() => {
+          void loadMembers();
+        }, 30000);
+      } catch {
+        if (!cancelled) {
+          window.location.replace("/admin/login");
+        }
+      }
     }
 
-    setIsAdmin(true);
-    loadMembers();
+    void verifyAdminSession();
 
-    const interval = setInterval(() => {
-      loadMembers();
-    }, 30000);
-
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   async function loadMembers() {
@@ -273,7 +293,7 @@ export default function MembersPage() {
           zIndex: 1000,
         }}
       >
-        
+
          {/* Back */}
 
         <div
@@ -372,13 +392,16 @@ export default function MembersPage() {
           </button>
 
           <button
-            onClick={() => {
-              localStorage.removeItem(
-                "mspace_admin"
-              );
-              window.location.href =
-                "/admin/login";
-            }}
+            onClick={async () => {
+  try {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+    });
+  } finally {
+    localStorage.removeItem("mspace_admin");
+    window.location.href = "/admin/login";
+  }
+}}
             style={{
               display: "flex",
               alignItems: "center",

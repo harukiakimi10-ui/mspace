@@ -33,34 +33,53 @@ const [visits, setVisits] = useState<any[]>([]);
 const [onlineCount, setOnlineCount] = useState(0);
 const [totalMembers, setTotalMembers] = useState(0);
 const [bannedCount, setBannedCount] = useState(0);
+useEffect(() => {
+  let cancelled = false;
+  let refreshInterval: ReturnType<typeof setInterval> | undefined;
 
+  async function verifyAdminSession() {
+    try {
+      const response = await fetch("/api/admin/session", {
+        cache: "no-store",
+      });
 
-  useEffect(() => {
-    const admin =
-      localStorage.getItem("mspace_admin") === "true";
+      if (!response.ok) {
+        if (!cancelled) {
+          window.location.replace("/admin/login");
+        }
+        return;
+      }
 
-    setIsAdmin(admin);
-  }, []);
+      if (cancelled) return;
 
- useEffect(() => {
-  if (localStorage.getItem("mspace_admin") !== "true") {
-    window.location.replace("/admin/login");
-    return;
+      setIsAdmin(true);
+
+      void loadSettings();
+      void loadPhotos();
+      void loadVideos();
+      void loadMembers();
+      void loadVisits();
+
+      refreshInterval = setInterval(() => {
+        void loadMembers();
+        void loadVisits();
+      }, 30000);
+    } catch {
+      if (!cancelled) {
+        window.location.replace("/admin/login");
+      }
+    }
   }
 
-  loadSettings();
-  loadPhotos();
-  loadVideos();
-  loadMembers();
-  loadVisits();
-  
+  void verifyAdminSession();
 
-  const interval = setInterval(() => {
-    loadMembers();
-    loadVisits();
-  }, 30000);
+  return () => {
+    cancelled = true;
 
-  return () => clearInterval(interval);
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+  };
 }, []);
 
 async function loadPhotos() {
@@ -374,7 +393,7 @@ async function toggleBan(
     return;
   }
 
- 
+
 
   alert("Updated!");
 
@@ -506,14 +525,28 @@ async function loadSettings() {
 }
 }
 
-  function login() {
-    if (password === "MSPACE2026") {
-      localStorage.setItem("mspace_admin", "true");
-      window.location.reload();
-    } else {
-      alert("Wrong password");
+
+async function login() {
+  try {const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(result.error || "Login failed.");
+      return;
     }
+
+    window.location.reload();
+  } catch {
+    alert("Unable to connect. Please try again.");
   }
+}
 
   if (!isAdmin) {
     return (
@@ -668,10 +701,16 @@ function getLastSeenText(lastSeen: string | null) {
     </button>
 
     <button
-      onClick={() => {
-        localStorage.removeItem("mspace_admin");
-        window.location.href = "/admin/login";
-      }}
+      onClick={async () => {
+  try {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+    });
+  } finally {
+    localStorage.removeItem("mspace_admin");
+    window.location.href = "/admin";
+  }
+}}
       style={{
         display: "flex",
         alignItems: "center",
@@ -895,9 +934,9 @@ function getLastSeenText(lastSeen: string | null) {
       boxSizing: "border-box",
       boxShadow: "0 5px 18px rgba(245,158,11,0.08)",
     }}
-  
+
 >
-  
+
   <div
   style={{
     display: "flex",

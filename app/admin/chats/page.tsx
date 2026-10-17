@@ -114,140 +114,163 @@ async function testPushNotification() {
 
 const supabase = createClient();
 
+
 useEffect(() => {
-  if (localStorage.getItem("mspace_admin") !== "true") {
-    window.location.replace("/admin/login");
-    return;
-  }
+  let cancelled = false;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    restoreCachedConversations();
-  loadConversations();
+  async function initializeAdminChats() {
+    try {
+      const response = await fetch("/api/admin/session", {
+        cache: "no-store",
+      });
 
-  const channel = supabase
-    .channel("admin-conversations")
-    .on(
-  "postgres_changes",
-  {
-    event: "*",
-    schema: "public",
-    table: "messages",
-  },
-  (payload) => {
-    console.log(
-      "Admin conversation realtime message:",
-      payload.eventType
-    );
+      if (!response.ok) {
+        if (!cancelled) {
+          window.location.replace("/admin/login");
+        }
+        return;
+      }
 
-        scheduleConversationRefresh();
+      if (cancelled) return;
 
-    if (payload.eventType === "UPDATE") {
+      restoreCachedConversations();
       void loadConversations();
-    }
 
-    if (
-  selectedConversation &&
-  (payload.new as any)?.conversation_id ===
-    selectedConversation.id
-) {
-  loadMessages(selectedConversation.id);
-}
-  }
-)
-    .on(
-  "postgres_changes",
-  {
-    event: "UPDATE",
-    schema: "public",
-    table: "conversations",
-  },
-  (payload) => {
-    console.log(
-      "Admin conversation realtime update:",
-      payload.eventType
-    );
+      channel = supabase
+        .channel("admin-conversations")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+          },
+          (payload) => {
+            console.log(
+              "Admin conversation realtime message:",
+              payload.eventType
+            );
 
-    const updatedConversation = payload.new as any;
+            scheduleConversationRefresh();
 
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === updatedConversation.id
-          ? {
-              ...conversation,
-              member_typing:
-                updatedConversation.member_typing,
+            if (payload.eventType === "UPDATE") {
+              void loadConversations();
             }
-          : conversation
-      )
-    );
-  }
-)
 
-.on(
-  "postgres_changes",
-  {
-    event: "UPDATE",
-    schema: "public",
-    table: "members",
-  },
-  (payload) => {
-    const updatedMember = payload.new as any;
-
-    setConversations((current) => {
-      const updatedConversations = current.map(
-        (conversation) =>
-          conversation.member?.member_id ===
-          updatedMember?.member_id
-            ? {
-                ...conversation,
-                member: {
-                  ...conversation.member,
-                  is_online:
-                    updatedMember.is_online,
-                  online_at:
-                    updatedMember.online_at,
-                  last_seen:
-                    updatedMember.last_seen,
-                },
-              }
-            : conversation
-      );
-
-      const now = Date.now();
-
-      const activeOnlineCount =
-        updatedConversations.filter((conversation) => {
-          if (!conversation.member?.is_online) {
-            return false;
+            if (
+              selectedConversation &&
+              (payload.new as any)?.conversation_id ===
+                selectedConversation.id
+            ) {
+              void loadMessages(selectedConversation.id);
+            }
           }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "conversations",
+          },
+          (payload) => {
+            console.log(
+              "Admin conversation realtime update:",
+              payload.eventType
+            );
 
-          if (!conversation.member?.online_at) {
-            return false;
+            const updatedConversation = payload.new as any;
+
+            setConversations((current) =>
+              current.map((conversation) =>
+                conversation.id === updatedConversation.id
+                  ? {
+                      ...conversation,
+                      member_typing:
+                        updatedConversation.member_typing,
+                    }
+                  : conversation
+              )
+            );
           }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "members",
+          },
+          (payload) => {
+            const updatedMember = payload.new as any;
 
-          const onlineAt = new Date(
-            conversation.member.online_at
-          ).getTime();
+            setConversations((current) => {
+              const updatedConversations = current.map(
+                (conversation) =>
+                  conversation.member?.member_id ===
+                  updatedMember?.member_id
+                    ? {
+                        ...conversation,
+                        member: {
+                          ...conversation.member,
+                          is_online: updatedMember.is_online,
+                          online_at: updatedMember.online_at,
+                          last_seen: updatedMember.last_seen,
+                        },
+                      }
+                    : conversation
+              );
 
-          return now - onlineAt < 2 * 60 * 1000;
-        }).length;
+              const now = Date.now();
 
-      setOnlineCount(activeOnlineCount);
+              const activeOnlineCount =
+                updatedConversations.filter((conversation) => {
+                  if (!conversation.member?.is_online) {
+                    return false;
+                  }
 
-      return updatedConversations;
-    });
+                  if (!conversation.member?.online_at) {
+                    return false;
+                  }
+
+                  const onlineAt = new Date(
+                    conversation.member.online_at
+                  ).getTime();
+
+                  return now - onlineAt < 2 * 60 * 1000;
+                }).length;
+
+              setOnlineCount(activeOnlineCount);
+
+              return updatedConversations;
+            });
+          }
+        )
+        .subscribe();
+    } catch (error) {
+      console.error("Admin chat session check failed:", error);
+
+      if (!cancelled) {
+        window.location.replace("/admin/login");
+      }
+    }
   }
-)
 
-    .subscribe();
+  void initializeAdminChats();
 
   return () => {
-  if (conversationRefreshTimeout.current) {
-    clearTimeout(conversationRefreshTimeout.current);
-    conversationRefreshTimeout.current = null;
-  }
+    cancelled = true;
 
-  supabase.removeChannel(channel);
-};
+    if (conversationRefreshTimeout.current) {
+      clearTimeout(conversationRefreshTimeout.current);
+      conversationRefreshTimeout.current = null;
+    }
+
+    if (channel) {
+      void supabase.removeChannel(channel);
+    }
+  };
 }, []);
 
 useEffect(() => {

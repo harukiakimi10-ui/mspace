@@ -53,15 +53,18 @@ export async function getProfileSettings() {
   return data;
 }
 
+
 export async function getAdminStatus() {
-  const { data, error } = await supabase
-    .from("admins")
-    .select("is_online,last_seen")
-    .single();
+  const response = await fetch("/api/admin/presence", {
+    method: "GET",
+    cache: "no-store",
+  });
 
-  if (error) throw error;
+  if (!response.ok) {
+    throw new Error("Unable to load Admin presence.");
+  }
 
-  return data;
+  return response.json();
 }
 
 export async function updateOnlineStatus(

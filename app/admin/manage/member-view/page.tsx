@@ -1461,10 +1461,16 @@ id="member-view-top"
 
     <button
       type="button"
-      onClick={() => {
-        localStorage.removeItem("mspace_admin");
-        window.location.href = "/admin";
-      }}
+      onClick={async () => {
+  try {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+    });
+  } finally {
+    localStorage.removeItem("mspace_admin");
+    window.location.href = "/admin";
+  }
+}}
       style={{
         display: "flex",
         alignItems: "center",

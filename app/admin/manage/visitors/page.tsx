@@ -19,90 +19,104 @@ export default function RecentVisitorsPage() {
   const [visitors, setVisitors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAndroid, setIsAndroid] = useState(false);
+ useEffect(() => {
+    let cancelled = false;
 
-  useEffect(() => {
     async function checkAdminAndLoad() {
-      const supabase = createClient();
+      try {
+        const response = await fetch("/api/admin/session", {
+          cache: "no-store",
+        });
 
-      const storedAdmin = localStorage.getItem("mspace_admin");
-
-      if (storedAdmin !== "true") {
-        window.location.href = "/admin/login";
-        return;
-      }
-
-      setIsAdmin(true);
-
-      const { data, error } = await supabase
-        .from("page_visits")
-        .select("*")
-        .order("visited_at", {
-          ascending: false,
-        })
-        .limit(1000);
-
-      if (error) {
-        console.error(error);
-        setLoading(false);
-        return;
-      }
-
-      /*
-       * Keep only the newest visit for each member.
-       */
-      const uniqueVisitors: any[] = [];
-      const seenMembers = new Set<string>();
-
-      for (const visit of data || []) {
-        const memberKey = visit.member_id;
-
-        if (!memberKey || seenMembers.has(memberKey)) {
-          continue;
+        if (!response.ok) {
+          if (!cancelled) {
+            window.location.replace("/admin/login");
+          }
+          return;
         }
+if (cancelled) return;
 
-        seenMembers.add(memberKey);
-        uniqueVisitors.push(visit);
+setIsAdmin(true);
 
-        if (uniqueVisitors.length === 20) {
-          break;
-        }
-      }
+const supabase = createClient();
 
-      /*
-       * Load the actual member information for the
-       * 20 unique visitors.
-       */
-      const memberIds = uniqueVisitors
-        .map((visit) => visit.member_id)
-        .filter(Boolean);
 
-      let members: any[] = [];
-
-      if (memberIds.length > 0) {
-        const { data: memberData } = await supabase
-          .from("members")
+        const { data, error } = await supabase
+          .from("page_visits")
           .select("*")
-          .in("member_id", memberIds);
+          .order("visited_at", {
+            ascending: false,
+          })
+          .limit(1000);
 
-        members = memberData || [];
+        if (error) {
+          console.error(error);
+          if (!cancelled) setLoading(false);
+          return;
+        }
+
+        const uniqueVisitors: any[] = [];
+        const seenMembers = new Set<string>();
+
+        for (const visit of data || []) {
+          const memberKey = visit.member_id;
+
+          if (!memberKey || seenMembers.has(memberKey)) {
+            continue;
+          }
+
+          seenMembers.add(memberKey);
+          uniqueVisitors.push(visit);
+
+          if (uniqueVisitors.length === 20) {
+            break;
+          }
+        }
+
+        const memberIds = uniqueVisitors
+          .map((visit) => visit.member_id)
+          .filter(Boolean);
+
+        let members: any[] = [];
+
+        if (memberIds.length > 0) {
+          const { data: memberData } = await supabase
+            .from("members")
+            .select("*")
+            .in("member_id", memberIds);
+
+          members = memberData || [];
+        }
+
+        const mergedVisitors = uniqueVisitors.map((visit) => {
+          const member = members.find(
+            (item) => item.member_id === visit.member_id
+          );
+
+          return {
+            ...visit,
+            member,
+          };
+        });
+
+        if (!cancelled) {
+          setVisitors(mergedVisitors);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (!cancelled) {
+          window.location.replace("/admin/login");
+        }
       }
-
-      const mergedVisitors = uniqueVisitors.map((visit) => {
-        const member = members.find(
-          (item) => item.member_id === visit.member_id
-        );
-
-        return {
-          ...visit,
-          member,
-        };
-      });
-
-      setVisitors(mergedVisitors);
-      setLoading(false);
     }
 
-    checkAdminAndLoad();
+    void checkAdminAndLoad();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -265,10 +279,16 @@ export default function RecentVisitorsPage() {
           </button>
 
           <button
-            onClick={() => {
-              localStorage.removeItem("mspace_admin");
-              window.location.href = "/admin/login";
-            }}
+            onClick={async () => {
+  try {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+    });
+  } finally {
+    localStorage.removeItem("mspace_admin");
+    window.location.href = "/admin/login";
+  }
+}}
             style={{
               height: isAndroid ? "42px" : "48px",
               padding: isAndroid ? "0 10px" : "0 16px",
