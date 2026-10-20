@@ -55,7 +55,8 @@ const sessionSecret =
       );
     }
 
-    const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 12;
+    const SESSION_LIFETIME = 30 * 24 * 60 * 60;
+    const expires = Math.floor(Date.now() / 1000) + SESSION_LIFETIME;
     const payload = `admin:${expires}`;
     const signature = signSession(payload, sessionSecret);
     const token = `${payload}:${signature}`;
@@ -67,7 +68,7 @@ const sessionSecret =
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 12,
+      maxAge: SESSION_LIFETIME,
     });
 
     return NextResponse.json({ success: true });

@@ -1096,6 +1096,8 @@ const handleVisibility = async () => {
       loadConversation(),
       loadMessages(),
     ]);
+
+    await markMessagesAsRead();
   }
 };
 
@@ -2523,12 +2525,17 @@ async function markMessagesAsRead() {
     return;
   }
 
-  await supabase
+    const { error: markReadError } = await supabase
     .from("messages")
     .update({ is_read: true })
     .eq("conversation_id", id)
     .eq("sender", "member")
     .eq("is_read", false);
+
+  if (markReadError) {
+    console.error("MARK MESSAGES AS READ ERROR:", markReadError);
+    return;
+  }
 
     setDesktopConversations((currentConversations) =>
   currentConversations.map((chat) =>

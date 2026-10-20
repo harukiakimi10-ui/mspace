@@ -1104,9 +1104,19 @@ useEffect(() => {
   console.log("MEMBER CONVERSATION CHANNEL STATUS:", status);
 });
 
+const adminPresenceRefresh = window.setInterval(() => {
+  if (
+    document.visibilityState === "visible" &&
+    navigator.onLine
+  ) {
+    void loadAdminStatus();
+  }
+}, 5000);
+
   return () => {
-    supabase.removeChannel(adminChannel);
-  };
+  window.clearInterval(adminPresenceRefresh);
+  void supabase.removeChannel(adminChannel);
+};
 }, [conversationId]);
 
   useEffect(() => {
@@ -1373,78 +1383,61 @@ localStorage.setItem(
 }
 
 async function loadAdminStatus() {
-  // Load the last known admin status immediately
-  const cached = localStorage.getItem(CHAT_CACHE_KEY);
-
-  if (cached) {
-    try {
-      const header = JSON.parse(cached);
-
-      if (header.admin) {
-        setAdmin(header.admin);
-      }
-    } catch (err) {
-      console.error("Cache parse error:", err);
-    }
-  }
-
-  // Fetch the latest status from Supabase
   let data;
 
-try {
-  data = await getAdminStatus();
-} 
+  try {
+    data = await getAdminStatus();
+  } catch (error: any) {
+    console.error("ADMIN STATUS LOAD FAILED:", error);
 
-  catch (error: any) {
-  console.error("ADMIN ERROR:", error);
-  console.error("MESSAGE:", error?.message);
-  console.error("DETAILS:", error?.details);
-  console.error("HINT:", error?.hint);
-  console.error("CODE:", error?.code);
-  return;
-}
+    // Remove stale cached presence if authorization or the
+    // network check fails.
+    try {
+      const cached = localStorage.getItem(CHAT_CACHE_KEY);
 
-console.log("ADMIN STATUS:", data);
+      if (cached) {
+        const header = JSON.parse(cached);
+        delete header.admin;
 
-if (!data) return;
+        localStorage.setItem(
+          CHAT_CACHE_KEY,
+          JSON.stringify(header)
+        );
+      }
+    } catch (cacheError) {
+      console.error("Admin cache cleanup failed:", cacheError);
+    }
 
-if (data.hidden === true) {
-  setAdmin(null);
+    return;
+  }
+
+  if (!data) return;
 
   const cached = localStorage.getItem(CHAT_CACHE_KEY);
+  let header: any = {};
 
   if (cached) {
     try {
-      const header = JSON.parse(cached);
-      delete header.admin;
-
-      localStorage.setItem(
-        CHAT_CACHE_KEY,
-        JSON.stringify(header)
-      );
-    } catch (error) {
-      console.error("Admin cache cleanup failed:", error);
-    }
-  }
-
-  return;
-}
-
-  // Update React state
-  setAdmin(data);
-
-  // Save the updated status back to the cache
-  const existing = localStorage.getItem(CHAT_CACHE_KEY);
-
-  let header: any = {};
-
-  if (existing) {
-    try {
-      header = JSON.parse(existing);
+      header = JSON.parse(cached);
     } catch {
       header = {};
     }
   }
+
+  if (data.hidden === true) {
+    setAdmin(null);
+    delete header.admin;
+
+    localStorage.setItem(
+      CHAT_CACHE_KEY,
+      JSON.stringify(header)
+    );
+
+    return;
+  }
+
+  // Display presence only after receiving the server response.
+  setAdmin(data);
 
   header.admin = data;
 

@@ -5,6 +5,14 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
 
+const SESSION_LIFETIME = 30 * 24 * 60 * 60;
+
+function signSession(payload: string, secret: string) {
+  return createHmac("sha256", secret)
+    .update(payload)
+    .digest("hex");
+}
+
 export async function GET() {
   const secret = process.env.MSPACE_ADMIN_SESSION_SECRET;
 
@@ -36,28 +44,10 @@ export async function GET() {
 
   const [identity, expiresText, signature] = parts;
 
-if (!/^[a-f0-9]{64}$/.test(signature)) {
-  return NextResponse.json(
-    { authenticated: false },
-    { status: 401 }
-  );
-}
-
-const payload = `${identity}:${expiresText}`;
-
-  const expectedSignature = createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
-
-  const supplied = Buffer.from(signature, "hex");
-  const expected = Buffer.from(expectedSignature, "hex");
-
   if (
     identity !== "admin" ||
     !/^\d+$/.test(expiresText) ||
-    supplied.length !== expected.length ||
-    !timingSafeEqual(supplied, expected) ||
-    Number(expiresText) <= Math.floor(Date.now() / 1000)
+    !/^[a-f0-9]{64}$/.test(signature)
   ) {
     return NextResponse.json(
       { authenticated: false },
@@ -65,5 +55,47 @@ const payload = `${identity}:${expiresText}`;
     );
   }
 
-  return NextResponse.json({ authenticated: true });
+  const payload = `${identity}:${expiresText}`;
+  const expectedSignature = signSession(payload, secret);
+  const supplied = Buffer.from(signature, "hex");
+  const expected = Buffer.from(expectedSignature, "hex");
+
+  if (
+    supplied.length !== expected.length ||
+    !timingSafeEqual(supplied, expected) ||
+    Number(expiresText) <= Math.floor(Date.now() / 1000)
+  ) {
+    cookieStore.set("mspace_admin_session", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 0,
+      expires: new Date(0),
+    });
+
+    return NextResponse.json(
+      { authenticated: false },
+      { status: 401 }
+    );
+  }
+
+  // Renew both the signed expiration and browser cookie.
+  const expires = Math.floor(Date.now() / 1000) + SESSION_LIFETIME;
+  const renewedPayload = `${identity}:${expires}`;
+  const renewedSignature = signSession(renewedPayload, secret);
+  const renewedToken = `${renewedPayload}:${renewedSignature}`;
+
+  cookieStore.set("mspace_admin_session", renewedToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: SESSION_LIFETIME,
+  });
+
+  return NextResponse.json(
+    { authenticated: true },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

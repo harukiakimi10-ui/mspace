@@ -54,11 +54,23 @@ export async function getProfileSettings() {
 }
 
 
+
+
+
 export async function getAdminStatus() {
-  const response = await fetch("/api/admin/presence", {
-    method: "GET",
-    cache: "no-store",
-  });
+  const memberId = localStorage.getItem("mspace_member_id");
+
+  if (!memberId) {
+    throw new Error("Member ID is missing.");
+  }
+
+  const response = await fetch(
+    `/api/admin/presence?memberId=${encodeURIComponent(memberId)}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
 
   if (!response.ok) {
     throw new Error("Unable to load Admin presence.");

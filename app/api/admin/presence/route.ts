@@ -37,34 +37,12 @@ function verifyAdminSession(token: string, secret: string) {
 
 
 
-export async function GET() {
+
+
+export async function GET(request: Request) {
+    const presenceStart = Date.now();
+
   try {
-    const secret = process.env.MSPACE_ADMIN_SESSION_SECRET;
-
-    if (!secret) {
-      return NextResponse.json(
-        { error: "Server configuration is incomplete." },
-        { status: 500 }
-      );
-    }
-
-    const cookieStore = await cookies();
-    const token = cookieStore.get("mspace_admin_session")?.value;
-
-    if (!token || !verifyAdminSession(token, secret)) {
-      return NextResponse.json(
-        {
-          hidden: true,
-          is_online: false,
-          last_seen: null,
-        },
-        {
-          status: 200,
-          headers: { "Cache-Control": "no-store" },
-        }
-      );
-    }
-
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
@@ -72,6 +50,16 @@ export async function GET() {
       return NextResponse.json(
         { error: "Server configuration is incomplete." },
         { status: 500 }
+      );
+    }
+
+    const memberId = new URL(request.url).searchParams.get("memberId");
+
+    // Do not reveal Admin presence without an existing member ID.
+    if (!memberId || memberId.length > 200) {
+      return NextResponse.json(
+        { hidden: true, is_online: false, last_seen: null },
+        { headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -86,46 +74,98 @@ export async function GET() {
       }
     );
 
-    const { data: privacy, error: privacyError } = await supabase
-      .from("admin_presence_privacy")
-      .select("hide_from_all")
-      .eq("id", 1)
-      .maybeSingle();
+        // Run the independent identity and privacy lookups in parallel.
+    const [
+      { data: member, error: memberError },
+      { data: privacy, error: privacyError },
+      { data: hiddenMember, error: hiddenMemberError },
+    ] = await Promise.all([
+      supabase
+        .from("members")
+        .select("member_id,banned")
+        .eq("member_id", memberId)
+        .maybeSingle(),
 
-    if (privacyError) {
-      console.error("Admin privacy lookup failed:", privacyError.message);
+      supabase
+        .from("admin_presence_privacy")
+        .select("hide_from_all")
+        .eq("id", 1)
+        .maybeSingle(),
 
+      supabase
+        .from("admin_presence_hidden_members")
+        .select("member_id")
+        .eq("member_id", memberId)
+        .maybeSingle(),
+    ]);
+
+    if (memberError) {
+      console.error(
+        "Member presence identity lookup failed:",
+        memberError.message
+      );
       return NextResponse.json(
         { error: "Unable to load Admin presence." },
         { status: 500 }
       );
     }
 
-    if (privacy?.hide_from_all) {
+    if (privacyError) {
+      console.error("Admin privacy lookup failed:", privacyError.message);
       return NextResponse.json(
-        {
-          hidden: true,
-          is_online: false,
-          last_seen: null,
-        },
-        {
-          headers: { "Cache-Control": "no-store" },
-        }
+        { error: "Unable to load Admin presence." },
+        { status: 500 }
       );
     }
 
+    if (hiddenMemberError) {
+      console.error(
+        "Individual Admin privacy lookup failed:",
+        hiddenMemberError.message
+      );
+      return NextResponse.json(
+        { error: "Unable to load Admin presence." },
+        { status: 500 }
+      );
+    }
+
+    // Never reveal Admin presence to missing or banned members.
+    if (!member || member.banned) {
+      return NextResponse.json(
+        { hidden: true, is_online: false, last_seen: null },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+    // Preserve both global and individual privacy settings.
+    if (privacy?.hide_from_all || hiddenMember) {
+      return NextResponse.json(
+        { hidden: true, is_online: false, last_seen: null },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
+     const adminLookupStart = Date.now();
     const { data: admin, error: adminError } = await supabase
       .from("admins")
       .select("is_online,last_seen")
       .eq("id", ADMIN_ID)
       .maybeSingle();
 
-    if (adminError || !admin) {
-      console.error(
-        "Admin presence lookup failed:",
-        adminError?.message
-      );
+      console.log(
+  "[PRESENCE TIMING] Admin status lookup:",
+  Date.now() - adminLookupStart,
+  "ms"
+);
 
+console.log(
+  "[PRESENCE TIMING] Total API time:",
+  Date.now() - presenceStart,
+  "ms"
+);
+
+    if (adminError || !admin) {
+      console.error("Admin presence lookup failed:", adminError?.message);
       return NextResponse.json(
         { error: "Unable to load Admin presence." },
         { status: 500 }
@@ -138,13 +178,10 @@ export async function GET() {
         is_online: admin.is_online,
         last_seen: admin.last_seen,
       },
-      {
-        headers: { "Cache-Control": "no-store" },
-      }
+      { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {
     console.error("Admin presence request failed:", error);
-
     return NextResponse.json(
       { error: "Unable to load Admin presence." },
       { status: 500 }

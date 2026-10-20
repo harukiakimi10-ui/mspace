@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import AdminSessionRenewal from "./components/AdminSessionRenewal";
 
 export const metadata: Metadata = {
   title: "MSpace Admin",
@@ -13,5 +14,10 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+  <>
+    <AdminSessionRenewal />
+    {children}
+  </>
+);
 }

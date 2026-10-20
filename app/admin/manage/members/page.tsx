@@ -20,6 +20,10 @@ export default function MembersPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [hideFromAll, setHideFromAll] = useState(false);
+const [hiddenMemberIds, setHiddenMemberIds] = useState<string[]>([]);
+const [privacyLoading, setPrivacyLoading] = useState(true);
+const [privacySaving, setPrivacySaving] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -41,6 +45,7 @@ export default function MembersPage() {
 
         setIsAdmin(true);
         void loadMembers();
+        void loadPresencePrivacy();
 
         interval = setInterval(() => {
           void loadMembers();
@@ -104,6 +109,82 @@ export default function MembersPage() {
       setMembers(updatedMembers);
     }
   }
+
+
+async function loadPresencePrivacy() {
+  setPrivacyLoading(true);
+
+  try {
+    const response = await fetch(
+      "/api/admin/member-presence-privacy",
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not load presence privacy settings.");
+    }
+
+    const data = await response.json();
+
+    setHideFromAll(data.hideFromAll === true);
+    setHiddenMemberIds(
+      Array.isArray(data.hiddenMemberIds)
+        ? data.hiddenMemberIds
+        : []
+    );
+  } catch (error) {
+    console.error("Presence privacy load failed:", error);
+    alert("Could not load presence privacy settings.");
+  } finally {
+    setPrivacyLoading(false);
+  }
+}
+
+async function updatePresencePrivacy(
+  body: {
+    action: "setGlobal";
+    hideFromAll: boolean;
+  } | {
+    action: "setMember";
+    memberId: string;
+    hidden: boolean;
+  }
+) {
+  if (privacySaving) return;
+
+  setPrivacySaving(true);
+
+  try {
+    const response = await fetch(
+      "/api/admin/member-presence-privacy",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error || "Could not save privacy settings."
+      );
+    }
+
+    await loadPresencePrivacy();
+  } catch (error) {
+    console.error("Presence privacy update failed:", error);
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Could not save privacy settings."
+    );
+  } finally {
+    setPrivacySaving(false);
+  }
+}
+
 
   async function toggleBan(
     id: number,
@@ -535,6 +616,62 @@ export default function MembersPage() {
         />
       </div>
 
+
+{/* Global member presence privacy */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: "12px",
+    padding: "16px",
+    marginBottom: "16px",
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "16px",
+  }}
+>
+  <div style={{ flex: 1, minWidth: "200px" }}>
+    <div style={{ fontWeight: 700, color: "#172554" }}>
+      Hide online status for everyone
+    </div>
+    <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
+      Overrides individual member settings while enabled.
+    </div>
+  </div>
+
+  <button
+    type="button"
+    disabled={privacyLoading || privacySaving}
+    onClick={() =>
+      void updatePresencePrivacy({
+        action: "setGlobal",
+        hideFromAll: !hideFromAll,
+      })
+    }
+    style={{
+      padding: "10px 16px",
+      border: "none",
+      borderRadius: "10px",
+      background: hideFromAll ? "#dc2626" : "#2563eb",
+      color: "#ffffff",
+      fontWeight: 700,
+      cursor: privacyLoading || privacySaving ? "wait" : "pointer",
+      opacity: privacyLoading || privacySaving ? 0.6 : 1,
+    }}
+  >
+    {privacyLoading
+      ? "Loading..."
+      : privacySaving
+        ? "Saving..."
+        : hideFromAll
+          ? "Hide for everyone: ON"
+          : "Hide for everyone: OFF"}
+  </button>
+</div>
+
+
       {/* Member cards */}
       <div
         style={{
@@ -731,6 +868,57 @@ export default function MembersPage() {
                     </div>
                   </div>
                 </div>
+
+
+{/* Individual member presence privacy */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: "10px",
+    marginTop: "12px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    background: "#f8fafc",
+  }}
+>
+  <span style={{ fontSize: "13px", color: "#475569" }}>
+    Member online visibility
+  </span>
+
+  <button
+    type="button"
+    disabled={privacyLoading || privacySaving}
+    onClick={() =>
+      void updatePresencePrivacy({
+        action: "setMember",
+        memberId: String(member.member_id),
+        hidden: !hiddenMemberIds.includes(String(member.member_id)),
+      })
+    }
+    style={{
+      padding: "8px 12px",
+      border: "none",
+      borderRadius: "9px",
+      background: hiddenMemberIds.includes(String(member.member_id))
+        ? "#dcfce7"
+        : "#e0e7ff",
+      color: hiddenMemberIds.includes(String(member.member_id))
+        ? "#166534"
+        : "#3730a3",
+      fontSize: "13px",
+      fontWeight: 700,
+      cursor: privacyLoading || privacySaving ? "wait" : "pointer",
+      opacity: privacyLoading || privacySaving ? 0.6 : 1,
+    }}
+  >
+    {hiddenMemberIds.includes(String(member.member_id))
+      ? "Show status"
+      : "Hide status"}
+  </button>
+</div>
 
                 {/* Actions */}
                 <div
