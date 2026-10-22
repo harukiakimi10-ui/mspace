@@ -24,6 +24,10 @@ export default function MembersPage() {
 const [hiddenMemberIds, setHiddenMemberIds] = useState<string[]>([]);
 const [privacyLoading, setPrivacyLoading] = useState(true);
 const [privacySaving, setPrivacySaving] = useState(false);
+
+const [hideReadReceipts, setHideReadReceipts] = useState(false);
+const [readReceiptLoading, setReadReceiptLoading] = useState(true);
+const [readReceiptSaving, setReadReceiptSaving] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -46,6 +50,7 @@ const [privacySaving, setPrivacySaving] = useState(false);
         setIsAdmin(true);
         void loadMembers();
         void loadPresencePrivacy();
+        void loadReadReceiptPrivacy();
 
         interval = setInterval(() => {
           void loadMembers();
@@ -137,6 +142,60 @@ async function loadPresencePrivacy() {
     alert("Could not load presence privacy settings.");
   } finally {
     setPrivacyLoading(false);
+  }
+}
+
+async function loadReadReceiptPrivacy() {
+  setReadReceiptLoading(true);
+
+  try {
+    const response = await fetch(
+      "/api/admin/read-receipt-privacy",
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not load read receipt privacy settings.");
+    }
+
+    const data = await response.json();
+    setHideReadReceipts(data.hideReadReceipts === true);
+  } catch (error) {
+    console.error("Read receipt privacy load failed:", error);
+    alert("Could not load read receipt privacy settings.");
+  } finally {
+    setReadReceiptLoading(false);
+  }
+}
+
+async function saveReadReceiptPrivacy(nextValue: boolean) {
+  setReadReceiptSaving(true);
+
+  try {
+    const response = await fetch(
+      "/api/admin/read-receipt-privacy",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          hideReadReceipts: nextValue,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not save read receipt privacy settings.");
+    }
+
+    const data = await response.json();
+    setHideReadReceipts(data.hideReadReceipts === true);
+  } catch (error) {
+    console.error("Read receipt privacy save failed:", error);
+    alert("Could not save read receipt privacy settings.");
+  } finally {
+    setReadReceiptSaving(false);
   }
 }
 
@@ -668,6 +727,60 @@ async function updatePresencePrivacy(
         : hideFromAll
           ? "Hide for everyone: ON"
           : "Hide for everyone: OFF"}
+  </button>
+</div>
+
+{/* Read receipt privacy */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: "12px",
+    padding: "16px",
+    marginBottom: "16px",
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "16px",
+  }}
+>
+  <div style={{ flex: 1, minWidth: "200px" }}>
+    <div style={{ fontWeight: 700, color: "#172554" }}>
+      Hide read receipts from members
+    </div>
+    <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>
+      When enabled, members cannot see whether Admin has read their messages.
+      Admin can still see members' read receipts.
+    </div>
+  </div>
+
+  <button
+    type="button"
+    disabled={readReceiptLoading || readReceiptSaving}
+    onClick={() =>
+      void saveReadReceiptPrivacy(!hideReadReceipts)
+    }
+    style={{
+      padding: "10px 16px",
+      border: "none",
+      borderRadius: "10px",
+      background: hideReadReceipts ? "#dc2626" : "#2563eb",
+      color: "#ffffff",
+      fontWeight: 700,
+      cursor:
+        readReceiptLoading || readReceiptSaving ? "wait" : "pointer",
+      opacity:
+        readReceiptLoading || readReceiptSaving ? 0.6 : 1,
+    }}
+  >
+    {readReceiptLoading
+      ? "Loading..."
+      : readReceiptSaving
+        ? "Saving..."
+        : hideReadReceipts
+          ? "Hide Read Receipts: ON"
+          : "Hide Read Receipts: OFF"}
   </button>
 </div>
 

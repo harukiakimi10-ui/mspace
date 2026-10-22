@@ -9,6 +9,8 @@ import "leaflet/dist/leaflet.css";
 type LocationMessageProps = {
   msg: any;
   currentUser: string;
+  hideReadReceipts: boolean;
+  hideReadReceiptsForEveryone?: boolean;
   formatTime: (date: string) => string;
   onLongPress?: (
     msg: any,
@@ -20,6 +22,8 @@ export default function LocationMessage({
   msg,
   currentUser,
   formatTime,
+  hideReadReceipts,
+  hideReadReceiptsForEveryone = false,
   onLongPress,
 }: LocationMessageProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -263,12 +267,21 @@ onPointerCancelCapture={() => {
     />
   ) : (
     <span
-      style={{
+            style={{
         fontSize: "14px",
         lineHeight: "14px",
+        color: hideReadReceipts || hideReadReceiptsForEveryone
+          ? "#d1d5db"
+          : msg.is_read
+            ? "#53bdeb"
+            : "#d1d5db",
       }}
     >
-      ✓
+      {hideReadReceipts || hideReadReceiptsForEveryone
+         ? "✓"
+         : msg.is_read
+         ? "✓✓"
+         : "✓"}
     </span>
   )
 )}

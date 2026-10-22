@@ -25,6 +25,7 @@ type Conversation = {
   name: string;
   photo_url: string;
   is_online?: boolean;
+  hide_read_receipts?: boolean;
 };
 
   lastMessage?: {
@@ -41,11 +42,13 @@ type Conversation = {
 type Props = {
   conversations: Conversation[];
   selectedConversationId?: string;
+  hideReadReceiptsForEveryone?: boolean;
 };
 
 export default function ConversationList({
   conversations,
   selectedConversationId,
+  hideReadReceiptsForEveryone = false,
 }: Props) {
 
   const router = useRouter();
@@ -93,8 +96,13 @@ function formatVoiceDuration(duration?: number | null) {
 
 function MessageReadReceipt({
   message,
+  hideReadReceipts,
+  hideReadReceiptsForEveryone,
 }: {
   message?: Conversation["lastMessage"];
+  hideReadReceipts: boolean;
+  hideReadReceiptsForEveryone: boolean;
+
 }) {
   if (!message || message.sender !== "admin") {
     return null;
@@ -109,12 +117,19 @@ function MessageReadReceipt({
         fontSize: 13,
         fontWeight: 600,
         letterSpacing: "-2px",
-        color: message.is_read
-          ? "#2196F3"
-          : "#777",
+        color:
+  hideReadReceipts || hideReadReceiptsForEveryone
+    ? "#777"
+    : message.is_read
+      ? "#2196F3"
+      : "#777",
       }}
     >
-      {message.is_read ? "✓✓" : "✓"}
+      {hideReadReceipts || hideReadReceiptsForEveryone
+        ? "✓"
+        : message.is_read
+        ? "✓✓"
+        : "✓"}
     </span>
   );
 }
@@ -241,6 +256,8 @@ function MessageReadReceipt({
 {!chat.member_typing && (
   <MessageReadReceipt
     message={chat.lastMessage}
+     hideReadReceipts={chat.member?.hide_read_receipts === true}
+     hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   />
 )}
 

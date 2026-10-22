@@ -242,7 +242,24 @@ if (memberId) {
       return "signup";
     }
 
-    console.log("Valid member found. Restoring login...");
+        const deviceId = localStorage.getItem("mspace_device_id");
+
+    if (!deviceId) {
+      console.warn("Cannot create member session: device ID is missing.");
+      return "error";
+    }
+
+    const sessionCreated = await createMemberServerSession(
+      existingMember.member_id,
+      deviceId
+    );
+
+    if (!sessionCreated) {
+      console.warn("Member session was not created; preserving saved identity.");
+      return "error";
+    }
+
+    console.log("Valid member and server session restored.");
     router.replace("/members");
     return "redirect";
   }
@@ -300,7 +317,19 @@ if (memberId) {
     return "signup";
   }
 
-  console.log("Restoring login...");
+    console.log("Restoring login...");
+
+  const sessionCreated = await createMemberServerSession(
+    member.member_id,
+    deviceId
+  );
+
+  if (!sessionCreated) {
+    console.warn(
+      "Member session creation failed during device restoration."
+    );
+    return "error";
+  }
 
   localStorage.setItem(
     "mspace_member_id",
@@ -406,6 +435,37 @@ const installApp = async () => {
     setDeferredPrompt(null);
   }
 };
+
+async function createMemberServerSession(
+  memberId: string,
+  deviceId: string
+): Promise<boolean> {
+  try {
+    const response = await fetch("/api/member/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "same-origin",
+      cache: "no-store",
+      body: JSON.stringify({ memberId, deviceId }),
+    });
+
+    if (!response.ok) {
+      console.error(
+        "Member server session creation failed:",
+        response.status
+      );
+      return false;
+    }
+
+    const result = await response.json();
+    return result.authenticated === true;
+  } catch (error) {
+    console.error("Member server session request failed:", error);
+    return false;
+  }
+}
 
 async function joinMSpace() {
   if (loading) return;
@@ -558,7 +618,27 @@ async function joinMSpace() {
       return;
     }
 
-    // 8. Save the account locally and open the members page.
+        // 8. Create a server session for the new account.
+    const sessionCreated = await createMemberServerSession(
+      memberId,
+      deviceId
+    );
+
+    if (!sessionCreated) {
+      console.error(
+        "Account created, but server session creation failed."
+      );
+
+      // Preserve the account ID so the member's account is not lost.
+      localStorage.setItem("mspace_member_id", memberId);
+
+      alert(
+        "Your account was created, but your secure session could not be established. Please check your connection and try again."
+      );
+      return;
+    }
+
+    // 9. Save the account locally and open the members page.
     localStorage.setItem("mspace_member_id", memberId);
 
     setName("");

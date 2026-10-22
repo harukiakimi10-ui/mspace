@@ -50,6 +50,47 @@ const [messages, setMessages] = useState<any[]>([]);
 const [reply, setReply] = useState("");
 const [onlineCount, setOnlineCount] = useState(0);
 const [conversationSearch, setConversationSearch] = useState("");
+const [hideReadReceiptsForEveryone, setHideReadReceiptsForEveryone] =
+  useState(false);
+  useEffect(() => {
+  let cancelled = false;
+
+  async function loadGlobalReadReceiptSetting() {
+    try {
+      const response = await fetch(
+        "/api/admin/read-receipt-privacy",
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      if (!cancelled) {
+        setHideReadReceiptsForEveryone(
+          data.hideReadReceipts === true
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load global read receipt setting:",
+        error
+      );
+    }
+  }
+
+  void loadGlobalReadReceiptSetting();
+
+  const intervalId = window.setInterval(() => {
+    void loadGlobalReadReceiptSetting();
+  }, 5000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(intervalId);
+  };
+}, []);
+
 const conversationRefreshTimeout =
   useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -204,6 +245,18 @@ useEffect(() => {
           },
           (payload) => {
             const updatedMember = payload.new as any;
+       console.log("MEMBER PRIVACY REALTIME UPDATE:", {
+  memberId: updatedMember?.member_id,
+  hideReadReceipts: updatedMember?.hide_read_receipts,
+});
+
+console.log(
+  "MATCHING CONVERSATIONS:",
+  conversations.filter(
+    (conversation) =>
+      conversation.member?.member_id === updatedMember?.member_id
+  ).length
+);
 
             setConversations((current) => {
               const updatedConversations = current.map(
@@ -217,6 +270,7 @@ useEffect(() => {
                           is_online: updatedMember.is_online,
                           online_at: updatedMember.online_at,
                           last_seen: updatedMember.last_seen,
+                          hide_read_receipts: updatedMember.hide_read_receipts,
                         },
                       }
                     : conversation
@@ -247,7 +301,9 @@ useEffect(() => {
             });
           }
         )
-        .subscribe();
+       .subscribe((status) => {
+  console.log("Admin conversations Realtime status:", status);
+});
     } catch (error) {
       console.error("Admin chat session check failed:", error);
 
@@ -450,7 +506,7 @@ await Promise.all(
     const { data: member } = await supabase
   .from("members")
   .select(
-  "member_id, name, photo_url, is_online, online_at, last_seen"
+  "member_id, name, photo_url, is_online, online_at, last_seen, hide_read_receipts"
 )
   .eq("member_id", conversation.member_id)
   .single();
@@ -914,6 +970,7 @@ return isDesktop ? (
         >
           <ConversationList
             conversations={filteredConversations}
+            hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
           />
         </div>
       </div>
@@ -1033,6 +1090,7 @@ return isDesktop ? (
     >
       <ConversationList
         conversations={conversations}
+        hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
       />
     </div>
   </div>

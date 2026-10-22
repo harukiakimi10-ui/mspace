@@ -7,6 +7,10 @@ type VoiceMessageProps = {
   msg?: any;
   currentUser: "member" | "admin";
 
+  hideReadReceipts?: boolean;
+
+  hideReadReceiptsForEveryone?: boolean;
+
   formatTime?: (date: string) => string;
 
   preview?: boolean;
@@ -19,6 +23,8 @@ type VoiceMessageProps = {
 export default function VoiceMessage({
   msg,
   currentUser,
+  hideReadReceipts = false,
+  hideReadReceiptsForEveryone = false,
   formatTime,
   preview = false,
   audioBlob,
@@ -323,12 +329,18 @@ useEffect(() => {
   ) : (
     <span
       style={{
-        color: msg.is_read
-          ? "#53bdeb"
-          : "#d1d5db",
+      color: hideReadReceipts || hideReadReceiptsForEveryone
+        ? "#d1d5db"
+        : msg.is_read
+        ? "#53bdeb"
+        : "#d1d5db",
       }}
     >
-      {msg.is_read ? "✓✓" : "✓"}
+      {hideReadReceipts || hideReadReceiptsForEveryone
+        ? "✓"
+        : msg.is_read
+        ? "✓✓"
+        : "✓"}
     </span>
   )
 )}

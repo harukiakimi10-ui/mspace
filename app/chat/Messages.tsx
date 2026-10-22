@@ -29,6 +29,8 @@ type MessagesProps = {
   onOpenLink: (url: string) => void;
 
   currentUser: "member" | "admin";
+  hideReadReceipts: boolean;
+  hideReadReceiptsForEveryone?: boolean;
   pendingMessageIds: string[];
 
   profileName: string;
@@ -214,6 +216,8 @@ export default function Messages({
   pinnedMessage,
   onOpenLink,
   currentUser,
+  hideReadReceipts,
+  hideReadReceiptsForEveryone = false,
   pendingMessageIds,
   profileName,
   adminPhoto,
@@ -1670,7 +1674,7 @@ msg.reply_preview === "🎤 Voice message" ? (
     >
       <span>{formatTime(msg.created_at)}</span>
 
-      {msg.sender === currentUser && (
+    {msg.sender === currentUser && (
   isPending ? (
     <LoaderCircle
       size={12}
@@ -1682,11 +1686,19 @@ msg.reply_preview === "🎤 Voice message" ? (
   ) : (
     <span
       style={{
-        color: msg.is_read ? "#53bdeb" : "#d1d5db",
+        color: hideReadReceipts || hideReadReceiptsForEveryone
+  ? "#d1d5db"
+  : msg.is_read
+    ? "#53bdeb"
+    : "#d1d5db",
         fontWeight: 700,
       }}
     >
-      {msg.is_read ? "✓✓" : "✓"}
+{hideReadReceipts || hideReadReceiptsForEveryone
+  ? "✓"
+  : msg.is_read
+    ? "✓✓"
+    : "✓"}
     </span>
   )
 )}
@@ -1728,11 +1740,19 @@ msg.reply_preview === "🎤 Voice message" ? (
   ) : (
     <span
       style={{
-        color: msg.is_read ? "#53bdeb" : "#d1d5db",
+       color: hideReadReceipts || hideReadReceiptsForEveryone
+  ? "#d1d5db"
+  : msg.is_read
+    ? "#53bdeb"
+    : "#d1d5db",
         fontWeight: 700,
       }}
     >
-      {msg.is_read ? "✓✓" : "✓"}
+{hideReadReceipts || hideReadReceiptsForEveryone
+  ? "✓"
+  : msg.is_read
+    ? "✓✓"
+    : "✓"}
     </span>
   )
 )}
@@ -1818,7 +1838,7 @@ msg.reply_preview === "🎤 Voice message" ? (
     >
       <span>{formatTime(msg.created_at)}</span>
 
-      {msg.sender === currentUser && (
+  {msg.sender === currentUser && (
   isPending ? (
     <LoaderCircle
       size={12}
@@ -1830,11 +1850,19 @@ msg.reply_preview === "🎤 Voice message" ? (
   ) : (
     <span
       style={{
-        color: msg.is_read ? "#53bdeb" : "#d1d5db",
+        color: hideReadReceipts || hideReadReceiptsForEveryone
+  ? "#d1d5db"
+  : msg.is_read
+    ? "#53bdeb"
+    : "#d1d5db",
         fontWeight: 700,
       }}
     >
-      {msg.is_read ? "✓✓" : "✓"}
+{hideReadReceipts || hideReadReceiptsForEveryone
+    ? "✓"
+    : msg.is_read
+    ? "✓✓"
+    : "✓"}
     </span>
   )
 )}
@@ -2186,9 +2214,8 @@ decoding="sync"
                       )}
                     </span>
 
-                    {media.sender ===
-                      currentUser && (
-                      mediaGroupMessages.some(
+              {media.sender === currentUser && (
+              mediaGroupMessages.some(
   (item) =>
     item.uploading ||
     item.offline
@@ -2207,16 +2234,19 @@ decoding="sync"
                       ) : (
                         <span
                           style={{
-                            color:
-                              media.is_read
-                                ? "#53bdeb"
-                                : "#fff",
+                color: hideReadReceipts || hideReadReceiptsForEveryone
+                  ? "#d1d5db"
+                  : media.is_read
+                  ? "#53bdeb"
+                  : "#fff",
                             fontWeight: 700,
                           }}
                         >
-                          {media.is_read
-                            ? "✓✓"
-                            : "✓"}
+           {hideReadReceipts || hideReadReceiptsForEveryone
+               ? "✓"
+               : msg.is_read
+               ? "✓✓"
+               : "✓"}
                         </span>
                       )
                     )}
@@ -2354,6 +2384,8 @@ decoding="sync"
     msg={msg}
     currentUser={currentUser}
     formatTime={formatTime}
+    hideReadReceipts={hideReadReceipts}
+    hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   />
 )}
 
@@ -2362,6 +2394,8 @@ decoding="sync"
     msg={msg}
     currentUser={currentUser}
     formatTime={formatTime}
+    hideReadReceipts={hideReadReceipts}
+    hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
     onLongPress={handleMessageLongPress}
   />
 )}

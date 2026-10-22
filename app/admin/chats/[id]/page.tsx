@@ -31,7 +31,10 @@ import {
   Search,
   Trash2,
   Pin,
-ChevronDown,
+  ChevronDown,
+  CheckCheck,
+  EyeOff,
+  ChevronRight,
 } from "lucide-react";
 
 import DeleteConversationDialog from "@/app/admin/chats/components/DeleteConversationDialog";
@@ -64,6 +67,85 @@ export default function ChatPage() {
   const [cacheReady, setCacheReady] = useState(false);
   const [member, setMember] = useState<any>(null);
   const [adminProfilePhoto, setAdminProfilePhoto] = useState("");
+  const [hideReadReceipts, setHideReadReceipts] = useState(false);
+  const [hideReadReceiptsForEveryone, setHideReadReceiptsForEveryone] =
+  useState(false);
+  const [savingMemberReadReceipt, setSavingMemberReadReceipt] =
+  useState(false);
+
+  const [hiddenOnlineStatus, setHiddenOnlineStatus] = useState(false);
+const [savingOnlineStatus, setSavingOnlineStatus] = useState(false);
+
+async function saveMemberReadReceiptPrivacy(nextValue: boolean) {
+  const memberId = conversation?.member_id;
+
+  if (!memberId || savingMemberReadReceipt) return;
+
+  setSavingMemberReadReceipt(true);
+
+  try {
+    const response = await fetch(
+      "/api/admin/member-read-receipt-privacy",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId,
+          hideReadReceipts: nextValue,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to save setting.");
+    }
+
+    setHideReadReceipts(data.hideReadReceipts === true);
+  } catch (error) {
+    console.error("Member read receipt save failed:", error);
+    alert("Could not save this member's read receipt setting.");
+  } finally {
+    setSavingMemberReadReceipt(false);
+  }
+}
+
+async function saveMemberOnlineStatusPrivacy(nextValue: boolean) {
+  const memberId = conversation?.member_id;
+
+  if (!memberId || savingOnlineStatus) return;
+
+  setSavingOnlineStatus(true);
+
+  try {
+    const response = await fetch(
+      "/api/admin/member-presence-privacy",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "setMember",
+          memberId: String(memberId),
+          hidden: nextValue,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to save online-status setting.");
+    }
+
+    setHiddenOnlineStatus(nextValue);
+  } catch (error) {
+    console.error("Member online-status privacy save failed:", error);
+    alert("Could not save this member's online-status setting.");
+  } finally {
+    setSavingOnlineStatus(false);
+  }
+}
 
   function getAvatarColors(value: string) {
   const colors = [
@@ -130,6 +212,162 @@ useEffect(() => {
     window.removeEventListener("resize", checkDesktop);
   };
 }, []);
+
+useEffect(() => {
+  const memberId = conversation?.member_id;
+
+  if (!memberId) {
+    setHideReadReceipts(false);
+    return;
+  }
+
+  let cancelled = false;
+
+  async function loadMemberReadReceiptSetting() {
+    try {
+      const response = await fetch(
+        `/api/admin/member-read-receipt-privacy?memberId=${encodeURIComponent(memberId)}`,
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Could not load this member's read receipt privacy."
+        );
+      }
+
+      const data = await response.json();
+
+      if (!cancelled) {
+  const hideReadReceiptsValue =
+    data.hideReadReceipts === true;
+
+  setHideReadReceipts(hideReadReceiptsValue);
+
+  setDesktopConversations((currentConversations) =>
+    currentConversations.map((chat) =>
+      chat.member_id === memberId
+        ? {
+            ...chat,
+            member: chat.member
+              ? {
+                  ...chat.member,
+                  hide_read_receipts: hideReadReceiptsValue,
+                }
+              : chat.member,
+          }
+        : chat
+    )
+  );
+}
+    } catch (error) {
+      console.error(
+        "Member read receipt privacy load failed:",
+        error
+      );
+    }
+  }
+
+  void loadMemberReadReceiptSetting();
+
+  const intervalId = window.setInterval(() => {
+    void loadMemberReadReceiptSetting();
+  }, 5000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(intervalId);
+  };
+}, [conversation?.member_id]);
+
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadGlobalReadReceiptSetting() {
+    try {
+      const response = await fetch("/api/admin/read-receipt-privacy", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not load the global read receipt setting.");
+      }
+
+      const data = await response.json();
+
+      if (!cancelled) {
+        setHideReadReceiptsForEveryone(
+          data.hideReadReceipts === true
+        );
+      }
+    } catch (error) {
+      console.error("Global read receipt privacy load failed:", error);
+    }
+  }
+
+  void loadGlobalReadReceiptSetting();
+
+  const intervalId = window.setInterval(() => {
+    void loadGlobalReadReceiptSetting();
+  }, 5000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(intervalId);
+  };
+}, []);
+
+useEffect(() => {
+  const memberId = conversation?.member_id;
+
+  if (!memberId) {
+    setHiddenOnlineStatus(false);
+    return;
+  }
+
+  let cancelled = false;
+
+  async function loadMemberOnlineStatusPrivacy() {
+    try {
+      const response = await fetch(
+        "/api/admin/member-presence-privacy",
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not load online-status privacy.");
+      }
+
+      const data = await response.json();
+
+      if (!cancelled) {
+        const hiddenIds = Array.isArray(data.hiddenMemberIds)
+          ? data.hiddenMemberIds.map(String)
+          : [];
+
+        setHiddenOnlineStatus(
+          hiddenIds.includes(String(memberId))
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Member online-status privacy load failed:",
+        error
+      );
+    }
+  }
+
+  void loadMemberOnlineStatusPrivacy();
+
+  const intervalId = window.setInterval(() => {
+    void loadMemberOnlineStatusPrivacy();
+  }, 5000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(intervalId);
+  };
+}, [conversation?.member_id]);
 
 useEffect(() => {
   if (!isDesktop) return;
@@ -2229,7 +2467,9 @@ async function loadConversation() {
   const { data: memberData, error: memberError } =
     await supabase
       .from("members")
-      .select("name, photo_url, is_online, last_seen")
+      .select(
+       "name, photo_url, is_online, last_seen, hide_read_receipts"
+    )
       .eq("member_id", data.member_id)
       .single();
 
@@ -4059,6 +4299,7 @@ onVideo={() => {
   selectedConversationId={
     Array.isArray(id) ? id[0] : id
   }
+  hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
 />
     </div>
   </div>
@@ -4227,66 +4468,247 @@ onVideo={() => {
       strokeWidth={2.5}
     />
   </button>
-
-  {showMenu && (
+ {showMenu && (
+  <div
+    style={{
+      position: "absolute",
+      top: 46,
+      right: 0,
+      width: 340,
+      minWidth: 320,
+      maxWidth: "calc(100vw - 24px)",
+      boxSizing: "border-box",
+      background: "#ffffff",
+      borderRadius: 20,
+      boxShadow: "0 18px 55px rgba(15, 23, 42, 0.18)",
+      border: "1px solid #e9eaf0",
+      padding: 10,
+      zIndex: 1000,
+      color: "#111827",
+    }}
+  >
     <div
       style={{
-        position: "absolute",
-        top: 46,
-        right: 0,
-
-        minWidth: 170,
-
-        background: "#fff",
-        borderRadius: 14,
-
-        boxShadow:
-          "0 10px 30px rgba(0,0,0,0.18)",
-
-        border: "1px solid rgba(0,0,0,0.08)",
-
-        padding: 6,
-
-        zIndex: 1000,
+        padding: "8px 12px 12px",
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: "1.2px",
+        color: "#9ca3af",
+        textTransform: "uppercase",
       }}
     >
-      <button
-        type="button"
-        onClick={() => {
-          setShowMenu(false);
-          deleteConversation();
-        }}
-        style={{
-          width: "100%",
+      Conversation settings
+    </div>
 
+    <button
+      type="button"
+      disabled={!conversation?.member_id || savingMemberReadReceipt}
+      onClick={() => {
+        void saveMemberReadReceiptPrivacy(!hideReadReceipts);
+      }}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "13px 12px",
+        border: "none",
+        borderRadius: 14,
+        background: "transparent",
+        color: "#111827",
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <span
+        style={{
+          width: 44,
+          height: 44,
+          flexShrink: 0,
           display: "flex",
           alignItems: "center",
-          gap: 10,
-
-          padding: "11px 12px",
-
-          border: "none",
-          borderRadius: 10,
-
-          background: "transparent",
-          color: "#dc2626",
-
-          fontSize: 15,
-          fontWeight: 600,
-
-          cursor: "pointer",
-          textAlign: "left",
+          justifyContent: "center",
+          borderRadius: 14,
+          background: "#ede9fe",
+          color: "#6d28d9",
         }}
       >
-        <Trash2
-          size={18}
-          strokeWidth={2.2}
-        />
+        <CheckCheck size={21} strokeWidth={2} />
+      </span>
 
-        Delete conversation
-      </button>
-    </div>
-  )}
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 14, fontWeight: 700 }}>
+          Hide Read Receipts
+        </span>
+        <span
+          style={{
+            display: "block",
+            marginTop: 4,
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: "#6b7280",
+          }}
+        >
+          Control read confirmation visibility
+        </span>
+      </span>
+
+      <span
+        style={{
+          width: 44,
+          height: 25,
+          flexShrink: 0,
+          padding: 3,
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: hideReadReceipts ? "flex-end" : "flex-start",
+          borderRadius: 20,
+          background: hideReadReceipts ? "#6d28d9" : "#d1d5db",
+          opacity: savingMemberReadReceipt ? 0.6 : 1,
+        }}
+      >
+        <span
+          style={{
+            width: 19,
+            height: 19,
+            borderRadius: "50%",
+            background: "#ffffff",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          }}
+        />
+      </span>
+    </button>
+
+    <div style={{ height: 1, background: "#f0f1f5", margin: "4px 8px" }} />
+
+    <button
+      type="button"
+      disabled={!conversation?.member_id || savingOnlineStatus}
+      onClick={() => {
+        void saveMemberOnlineStatusPrivacy(!hiddenOnlineStatus);
+      }}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "13px 12px",
+        border: "none",
+        borderRadius: 14,
+        background: "transparent",
+        color: "#111827",
+        cursor: savingOnlineStatus ? "wait" : "pointer",
+        textAlign: "left",
+        opacity: savingOnlineStatus ? 0.7 : 1,
+      }}
+    >
+      <span
+        style={{
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 14,
+          background: "#dbeafe",
+          color: "#1d4ed8",
+        }}
+      >
+        <EyeOff size={21} strokeWidth={2} />
+      </span>
+
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 14, fontWeight: 700 }}>
+          Hide Online Status
+        </span>
+        <span
+          style={{
+            display: "block",
+            marginTop: 4,
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: "#6b7280",
+          }}
+        >
+          Hide your online status from this member
+        </span>
+      </span>
+
+      <span
+        style={{
+          width: 44,
+          height: 25,
+          flexShrink: 0,
+          padding: 3,
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: hiddenOnlineStatus ? "flex-end" : "flex-start",
+          borderRadius: 20,
+          background: hiddenOnlineStatus ? "#2563eb" : "#d1d5db",
+          opacity: savingOnlineStatus ? 0.6 : 1,
+        }}
+      >
+        <span
+          style={{
+            width: 19,
+            height: 19,
+            borderRadius: "50%",
+            background: "#ffffff",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          }}
+        />
+      </span>
+    </button>
+
+    <div style={{ height: 1, background: "#f0f1f5", margin: "4px 8px" }} />
+
+    <button
+      type="button"
+      onClick={() => {
+        setShowMenu(false);
+        deleteConversation();
+      }}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "13px 12px",
+        marginTop: 4,
+        border: "none",
+        borderRadius: 14,
+        background: "#fff5f5",
+        color: "#dc2626",
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <span
+        style={{
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 14,
+          background: "#fee2e2",
+          color: "#dc2626",
+        }}
+      >
+        <Trash2 size={21} strokeWidth={2} />
+      </span>
+
+      <span style={{ flex: 1 }}>Delete Conversation</span>
+      <ChevronRight size={18} color="#ef4444" />
+    </button>
+  </div>
+)}
 </div>
     </div>
 
@@ -4465,6 +4887,8 @@ paddingBottom: showStickerPanel
 ]}
   pinnedMessage={pinnedMessage}
   currentUser="admin"
+  hideReadReceipts={hideReadReceipts}
+  hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   pendingMessageIds={pendingMessageIds}
   profileName={member?.name || "Member"}
   adminPhoto={adminProfilePhoto}

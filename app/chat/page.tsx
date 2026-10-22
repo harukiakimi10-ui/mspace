@@ -301,6 +301,11 @@ const [profilePhoto, setProfilePhoto] = useState("");
 
 const [memberPhoto, setMemberPhoto] = useState("");
 
+const [hideReadReceipts, setHideReadReceipts] = useState(false);
+
+const [hideReadReceiptsForEveryone, setHideReadReceiptsForEveryone] =
+  useState(false);
+
 const [admin, setAdmin] = useState<any>(null);
   
 
@@ -758,6 +763,68 @@ useEffect(() => {
 
   void loadPinnedMessage();
 }, [conversationId]);
+
+
+
+
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadReadReceiptSetting() {
+    try {
+      const response = await fetch(
+        "/api/member/read-receipt-privacy",
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not load read receipt privacy.");
+      }
+
+      const data = await response.json();
+
+            if (!cancelled) {
+        setHideReadReceipts(data.hideReadReceipts === true);
+        setHideReadReceiptsForEveryone(
+          data.hideReadReceiptsForEveryone === true
+        );
+      }
+    } catch (error) {
+      console.error("Read receipt privacy load failed:", error);
+    }
+  }
+
+  // Load immediately when the chat opens.
+  void loadReadReceiptSetting();
+
+  // Recheck while the member chat remains open.
+  const intervalId = window.setInterval(() => {
+    void loadReadReceiptSetting();
+  }, 5000);
+
+  // Refresh promptly when the member returns to the chat tab.
+  function handleVisibilityChange() {
+    if (document.visibilityState === "visible") {
+      void loadReadReceiptSetting();
+    }
+  }
+
+  document.addEventListener(
+    "visibilitychange",
+    handleVisibilityChange
+  );
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(intervalId);
+    document.removeEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+  };
+}, []);
+
+
 
 useEffect(() => {
   if (!conversationId) return;
@@ -4850,6 +4917,8 @@ onOpenLink={(url) => {
   setShowMSpaceBrowser(true);
 }}
   currentUser="member"
+  hideReadReceipts={hideReadReceipts}
+  hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   pendingMessageIds={pendingMessageIds}
   profileName={profileName}
   adminPhoto={profilePhoto}
