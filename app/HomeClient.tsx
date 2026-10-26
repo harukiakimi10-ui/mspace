@@ -700,7 +700,7 @@ return (
     </div>
   )}
 
-  <div
+    <div
     style={{
       display: "flex",
       justifyContent: "space-between",
@@ -711,6 +711,11 @@ return (
       position: "sticky",
       top: 0,
       zIndex: 100,
+      isolation: "isolate",
+      transform: "translateZ(0)",
+      WebkitTransform: "translateZ(0)",
+      WebkitBackfaceVisibility: "hidden",
+      backfaceVisibility: "hidden",
     }}
   >
     <div

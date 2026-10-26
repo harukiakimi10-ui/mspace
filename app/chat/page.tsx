@@ -625,43 +625,6 @@ const closeMessageMenu = () => {
 
 
 async function bootstrapChat() {
-    // Verify the member session before restoring cached chat data.
-  try {
-    const sessionResponse = await fetch(
-      "/api/member/session",
-      {
-        method: "GET",
-        cache: "no-store",
-      }
-    );
-
-    if (sessionResponse.status === 401) {
-      localStorage.removeItem("mspace_member_id");
-      localStorage.removeItem("mspace_device_id");
-      localStorage.removeItem("mspace-member-photo");
-      localStorage.removeItem(CHAT_CACHE_KEY);
-      localStorage.removeItem(MESSAGE_CACHE_KEY);
-      localStorage.removeItem(PIN_CACHE_KEY);
-      localStorage.removeItem(OUTBOX_CACHE_KEY);
-
-      window.location.replace("/");
-      return;
-    }
-
-    if (!sessionResponse.ok) {
-      console.error(
-        "Unable to verify member session:",
-        sessionResponse.status
-      );
-      return;
-    }
-  } catch (error) {
-    console.error(
-      "Member session verification failed:",
-      error
-    );
-    return;
-  }
   // Restore cached member profile photo immediately
   const cachedMemberPhoto =
     localStorage.getItem("mspace-member-photo");
@@ -795,6 +758,46 @@ if (cachedPinnedMessage) {
     // Do not wait for Supabase while offline.
     setStartupComplete(true);
 
+    return;
+  }
+
+  // Verify the member session before refreshing online chat data.
+  try {
+    const sessionResponse = await fetch(
+      "/api/member/session",
+      {
+        method: "GET",
+        cache: "no-store",
+      }
+    );
+
+    if (sessionResponse.status === 401) {
+      localStorage.removeItem("mspace_member_id");
+      localStorage.removeItem("mspace_device_id");
+      localStorage.removeItem("mspace-member-photo");
+      localStorage.removeItem(CHAT_CACHE_KEY);
+      localStorage.removeItem(MESSAGE_CACHE_KEY);
+      localStorage.removeItem(PIN_CACHE_KEY);
+      localStorage.removeItem(OUTBOX_CACHE_KEY);
+
+      window.location.replace("/");
+      return;
+    }
+
+    if (!sessionResponse.ok) {
+      console.error(
+        "Unable to verify member session:",
+        sessionResponse.status
+      );
+            setStartupComplete(true);
+      return;
+    }
+    } catch (error) {
+    console.error(
+      "Member session verification failed:",
+      error
+    );
+    setStartupComplete(true);
     return;
   }
 
