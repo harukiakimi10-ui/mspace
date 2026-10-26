@@ -45,6 +45,52 @@ type Props = {
   hideReadReceiptsForEveryone?: boolean;
 };
 
+function formatConversationDate(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (sameDay) {
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+
+  const isYesterday =
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate();
+
+  if (isYesterday) return "Yesterday";
+
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+
+  if (date >= startOfWeek) {
+    return date.toLocaleDateString([], {
+      weekday: "long",
+    });
+  }
+
+  return date.toLocaleDateString(
+    [],
+    date.getFullYear() === now.getFullYear()
+      ? { month: "short", day: "numeric" }
+      : { month: "short", day: "numeric", year: "numeric" }
+  );
+}
+
 export default function ConversationList({
   conversations,
   selectedConversationId,
@@ -139,7 +185,6 @@ function MessageReadReceipt({
   data-mspace-conversation-list="true"
   style={{
     width: "100%",
-    overflowY: "auto",
   }}
 >
         {conversations.map((chat) => (
@@ -148,7 +193,7 @@ function MessageReadReceipt({
         data-conversation-id={chat.id}
         onClick={() => {
   const list = document.querySelector(
-    '[data-mspace-conversation-list="true"]'
+    '[data-mspace-conversation-scroll="true"]'
   ) as HTMLElement | null;
 
   if (list) {
@@ -221,13 +266,8 @@ function MessageReadReceipt({
       }}
     >
       {chat.lastMessage
-        ? new Date(
-            chat.lastMessage.created_at
-          ).toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          })
-        : ""}
+  ? formatConversationDate(chat.lastMessage.created_at)
+  : ""}
     </span>
   </div>
 

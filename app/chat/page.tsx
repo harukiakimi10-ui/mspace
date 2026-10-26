@@ -144,6 +144,13 @@ const t = {
    useEffect(() => {
   if (!conversationId) return;
 
+  if (
+    typeof navigator === "undefined" ||
+    !("serviceWorker" in navigator)
+  ) {
+    return;
+  }
+
   const sendOpenConversation = async () => {
     try {
       const registration =
@@ -184,17 +191,31 @@ console.log(
 
   sendOpenConversation();
 
-  return () => {
-    navigator.serviceWorker.ready.then((registration) => {
-      const worker =
-        navigator.serviceWorker.controller ||
-        registration.active;
+    return () => {
+    if (
+      typeof navigator === "undefined" ||
+      !("serviceWorker" in navigator)
+    ) {
+      return;
+    }
 
-      worker?.postMessage({
-        type: "MSPACE_SET_OPEN_CONVERSATION",
-        conversationId: null,
+    navigator.serviceWorker.ready
+      .then((registration) => {
+        const worker =
+          navigator.serviceWorker.controller ||
+          registration.active;
+
+        worker?.postMessage({
+          type: "MSPACE_SET_OPEN_CONVERSATION",
+          conversationId: null,
+        });
+      })
+      .catch((error) => {
+        console.error(
+          "MSpace: failed to clear open conversation:",
+          error
+        );
       });
-    });
   };
 }, [conversationId]);
 
@@ -604,6 +625,43 @@ const closeMessageMenu = () => {
 
 
 async function bootstrapChat() {
+    // Verify the member session before restoring cached chat data.
+  try {
+    const sessionResponse = await fetch(
+      "/api/member/session",
+      {
+        method: "GET",
+        cache: "no-store",
+      }
+    );
+
+    if (sessionResponse.status === 401) {
+      localStorage.removeItem("mspace_member_id");
+      localStorage.removeItem("mspace_device_id");
+      localStorage.removeItem("mspace-member-photo");
+      localStorage.removeItem(CHAT_CACHE_KEY);
+      localStorage.removeItem(MESSAGE_CACHE_KEY);
+      localStorage.removeItem(PIN_CACHE_KEY);
+      localStorage.removeItem(OUTBOX_CACHE_KEY);
+
+      window.location.replace("/");
+      return;
+    }
+
+    if (!sessionResponse.ok) {
+      console.error(
+        "Unable to verify member session:",
+        sessionResponse.status
+      );
+      return;
+    }
+  } catch (error) {
+    console.error(
+      "Member session verification failed:",
+      error
+    );
+    return;
+  }
   // Restore cached member profile photo immediately
   const cachedMemberPhoto =
     localStorage.getItem("mspace-member-photo");
@@ -1775,18 +1833,24 @@ if (unreadCountError) {
 }
 
   
-try {
-  const registration = await navigator.serviceWorker.ready;
+if (
+  typeof navigator !== "undefined" &&
+  "serviceWorker" in navigator
+) {
+  try {
+    const registration =
+      await navigator.serviceWorker.ready;
 
-  registration.active?.postMessage({
-    type: "MSPACE_CLOSE_READ_NOTIFICATIONS",
-    conversationId: id,
-  });
-} catch (error) {
-  console.error(
-    "MSpace member close notifications error:",
-    error
-  );
+    registration.active?.postMessage({
+      type: "MSPACE_CLOSE_READ_NOTIFICATIONS",
+      conversationId: id,
+    });
+  } catch (error) {
+    console.error(
+      "MSpace member close notifications error:",
+      error
+    );
+  }
 }
 
 await loadMessages(id);

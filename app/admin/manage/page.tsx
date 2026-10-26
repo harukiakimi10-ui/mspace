@@ -17,6 +17,7 @@ import ProfileAvatar from "@/app/chat/ProfileAvatar";
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+const [checkingSession, setCheckingSession] = useState(true);
 const [profileName, setProfileName] = useState("");
 const [profileBio, setProfileBio] = useState("");
 const [profilePhoto, setProfilePhoto] = useState("");
@@ -44,15 +45,17 @@ useEffect(() => {
       });
 
       if (!response.ok) {
-        if (!cancelled) {
-          window.location.replace("/admin/login");
-        }
-        return;
-      }
+  if (!cancelled) {
+    setCheckingSession(false);
+    window.location.replace("/admin/login");
+  }
+  return;
+}
 
       if (cancelled) return;
 
       setIsAdmin(true);
+      setCheckingSession(false);
 
       void loadSettings();
       void loadPhotos();
@@ -548,8 +551,25 @@ async function login() {
   }
 }
 
-  if (!isAdmin) {
-    return (
+  if (checkingSession) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "Arial, sans-serif",
+        color: "#555",
+      }}
+    >
+      Checking admin session...
+    </div>
+  );
+}
+
+if (!isAdmin) {
+  return (
       <div
         style={{
           maxWidth: "400px",

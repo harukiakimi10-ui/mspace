@@ -95,6 +95,7 @@ const conversationRefreshTimeout =
   useRef<ReturnType<typeof setTimeout> | null>(null);
 
 const conversationListRef = useRef<HTMLDivElement>(null);
+const mobileConversationListRef = useRef<HTMLDivElement>(null);
 
 const totalMembers = conversations.length;
 const filteredConversations = conversations.filter((chat) => {
@@ -161,10 +162,13 @@ useEffect(() => {
   let channel: ReturnType<typeof supabase.channel> | null = null;
 
   async function initializeAdminChats() {
-    try {
-      const response = await fetch("/api/admin/session", {
-        cache: "no-store",
-      });
+  // Show cached conversations immediately while checking the session.
+  restoreCachedConversations();
+
+  try {
+    const response = await fetch("/api/admin/session", {
+      cache: "no-store",
+    });
 
       if (!response.ok) {
         if (!cancelled) {
@@ -175,7 +179,6 @@ useEffect(() => {
 
       if (cancelled) return;
 
-      restoreCachedConversations();
       void loadConversations();
 
       channel = supabase
@@ -194,10 +197,6 @@ useEffect(() => {
             );
 
             scheduleConversationRefresh();
-
-            if (payload.eventType === "UPDATE") {
-              void loadConversations();
-            }
 
             if (
               selectedConversation &&
@@ -330,7 +329,9 @@ console.log(
 }, []);
 
 useEffect(() => {
-  const list = conversationListRef.current;
+  const list = isDesktop
+    ? conversationListRef.current
+    : mobileConversationListRef.current;
 
   if (!list) return;
 
@@ -341,44 +342,46 @@ useEffect(() => {
     );
   };
 
-  list.addEventListener(
-    "scroll",
-    saveScrollPosition,
-    { passive: true }
-  );
+  list.addEventListener("scroll", saveScrollPosition, {
+    passive: true,
+  });
 
   return () => {
-    list.removeEventListener(
-      "scroll",
-      saveScrollPosition
-    );
+    list.removeEventListener("scroll", saveScrollPosition);
   };
-}, []);
+}, [isDesktop]);
 
 useEffect(() => {
-  const selectedId = sessionStorage.getItem(
-    "mspace-selected-conversation-id"
+  const savedScroll = sessionStorage.getItem(
+    "mspace-conversation-list-scroll"
   );
 
-  if (!selectedId) return;
+  if (savedScroll === null) return;
 
-  const restoreSelectedConversation = () => {
-    const element = document.querySelector(
-      `[data-conversation-id="${selectedId}"]`
-    ) as HTMLElement | null;
+  const scrollPosition = Number(savedScroll);
 
-    if (!element) return;
+  if (!Number.isFinite(scrollPosition)) return;
 
-    element.scrollIntoView({
-      block: "center",
-      behavior: "auto",
+  let frame1 = 0;
+  let frame2 = 0;
+
+  frame1 = requestAnimationFrame(() => {
+    frame2 = requestAnimationFrame(() => {
+      const list = isDesktop
+        ? conversationListRef.current
+        : mobileConversationListRef.current;
+
+      if (!list) return;
+
+      list.scrollTop = scrollPosition;
     });
-  };
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(restoreSelectedConversation);
   });
-}, []);
+
+  return () => {
+    cancelAnimationFrame(frame1);
+    cancelAnimationFrame(frame2);
+  };
+}, [conversations.length, isDesktop]);
 
 useEffect(() => {
   if (!selectedConversation) return;
@@ -481,8 +484,11 @@ function restoreCachedConversations() {
   }
 }
 
+let conversationsLoadRequestId = 0;
 
 async function loadConversations() {
+  const requestId = ++conversationsLoadRequestId;
+
   console.time("loadConversations");
   const { data, error } = await supabase
     .from("conversations")
@@ -518,7 +524,10 @@ await Promise.all(
       .eq("sender", "member")
       .eq("is_read", false);
 
-   const { data: recentMessages } = await supabase
+   const {
+  data: recentMessages,
+  error: recentMessagesError,
+} = await supabase
   .from("messages")
   .select(
     "id, content, message_type, sender, created_at, file_duration, is_deleted, is_read, deleted_for"
@@ -527,10 +536,39 @@ await Promise.all(
   .order("created_at", { ascending: false })
   .limit(50);
 
-const lastMessage =
-  recentMessages?.find(
-    (msg: any) => msg.deleted_for !== "admin"
-  ) || null;
+let lastMessage = null;
+
+if (recentMessagesError) {
+  console.error(
+    "Failed to load conversation preview:",
+    conversation.id,
+    recentMessagesError
+  );
+
+  try {
+    const cached = JSON.parse(
+      localStorage.getItem(
+        "mspace-admin-conversations"
+      ) || "[]"
+    );
+
+    const cachedConversation = cached.find(
+      (item: any) => item.id === conversation.id
+    );
+
+    lastMessage = cachedConversation?.lastMessage ?? null;
+  } catch (error) {
+    console.error(
+      "Failed to restore cached preview:",
+      error
+    );
+  }
+} else {
+  lastMessage =
+    recentMessages?.find(
+      (msg: any) => msg.deleted_for !== "admin"
+    ) || null;
+}
 
     result.push({
       ...conversation,
@@ -541,6 +579,11 @@ const lastMessage =
     });
   })
 );
+
+if (requestId !== conversationsLoadRequestId) {
+  console.log("Ignoring stale conversation load:", requestId);
+  return;
+}
 
 console.log("Result length:", result.length);
 result.sort((a, b) => {
@@ -554,23 +597,16 @@ result.sort((a, b) => {
 
   return bTime - aTime;
 });
+console.log(
+  "Conversation previews before update:",
+  result.map((c) => ({
+    id: c.id,
+    lastMessage: c.lastMessage?.content ?? null,
+    lastMessageId: c.lastMessage?.id ?? null,
+  }))
+);
+
 setConversations(result);
-
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const savedScroll = sessionStorage.getItem(
-      "mspace-conversation-list-scroll"
-    );
-
-    if (!savedScroll) return;
-
-    const list = conversationListRef.current;
-
-    if (!list) return;
-
-    list.scrollTop = Number(savedScroll);
-  });
-});
 
 try {
   localStorage.setItem(
@@ -641,8 +677,7 @@ console.log("Inserted admin message:", data);
   }
 
   setReply("");
-  loadMessages(selectedConversation.id);
-  loadConversations();
+loadMessages(selectedConversation.id);
 }
 
   if (!screenSizeReady) {
@@ -959,6 +994,7 @@ return isDesktop ? (
         {/* Conversation list */}
         <div
           ref={conversationListRef}
+          data-mspace-conversation-scroll="true"
           style={{
             flex: 1,
             minHeight: 0,
@@ -1074,7 +1110,8 @@ return isDesktop ? (
 
     {/* ONLY THIS AREA SCROLLS */}
     <div
-      ref={conversationListRef}
+      ref={mobileConversationListRef}
+      data-mspace-conversation-scroll="true"
       style={{
         flex: 1,
         minHeight: 0,

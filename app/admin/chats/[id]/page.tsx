@@ -35,6 +35,7 @@ import {
   CheckCheck,
   EyeOff,
   ChevronRight,
+  PinOff,
 } from "lucide-react";
 
 import DeleteConversationDialog from "@/app/admin/chats/components/DeleteConversationDialog";
@@ -373,28 +374,12 @@ useEffect(() => {
   if (!isDesktop) return;
 
   let cancelled = false;
-
+  
+  let desktopLoadRequestId = 0;
   const loadDesktopConversations = async () => {
+    const requestId = ++desktopLoadRequestId;
+console.log("DESKTOP CONVERSATION LOAD START:", requestId);
     try {
-      // Show cached conversations immediately if available
-      try {
-        const cached = localStorage.getItem(
-          "mspace-admin-conversations"
-        );
-
-        if (cached) {
-          const parsed = JSON.parse(cached);
-
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setDesktopConversations(parsed);
-          }
-        }
-      } catch (error) {
-        console.error(
-          "MSpace desktop conversation cache error:",
-          error
-        );
-      }
 
       // Get the latest conversations from Supabase
       const { data: conversations, error } =
@@ -470,7 +455,16 @@ const membersById = new Map(
   ascending: false,
 })
 .limit(50),
-            ]);
+                        ]);
+
+            if (lastMessageResult.error) {
+              console.error(
+                "Desktop latest-message load error:",
+                conversation.id,
+                lastMessageResult.error
+              );
+              throw lastMessageResult.error;
+            }
 
             const member =
   membersById.get(conversation.member_id) ?? null;
@@ -495,7 +489,7 @@ const membersById = new Map(
         )
       );
 
-      if (cancelled) return;
+      if (cancelled || requestId !== desktopLoadRequestId) return;
 
       result.sort((a, b) => {
         const aTime = a.lastMessage
@@ -1089,6 +1083,7 @@ const [locationPreview, setLocationPreview] = useState<{
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const adminMessagesLoadRequestRef = useRef(0);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const memberTypingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoScrolled = useRef(false);
@@ -1320,7 +1315,13 @@ const messageInputRef =
   await loadMessages();
 })();
 
-const handleVisibility = async () => {
+const handleVisibility = async (trigger = "initial") => {
+  console.log("ADMIN CHAT VISIBILITY EVENT:", {
+  event: trigger,
+  visibility: document.visibilityState,
+  hasFocus: document.hasFocus(),
+  time: new Date().toLocaleTimeString(),
+});
   const active =
     document.visibilityState === "visible" &&
     document.hasFocus();
@@ -1330,29 +1331,48 @@ const handleVisibility = async () => {
   await updateAdminOnlineStatus(active);
 
   if (active) {
-    await Promise.all([
-      loadConversation(),
-      loadMessages(),
-    ]);
+  console.log("ADMIN VISIBILITY REFRESH:", {
+  event: trigger,
+  time: new Date().toLocaleTimeString(),
+});
 
-    await markMessagesAsRead();
-  }
+  await Promise.all([
+    loadConversation(),
+    loadMessages(),
+  ]);
+
+  await markMessagesAsRead();
+}
 };
 
 
 
 
 
-window.addEventListener("focus", handleVisibility);
-window.addEventListener("blur", handleVisibility);
+const handleFocus = () => {
+  void handleVisibility("focus");
+};
+
+const handleBlur = () => {
+  void handleVisibility("blur");
+};
+
+const handleDocumentVisibility = () => {
+  void handleVisibility("visibilitychange");
+};
+
 const handleUnload = () => {
-  updateAdminOnlineStatus(false);
+  void updateAdminOnlineStatus(false);
 };
 
 window.addEventListener("beforeunload", handleUnload);
+
+window.addEventListener("focus", handleFocus);
+window.addEventListener("blur", handleBlur);
+
 document.addEventListener(
   "visibilitychange",
-  handleVisibility
+  handleDocumentVisibility
 );
 
 setTimeout(() => {
@@ -1772,20 +1792,13 @@ return () => {
   }
   updateAdminOnlineStatus(false);
 
-  window.removeEventListener(
-    "focus",
-    handleVisibility
-  );
+  window.removeEventListener("focus", handleFocus);
+window.removeEventListener("blur", handleBlur);
 
-  window.removeEventListener(
-    "blur",
-    handleVisibility
-  );
-
-  document.removeEventListener(
-    "visibilitychange",
-    handleVisibility
-  );
+document.removeEventListener(
+  "visibilitychange",
+  handleDocumentVisibility
+);
 
   window.removeEventListener(
     "beforeunload",
@@ -2190,7 +2203,21 @@ const optimisticMessage = {
   _optimistic: true,
 };
 
-setMessages((prev) => [...prev, optimisticMessage]);
+
+setMessages((prev) => {
+  const nextMessages = [...prev, optimisticMessage];
+
+  localStorage.setItem(
+    `mspace-messages-${id}`,
+    JSON.stringify(
+      nextMessages.filter(
+        (message) => message.deleted_for !== "admin"
+      )
+    )
+  );
+
+  return nextMessages;
+});
 
 requestAnimationFrame(() => {
   scrollToLatest();
@@ -2338,31 +2365,44 @@ try {
       .select()
       .single();
 
-    console.log(
-      "Admin voice message:",
-      insertedMessage
-    );
+    
+console.log(
+  "Admin voice message:",
+  insertedMessage
+);
 
-    // Replace the temporary voice message with the real database message
-if (insertedMessage) {
-  setMessages((prev) =>
-    prev.map((message) =>
-      message.id === optimisticId
-        ? insertedMessage
-        : message
-    )
+if (error || !insertedMessage) {
+  console.error(
+    "Admin voice message insert error:",
+    error
   );
+
+  alert(
+    error?.message ??
+    "The voice message could not be saved."
+  );
+  return;
 }
 
-    if (error) {
-      console.error(
-        "Admin voice message insert error:",
-        error
-      );
+// Replace the temporary voice message with the real database message
+setMessages((prev) => {
+  const nextMessages = prev.map((message) =>
+    message.id === optimisticId
+      ? insertedMessage
+      : message
+  );
 
-      alert(error.message);
-      return;
-    }
+  localStorage.setItem(
+    `mspace-messages-${id}`,
+    JSON.stringify(
+      nextMessages.filter(
+        (message) => message.deleted_for !== "admin"
+      )
+    )
+  );
+
+  return nextMessages;
+});
 
     /*
      * Send push notification
@@ -2557,8 +2597,11 @@ async function updateAdminOnlineStatus(online: boolean) {
     console.error("Admin status network error:", error);
   }
 }
+
   async function loadMessages() {
   console.log("loadMessages() called");
+
+  const requestId = ++adminMessagesLoadRequestRef.current;
 
   if (!id) return;
 
@@ -2574,17 +2617,35 @@ async function updateAdminOnlineStatus(online: boolean) {
         (msg: any) => msg.deleted_for !== "admin"
       );
 
-            setMessages(visibleCachedMessages);
+      console.log(
+  "ADMIN CACHE DIAGNOSTIC:",
+  visibleCachedMessages.map((msg: any) => ({
+    id: msg.id,
+    type: msg.message_type,
+    file_url: msg.file_url,
+  }))
+);
+
+           setMessages(visibleCachedMessages);
 
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
     const el = messagesRef.current;
+    if (!el) return;
 
-    if (el) {
-      el.scrollTo({
-        top: el.scrollHeight,
-        behavior: "auto",
-      });
+    const conversationId = Array.isArray(id) ? id[0] : id;
+    if (!conversationId) return;
+
+    const savedScroll = sessionStorage.getItem(
+      `mspace-admin-message-scroll-${conversationId}`
+    );
+
+    if (savedScroll !== null) {
+      el.scrollTop = Number(savedScroll);
+      setInitialMessagesPositioned(true);
+    } else {
+      el.scrollTop = el.scrollHeight;
+      setInitialMessagesPositioned(true);
     }
   });
 });
@@ -2598,12 +2659,21 @@ requestAnimationFrame(() => {
     }
   }
 
-  const { data } = await supabase
-     
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", id)
-      .order("created_at", { ascending: true });
+  const { data, error } = await supabase
+  .from("messages")
+  .select("*")
+  .eq("conversation_id", id)
+  .order("created_at", { ascending: true });
+
+if (error) {
+  console.error("Admin loadMessages failed:", error);
+  return;
+}
+
+if (requestId !== adminMessagesLoadRequestRef.current) {
+  console.log("Ignoring stale admin message load:", requestId);
+  return;
+}
 
     const el = messagesRef.current;
 
@@ -2618,6 +2688,15 @@ const wasNearBottom =
   (data || []).filter(
     (msg) => msg.deleted_for !== "admin"
   );
+
+  console.log(
+  "ADMIN SERVER DIAGNOSTIC:",
+  visibleMessages.map((msg: any) => ({
+    id: msg.id,
+    type: msg.message_type,
+    file_url: msg.file_url,
+  }))
+);
 
 // Save the latest messages locally
 try {
@@ -2636,18 +2715,34 @@ setMessages(visibleMessages);
 
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    if (!messagesRef.current) return;
+    const el = messagesRef.current;
+    if (!el) return;
 
-    if (isNewConversation || wasNearBottom || !hasAutoScrolled.current) {
-      messagesRef.current.scrollTo({
-        top: messagesRef.current.scrollHeight,
+    const conversationId = Array.isArray(id) ? id[0] : id;
+    const savedScroll = conversationId
+      ? sessionStorage.getItem(
+          `mspace-admin-message-scroll-${conversationId}`
+        )
+      : null;
+
+    if (savedScroll !== null) {
+      el.scrollTop = Number(savedScroll);
+    } else if (
+      isNewConversation ||
+      wasNearBottom ||
+      !hasAutoScrolled.current
+    ) {
+      el.scrollTo({
+        top: el.scrollHeight,
         behavior: "auto",
       });
-
-      hasAutoScrolled.current = true;
-      autoScrollConversationId.current = typeof id === "string" ? id : null;
-      setInitialMessagesPositioned(true);
     }
+
+    hasAutoScrolled.current = true;
+    autoScrollConversationId.current =
+      typeof conversationId === "string" ? conversationId : null;
+
+    setInitialMessagesPositioned(true);
   });
 });
 
@@ -3007,19 +3102,31 @@ reply_file_duration:
   data
 );
 
+// Invalidate message loads that started before this insert completed.
+adminMessagesLoadRequestRef.current += 1;
+
 setMessages((prev) => {
   const alreadyExists = prev.some(
     (message) => message.id === data.id
   );
 
-  if (alreadyExists) {
-    return prev;
+  const updatedMessages = alreadyExists
+    ? prev
+    : [...prev, data];
+
+  try {
+    localStorage.setItem(
+      `mspace-messages-${id}`,
+      JSON.stringify(updatedMessages)
+    );
+  } catch (error) {
+    console.error(
+      "MSpace message cache save error:",
+      error
+    );
   }
 
-  return [
-    ...prev,
-    data,
-  ];
+  return updatedMessages;
 });
 
 requestAnimationFrame(() => {
@@ -3136,19 +3243,26 @@ async function sendSticker(sticker: string) {
       return;
     }
 
-    setMessages((prev) => {
+    
+setMessages((prev) => {
   const alreadyExists = prev.some(
     (message) => message.id === data.id
   );
 
-  if (alreadyExists) {
-    return prev;
-  }
+  const nextMessages = alreadyExists
+    ? prev
+    : [...prev, data];
 
-  return [
-    ...prev,
-    data,
-  ];
+  localStorage.setItem(
+    `mspace-messages-${id}`,
+    JSON.stringify(
+      nextMessages.filter(
+        (message) => message.deleted_for !== "admin"
+      )
+    )
+  );
+
+  return nextMessages;
 });
 
     setReplyMessage(null);
@@ -3324,9 +3438,6 @@ finalFile = await compressVideo(file);
 const compressionSeconds =
   (performance.now() - compressionStart) / 1000;
 
-alert(
-  `Video compression took ${compressionSeconds.toFixed(1)} seconds`
-);
 
 console.log(
   "Admin compression time:",
@@ -4338,7 +4449,20 @@ onVideo={() => {
   >
   <button
     type="button"
-    onClick={() => router.push("/admin/chats")}
+    onClick={() => {
+  const savedScroll = sessionStorage.getItem(
+  "mspace-conversation-list-scroll"
+);
+
+if (savedScroll !== null) {
+  sessionStorage.setItem(
+    "mspace-conversation-list-scroll",
+    savedScroll
+  );
+}
+
+  router.push("/admin/chats");
+}}
     aria-label="Back to chats"
     style={{
       width: 40,
@@ -4663,6 +4787,82 @@ onVideo={() => {
       </span>
     </button>
 
+        {pinnedMessageId && (
+      <>
+        <div style={{ height: 1, background: "#f0f1f5", margin: "4px 8px" }} />
+
+        <button
+          type="button"
+          onClick={async () => {
+            if (!id || !pinnedMessageId) return;
+
+            const confirmed = window.confirm(
+              "Unpin this message from the conversation?"
+            );
+
+            if (!confirmed) return;
+
+            const { error } = await supabase
+              .from("pinned_messages")
+              .delete()
+              .eq("conversation_id", id);
+
+            if (error) {
+              console.error("ADMIN UNPIN ERROR:", error);
+              window.alert("Could not unpin the message. Please try again.");
+              return;
+            }
+
+            setPinnedMessageId(null);
+            setPinnedMessage(null);
+
+            try {
+              localStorage.removeItem(
+                `mspace-pinned-message-${id}`
+              );
+            } catch (error) {
+              console.error("ADMIN UNPIN CACHE CLEAR ERROR:", error);
+            }
+
+            setShowMenu(false);
+          }}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "13px 12px",
+            border: "none",
+            borderRadius: 14,
+            background: "transparent",
+            color: "#6d28d9",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <span
+            style={{
+              width: 44,
+              height: 44,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 14,
+              background: "#ede9fe",
+              color: "#6d28d9",
+            }}
+          >
+            <PinOff size={21} strokeWidth={2} />
+          </span>
+
+          <span style={{ flex: 1 }}>Unpin Message</span>
+        </button>
+      </>
+    )}
+
     <div style={{ height: 1, background: "#f0f1f5", margin: "4px 8px" }} />
 
     <button
@@ -4809,25 +5009,34 @@ onVideo={() => {
 }
 }}
 onScroll={(e) => {
-    const el = e.currentTarget;
+  const el = e.currentTarget;
+  const conversationId = Array.isArray(id) ? id[0] : id;
 
-    const distanceFromBottom =
-      el.scrollHeight -
-      el.scrollTop -
-      el.clientHeight;
-    const isAtBottom = distanceFromBottom < 80;
+  if (conversationId) {
+    sessionStorage.setItem(
+      `mspace-admin-message-scroll-${conversationId}`,
+      String(el.scrollTop)
+    );
+  }
 
-    setShowScrollButton(!isAtBottom);
+  const distanceFromBottom =
+    el.scrollHeight -
+    el.scrollTop -
+    el.clientHeight;
 
-    if (
-  isAtBottom &&
-  document.visibilityState === "visible" &&
-  document.hasFocus()
-) {
-  setNewMessageCount(0);
-  void markMessagesAsRead();
-}
-  }}
+  const isAtBottom = distanceFromBottom < 80;
+
+  setShowScrollButton(!isAtBottom);
+
+  if (
+    isAtBottom &&
+    document.visibilityState === "visible" &&
+    document.hasFocus()
+  ) {
+    setNewMessageCount(0);
+    void markMessagesAsRead();
+  }
+}}
   style={{
     height: "100%",
     minHeight: 0,
@@ -5438,23 +5647,27 @@ onCloseStickerPanel={() => {
         );
       }
 
-      setMessages((prev) => {
-        const alreadyExists =
-          prev.some(
-            (message) =>
-              message.id ===
-              realMessage.id
-          );
+      
+setMessages((prev) => {
+  const alreadyExists = prev.some(
+    (message) => message.id === realMessage.id
+  );
 
-        if (alreadyExists) {
-          return prev;
-        }
+  const nextMessages = alreadyExists
+    ? prev
+    : [...prev, realMessage];
 
-        return [
-          ...prev,
-          realMessage,
-        ];
-      });
+  localStorage.setItem(
+    `mspace-messages-${id}`,
+    JSON.stringify(
+      nextMessages.filter(
+        (message) => message.deleted_for !== "admin"
+      )
+    )
+  );
+
+  return nextMessages;
+});
 
       setPendingUploads((prev) =>
         prev.filter(

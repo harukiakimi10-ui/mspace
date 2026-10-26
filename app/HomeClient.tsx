@@ -226,16 +226,17 @@ if (memberId) {
     return "error";
   }
 
-  // The browser has a stale member ID.
-  if (!existingMember) {
-    console.log(
-      "Stored member ID no longer exists. Clearing stale ID."
-    );
+  // The saved member was deleted.
+if (!existingMember) {
+  console.log(
+    "Stored member no longer exists. Clearing stale login."
+  );
 
-    localStorage.removeItem("mspace_member_id");
+  localStorage.removeItem("mspace_member_id");
+  localStorage.removeItem("mspace_device_id");
 
-    // Continue through the normal device/account check.
-  } else {
+  return "signup";
+} else {
     // Existing account is banned.
     if (existingMember.banned) {
       console.log("Stored member is banned");
