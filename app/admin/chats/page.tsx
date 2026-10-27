@@ -1006,6 +1006,7 @@ return isDesktop ? (
         >
           <ConversationList
             conversations={filteredConversations}
+            selectedConversationId={selectedConversation?.id}
             hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
           />
         </div>

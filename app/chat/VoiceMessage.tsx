@@ -7,6 +7,8 @@ type VoiceMessageProps = {
   msg?: any;
   currentUser: "member" | "admin";
 
+  isPending?: boolean;
+
   hideReadReceipts?: boolean;
 
   hideReadReceiptsForEveryone?: boolean;
@@ -23,6 +25,7 @@ type VoiceMessageProps = {
 export default function VoiceMessage({
   msg,
   currentUser,
+  isPending = false,
   hideReadReceipts = false,
   hideReadReceiptsForEveryone = false,
   formatTime,
@@ -316,7 +319,7 @@ useEffect(() => {
     <span>{formatTime ? formatTime(msg.created_at) : ""}</span>
 
     {msg.sender === currentUser && (
-  msg.offline ? (
+ (isPending || msg.offline) ? (
     <LoaderCircle
       size={12}
       strokeWidth={2.5}

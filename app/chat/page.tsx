@@ -259,6 +259,45 @@ console.log(
 }, [messages]);
 
   const [message, setMessage] = useState("");
+  const draftConversationIdRef = useRef<string | null>(null);
+  useEffect(() => {
+  if (!conversationId) return;
+
+  const draftKey = `mspace-member-draft-${conversationId}`;
+
+  let draft = "";
+
+  try {
+    draft = localStorage.getItem(draftKey) ?? "";
+  } catch (error) {
+    console.error("Could not load member draft:", error);
+  }
+
+  draftConversationIdRef.current = conversationId;
+  setMessage(draft);
+}, [conversationId]);
+
+useEffect(() => {
+  if (
+    !conversationId ||
+    draftConversationIdRef.current !== conversationId
+  ) {
+    return;
+  }
+
+  const draftKey = `mspace-member-draft-${conversationId}`;
+
+  try {
+    if (message.length > 0) {
+      localStorage.setItem(draftKey, message);
+    } else {
+      localStorage.removeItem(draftKey);
+    }
+  } catch (error) {
+    console.error("Could not save member draft:", error);
+  }
+}, [message, conversationId]);
+
   const [recording, setRecording] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [voiceState, setVoiceState] = useState<
@@ -312,6 +351,7 @@ console.log(
   })()
 );
 const OUTBOX_CACHE_KEY = `mspace-chat-outbox-${memberId ?? "default"}`;
+const MEMBER_CHAT_SCROLL_KEY = `mspace-member-chat-scroll-${memberId ?? "default"}`;
 
 
   const [cachedHeader, setCachedHeader] = useState<any>(null);
@@ -377,8 +417,10 @@ const adminTypingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 const typingActiveRef = useRef(false);
 const hasAutoScrolled = useRef(false);
+const pendingScrollRestoreRef = useRef<number | null>(null);
 const loadingConversationRef = useRef(false);
 const showScrollButtonRef = useRef(false);
+const wasNearBottomBeforeComposerResizeRef = useRef(true);
 const messageInputRef = useRef<HTMLTextAreaElement>(null);
 const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -441,6 +483,7 @@ const isAndroid =
   /Android/i.test(navigator.userAgent);
 
 const composerRef = useRef<HTMLDivElement | null>(null);
+const [composerHeight, setComposerHeight] = useState(80);
 const [messageFocus, setMessageFocus] = useState(false);
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 
@@ -818,6 +861,77 @@ useLayoutEffect(() => {
 
   void bootstrapChat();
 }, []);
+
+useEffect(() => {
+  const composer = composerRef.current;
+  const textarea = messageInputRef.current;
+
+  if (!composer) return;
+
+    const updateHeight = () => {
+    const composerHeightNow =
+      composer.getBoundingClientRect().height;
+
+    const textareaHeightNow =
+      textarea?.getBoundingClientRect().height ?? 0;
+
+    const messagesEl = messagesRef.current;
+
+    setComposerHeight((previous) => {
+      if (previous !== composerHeightNow && messagesEl) {
+        const distanceFromBottom =
+          messagesEl.scrollHeight -
+          messagesEl.scrollTop -
+          messagesEl.clientHeight;
+
+        wasNearBottomBeforeComposerResizeRef.current =
+          distanceFromBottom <= 80;
+      }
+
+      return previous === composerHeightNow
+        ? previous
+        : composerHeightNow;
+    });
+
+    console.log("MEMBER CHAT SIZES:", {
+      composer: composerHeightNow,
+      textarea: textareaHeightNow,
+    });
+  };
+
+  updateHeight();
+
+  const observer = new ResizeObserver(updateHeight);
+  observer.observe(composer);
+
+  if (textarea) {
+    observer.observe(textarea);
+  }
+
+  return () => observer.disconnect();
+}, [showComposer, showStickerPanel]);
+
+
+useEffect(() => {
+  if (pendingScrollRestoreRef.current !== null) {
+  return;
+}
+
+  if (!wasNearBottomBeforeComposerResizeRef.current) {
+    return;
+  }
+
+  const frame = requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const messagesEl = messagesRef.current;
+      if (!messagesEl) return;
+
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
+  });
+
+  return () => cancelAnimationFrame(frame);
+}, [composerHeight, showStickerPanel, showAttachmentMenu]);
 
 useEffect(() => {
   if (!conversationId) return;
@@ -1368,18 +1482,64 @@ const adminPresenceRefresh = window.setInterval(() => {
 };
   }, [conversationId]);
 
-useEffect(() => {
-  if (hasAutoScrolled.current) return;
-  if (!messages.length) return;
+useLayoutEffect(() => {
+  if (pendingScrollRestoreRef.current === null) {
+    const saved = sessionStorage.getItem(MEMBER_CHAT_SCROLL_KEY);
 
+    if (saved !== null) {
+      const position = Number(saved);
+
+      if (Number.isFinite(position) && position >= 0) {
+        pendingScrollRestoreRef.current = position;
+      } else {
+        sessionStorage.removeItem(MEMBER_CHAT_SCROLL_KEY);
+      }
+    }
+  }
+
+  const savedPosition = pendingScrollRestoreRef.current;
   const el = messagesRef.current;
-  if (!el) return;
 
-  requestAnimationFrame(() => {
+  if (savedPosition !== null && el && messages.length) {
+    const frame = requestAnimationFrame(() => {
+      const messagesEl = messagesRef.current;
+      if (!messagesEl) return;
+
+      messagesEl.scrollTop = Math.min(
+        savedPosition,
+        Math.max(
+          0,
+          messagesEl.scrollHeight - messagesEl.clientHeight
+        )
+      );
+
+      pendingScrollRestoreRef.current = null;
+      hasAutoScrolled.current = true;
+
+      wasNearBottomBeforeComposerResizeRef.current =
+        messagesEl.scrollHeight -
+          messagesEl.scrollTop -
+          messagesEl.clientHeight < 80;
+
+      sessionStorage.removeItem(MEMBER_CHAT_SCROLL_KEY);
+      setInitialLoad(false);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }
+
+  if (hasAutoScrolled.current) return;
+  if (!messages.length || !el) return;
+
+  const frame = requestAnimationFrame(() => {
+    if (pendingScrollRestoreRef.current !== null) return;
+
     el.scrollTop = el.scrollHeight;
     hasAutoScrolled.current = true;
     setInitialLoad(false);
   });
+
+  return () => cancelAnimationFrame(frame);
 }, [messages]);
 
 useEffect(() => {
@@ -4749,7 +4909,18 @@ overscrollBehavior: "none",
     admin={admin}
     conversation={conversation}
     formatLastSeen={formatLastSeen}
-    onBack={() => router.back()}
+    onBack={() => {
+  const el = messagesRef.current;
+
+  if (el && memberId) {
+    sessionStorage.setItem(
+      MEMBER_CHAT_SCROLL_KEY,
+      String(el.scrollTop)
+    );
+  }
+
+  router.back();
+}}
   />
 </div>
 
@@ -4893,8 +5064,10 @@ overscrollBehavior: "none",
 paddingLeft: 10,
 paddingRight: 10,
 paddingBottom: showStickerPanel
-  ? "calc(38vh + 80px)"
-  : 80,
+  ? `calc(38vh + ${composerHeight}px + 16px)`
+  : showAttachmentMenu
+    ? "210px"
+    : `${composerHeight + 16}px`,
 
   overscrollBehavior: "contain",
 }}
@@ -5175,7 +5348,19 @@ setMessageFocus={setMessageFocus}
       setTimeout(() => {
         messageInputRef.current?.focus();
       }, 150);
-    } else {
+        } else {
+      const messagesEl = messagesRef.current;
+
+      if (messagesEl) {
+        const distanceFromBottom =
+          messagesEl.scrollHeight -
+          messagesEl.scrollTop -
+          messagesEl.clientHeight;
+
+        wasNearBottomBeforeComposerResizeRef.current =
+          distanceFromBottom <= 80;
+      }
+
       messageInputRef.current?.blur();
       setShowStickerPanel(true);
     }
@@ -5183,10 +5368,22 @@ setMessageFocus={setMessageFocus}
 
   onCloseStickerPanel={() => setShowStickerPanel(false)}
 
-  onAttach={() => {
-  setShowStickerPanel(false);
-  setShowAttachmentMenu(true);
-}}
+    onAttach={() => {
+    const messagesEl = messagesRef.current;
+
+    if (messagesEl) {
+      const distanceFromBottom =
+        messagesEl.scrollHeight -
+        messagesEl.scrollTop -
+        messagesEl.clientHeight;
+
+      wasNearBottomBeforeComposerResizeRef.current =
+        distanceFromBottom <= 80;
+    }
+
+    setShowStickerPanel(false);
+    setShowAttachmentMenu(true);
+  }}
 
   uploading={uploading}
 

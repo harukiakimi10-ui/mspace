@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 import {
@@ -98,6 +98,12 @@ export default function ConversationList({
 }: Props) {
 
   const router = useRouter();
+const pathname = usePathname();
+
+const activeConversationId =
+  pathname.startsWith("/admin/chats/")
+    ? pathname.split("/")[3]
+    : undefined;
   function getAvatarColors(value: string) {
   const colors = [
     { background: "#E8F5E9", icon: "#2E7D32" },
@@ -124,6 +130,32 @@ export default function ConversationList({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+useEffect(() => {
+  const savedDrafts: Record<string, string> = {};
+
+  conversations.forEach((chat) => {
+    try {
+      const draft = localStorage.getItem(
+        `mspace-admin-draft-${chat.id}`
+      );
+
+      if (draft?.trim()) {
+        savedDrafts[chat.id] = draft;
+      }
+    } catch (error) {
+      console.error(
+        "Could not load conversation draft:",
+        chat.id,
+        error
+      );
+    }
+  });
+
+  setDrafts(savedDrafts);
+}, [conversations]);
 
 function formatVoiceDuration(duration?: number | null) {
   if (!duration || duration < 1) {
@@ -293,15 +325,48 @@ function MessageReadReceipt({
 }}
     >
 
-{!chat.member_typing && (
+{!chat.member_typing && !drafts[chat.id] && (
   <MessageReadReceipt
     message={chat.lastMessage}
-     hideReadReceipts={chat.member?.hide_read_receipts === true}
-     hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
+    hideReadReceipts={chat.member?.hide_read_receipts === true}
+    hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   />
 )}
 
-      {chat.member_typing ? (
+     {drafts[chat.id] && activeConversationId !== chat.id ? (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5,
+      minWidth: 0,
+      overflow: "hidden",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      color: "inherit",
+      fontStyle: "italic",
+    }}
+  >
+    <span
+  style={{
+    fontWeight: 700,
+    color: "#000000",
+    flexShrink: 0,
+  }}
+>
+  Draft:
+</span>
+    <span
+      style={{
+        overflow: "hidden",
+        whiteSpace: "nowrap",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {drafts[chat.id]}
+    </span>
+  </span>
+) : chat.member_typing ? (
   <span
     style={{
       fontStyle: "italic",

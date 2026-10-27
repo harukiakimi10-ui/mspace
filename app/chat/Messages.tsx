@@ -2386,6 +2386,7 @@ decoding="sync"
     formatTime={formatTime}
     hideReadReceipts={hideReadReceipts}
     hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
+    isPending={isPending || msg._optimistic === true}
   />
 )}
 

@@ -63,19 +63,28 @@ export default function MessageInput({
 }: MessageInputProps) {
 
   useLayoutEffect(() => {
-    if (message !== "") return;
+  const input = messageInputRef.current;
 
-    const input = messageInputRef.current;
+  if (!input) return;
 
-    if (!input) return;
+  // Restore the textarea height when a saved draft
+  // is present or when the chat page is revisited.
+  input.style.height = "0px";
+  input.style.height = `${Math.min(
+    input.scrollHeight,
+    140
+  )}px`;
 
-    input.scrollLeft = 0;
-    input.scrollTop = 0;
+  // Preserve the existing empty-message cursor reset.
+  if (message !== "") return;
 
-    try {
-      input.setSelectionRange(0, 0);
-    } catch {}
-  }, [message, messageInputRef]);
+  input.scrollLeft = 0;
+  input.scrollTop = 0;
+
+  try {
+    input.setSelectionRange(0, 0);
+  } catch {}
+}, [message, messageInputRef]);
 
   return (
   <div

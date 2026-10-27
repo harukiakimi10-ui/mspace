@@ -574,10 +574,53 @@ useEffect(() => {
   const [mspaceBrowserUrl, setMSpaceBrowserUrl] = useState("");
 
   const [reply, setReply] = useState("");
+  const draftConversationIdRef = useRef<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
   const [initialMessagesPositioned, setInitialMessagesPositioned] = useState(false);
+
+  const draftConversationId = Array.isArray(id) ? id[0] : id;
+
+useEffect(() => {
+  if (!draftConversationId) return;
+
+  let draft = "";
+
+  try {
+    draft =
+      localStorage.getItem(
+        `mspace-admin-draft-${draftConversationId}`
+      ) ?? "";
+  } catch (error) {
+    console.error("Could not load admin draft:", error);
+  }
+
+  draftConversationIdRef.current = draftConversationId;
+  setReply(draft);
+}, [draftConversationId]);
+
+
+useEffect(() => {
+  if (
+    !draftConversationId ||
+    draftConversationIdRef.current !== draftConversationId
+  ) {
+    return;
+  }
+
+  if (reply.length === 0) {
+    return;
+  }
+
+  const key = `mspace-admin-draft-${draftConversationId}`;
+
+  try {
+    localStorage.setItem(key, reply);
+  } catch (error) {
+    console.error("Could not save admin draft:", error);
+  }
+}, [reply, draftConversationId]);
 
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [showForwardLocationDialog, setShowForwardLocationDialog] =
@@ -589,7 +632,25 @@ useEffect(() => {
 
 const [showMessageMenu, setShowMessageMenu] = useState(false);
 
-const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null);
+const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(() => {
+  if (typeof window === "undefined" || !id) {
+    return null;
+  }
+
+  try {
+    const cached = localStorage.getItem(
+      `mspace-pinned-message-${id}`
+    );
+
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+
+    return parsed?.message_id ?? parsed?.message?.id ?? parsed?.id ?? null;
+  } catch {
+    return null;
+  }
+});
 const [pinnedMessage, setPinnedMessage] =
   useState<any | null>(() => {
     if (typeof window === "undefined") {
@@ -665,51 +726,114 @@ const [showComposer, setShowComposer] = useState(true);
 const [composerHeight, setComposerHeight] = useState(0);
 console.log("COMPOSER HEIGHT:", composerHeight);
 
+
+
 useEffect(() => {
-  let observer: ResizeObserver | null = null;
-  let frame: number | null = null;
-
-  const measureComposer = () => {
-  const composer = composerRef.current;
-
-  console.log("COMPOSER REF:", composer);
-
-  if (!composer) {
-    console.log("COMPOSER REF IS NULL");
+  if (!showComposer) {
     return;
   }
 
-  const height = composer.getBoundingClientRect().height;
+  let observer: ResizeObserver | null = null;
+  let retryFrame: number | null = null;
+  let cancelled = false;
 
-  console.log("MEASURED COMPOSER HEIGHT:", height);
+  const attachObserver = () => {
+    if (cancelled) return;
 
-  if (height > 0) {
-    setComposerHeight(height);
-  }
-};
+    const element =
+  composerContainerRef.current?.firstElementChild as HTMLDivElement | null;
 
-  frame = requestAnimationFrame(() => {
+    if (!element) {
+      retryFrame = requestAnimationFrame(attachObserver);
+      return;
+    }
+
+    const measureComposer = () => {
+      const height = element.getBoundingClientRect().height;
+      console.log("WRAPPER ELEMENT:", element);
+console.log("WRAPPER RECT:", element.getBoundingClientRect());
+      
+
+      console.log("OBSERVED COMPOSER WRAPPER HEIGHT:", height);
+
+      if (height > 0) {
+        setComposerHeight((previous) =>
+          previous === height ? previous : height
+        );
+      }
+    };
+
     measureComposer();
 
-    const composer = composerRef.current;
+    observer = new ResizeObserver(measureComposer);
+    observer.observe(element);
+  };
 
-    if (!composer) return;
-
-    observer = new ResizeObserver(() => {
-      measureComposer();
-    });
-
-    observer.observe(composer);
-  });
+  retryFrame = requestAnimationFrame(attachObserver);
 
   return () => {
-    if (frame !== null) {
-      cancelAnimationFrame(frame);
+    cancelled = true;
+
+    if (retryFrame !== null) {
+      cancelAnimationFrame(retryFrame);
     }
 
     observer?.disconnect();
   };
-}, [showComposer, showStickerPanel]);
+}, [showComposer]);
+
+useEffect(() => {
+  const conversationId = Array.isArray(id) ? id[0] : id;
+
+  if (
+    !conversationId ||
+    !initialMessagesPositioned ||
+    composerHeight <= 0 ||
+    positionedAfterComposerMeasureRef.current === conversationId
+  ) {
+    return;
+  }
+
+  const frame = requestAnimationFrame(() => {
+    const el = messagesRef.current;
+
+    if (!el) return;
+
+    el.scrollTop = el.scrollHeight;
+
+    positionedAfterComposerMeasureRef.current = conversationId;
+
+    sessionStorage.setItem(
+      `mspace-admin-message-scroll-${conversationId}`,
+      String(el.scrollTop)
+    );
+  });
+
+  return () => cancelAnimationFrame(frame);
+}, [id, initialMessagesPositioned, composerHeight]);
+
+useEffect(() => {
+  if (composerHeight <= 0 || !initialMessagesPositioned) {
+    return;
+  }
+
+  const frame = requestAnimationFrame(() => {
+    const el = messagesRef.current;
+
+    if (!el) return;
+
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+
+    // Keep the latest message visible if the user was already
+    // at or near the bottom before the composer changed height.
+    if (distanceFromBottom < composerHeight + 100) {
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+
+  return () => cancelAnimationFrame(frame);
+}, [composerHeight, initialMessagesPositioned]);
 
 const scrollToLatest = () => {
   const container = messagesRef.current;
@@ -1083,6 +1207,8 @@ const [locationPreview, setLocationPreview] = useState<{
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const composerContainerRef = useRef<HTMLDivElement>(null);
+  const positionedAfterComposerMeasureRef = useRef<string | null>(null);
   const adminMessagesLoadRequestRef = useRef(0);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const memberTypingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1216,10 +1342,17 @@ const messageInputRef =
         const parsedPinnedMessage =
           JSON.parse(cachedPinnedMessage);
 
-        setPinnedMessage(
-          parsedPinnedMessage.message ||
-            parsedPinnedMessage
-        );
+        const cachedMessage =
+  parsedPinnedMessage.message ||
+  parsedPinnedMessage;
+
+setPinnedMessage(cachedMessage);
+
+setPinnedMessageId(
+  parsedPinnedMessage.message_id ||
+    cachedMessage.id ||
+    null
+);
       }
     }
   } catch (error) {
@@ -2640,13 +2773,8 @@ requestAnimationFrame(() => {
       `mspace-admin-message-scroll-${conversationId}`
     );
 
-    if (savedScroll !== null) {
-      el.scrollTop = Number(savedScroll);
-      setInitialMessagesPositioned(true);
-    } else {
-      el.scrollTop = el.scrollHeight;
-      setInitialMessagesPositioned(true);
-    }
+    el.scrollTop = el.scrollHeight;
+setInitialMessagesPositioned(true);
   });
 });
     } catch (error) {
@@ -2719,24 +2847,19 @@ requestAnimationFrame(() => {
     if (!el) return;
 
     const conversationId = Array.isArray(id) ? id[0] : id;
-    const savedScroll = conversationId
-      ? sessionStorage.getItem(
-          `mspace-admin-message-scroll-${conversationId}`
-        )
-      : null;
+    // After a page reload, keep the latest message visible.
+// Do not restore an old scroll position over the latest message.
+el.scrollTo({
+  top: el.scrollHeight,
+  behavior: "auto",
+});
 
-    if (savedScroll !== null) {
-      el.scrollTop = Number(savedScroll);
-    } else if (
-      isNewConversation ||
-      wasNearBottom ||
-      !hasAutoScrolled.current
-    ) {
-      el.scrollTo({
-        top: el.scrollHeight,
-        behavior: "auto",
-      });
-    }
+if (conversationId) {
+  sessionStorage.setItem(
+    `mspace-admin-message-scroll-${conversationId}`,
+    String(el.scrollTop)
+  );
+}
 
     hasAutoScrolled.current = true;
     autoScrollConversationId.current =
@@ -2806,12 +2929,17 @@ requestAnimationFrame(() => {
     return;
   }
 
-  if (!pin) {
-    console.log("ADMIN: NO PIN FOUND");
+ if (!pin) {
+  console.log("ADMIN: NO PIN FOUND");
+
+  // Preserve the pinned message restored from local cache.
+  if (!cachedPinnedMessage) {
     setPinnedMessageId(null);
     setPinnedMessage(null);
-    return;
   }
+
+  return;
+}
 
   console.log(
     "ADMIN PIN MESSAGE ID:",
@@ -3101,6 +3229,14 @@ reply_file_duration:
   "Admin message inserted:",
   data
 );
+
+try {
+  localStorage.removeItem(
+    `mspace-admin-draft-${draftConversationId}`
+  );
+} catch (error) {
+  console.error("Could not clear sent admin draft:", error);
+}
 
 // Invalidate message loads that started before this insert completed.
 adminMessagesLoadRequestRef.current += 1;
@@ -4914,7 +5050,15 @@ if (savedScroll !== null) {
 
     {/* PINNED MESSAGE */}
 
-    {displayPinnedMessage?.content && (
+    <div
+  style={{
+    flexShrink: 0,
+    minHeight: displayPinnedMessage?.content
+      ? 0
+      : 0,
+  }}
+>
+{displayPinnedMessage?.content && (
       <div
         style={{
           flexShrink: 0,
@@ -4978,6 +5122,7 @@ if (savedScroll !== null) {
         </div>
       </div>
     )}
+  </div>
 
     {/* Messages */}
 
@@ -5223,6 +5368,7 @@ setMessageFocus={setMessageFocus}
 
 {showComposer && (
   <div
+    ref={composerContainerRef}
     style={{
       flexShrink: 0,
       position: "relative",
