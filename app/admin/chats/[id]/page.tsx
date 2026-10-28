@@ -66,6 +66,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [pendingMessageIds, setPendingMessageIds] = useState<string[]>([]);
   const [cacheReady, setCacheReady] = useState(false);
+  const [initialMessagesLoadComplete, setInitialMessagesLoadComplete] = useState(false);
   const [member, setMember] = useState<any>(null);
   const [adminProfilePhoto, setAdminProfilePhoto] = useState("");
   const [hideReadReceipts, setHideReadReceipts] = useState(false);
@@ -575,6 +576,8 @@ useEffect(() => {
 
   const [reply, setReply] = useState("");
   const draftConversationIdRef = useRef<string | null>(null);
+  const [draftReadyConversationId, setDraftReadyConversationId] =
+  useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isChatActive, setIsChatActive] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -582,45 +585,51 @@ useEffect(() => {
 
   const draftConversationId = Array.isArray(id) ? id[0] : id;
 
-useEffect(() => {
-  if (!draftConversationId) return;
 
+
+useEffect(() => {
+  if (!draftConversationId) {
+    setDraftReadyConversationId(null);
+    return;
+  }
+
+  setDraftReadyConversationId(null);
+
+  const draftKey = `mspace-admin-draft-${draftConversationId}`;
   let draft = "";
 
   try {
-    draft =
-      localStorage.getItem(
-        `mspace-admin-draft-${draftConversationId}`
-      ) ?? "";
+    draft = localStorage.getItem(draftKey) ?? "";
   } catch (error) {
     console.error("Could not load admin draft:", error);
   }
 
   draftConversationIdRef.current = draftConversationId;
   setReply(draft);
+  setDraftReadyConversationId(draftConversationId);
 }, [draftConversationId]);
-
 
 useEffect(() => {
   if (
     !draftConversationId ||
-    draftConversationIdRef.current !== draftConversationId
+    draftConversationIdRef.current !== draftConversationId ||
+    draftReadyConversationId !== draftConversationId
   ) {
     return;
   }
 
-  if (reply.length === 0) {
-    return;
-  }
-
-  const key = `mspace-admin-draft-${draftConversationId}`;
+  const draftKey = `mspace-admin-draft-${draftConversationId}`;
 
   try {
-    localStorage.setItem(key, reply);
+    if (reply.length > 0) {
+      localStorage.setItem(draftKey, reply);
+    } else {
+      localStorage.removeItem(draftKey);
+    }
   } catch (error) {
     console.error("Could not save admin draft:", error);
   }
-}, [reply, draftConversationId]);
+}, [reply, draftConversationId, draftReadyConversationId]);
 
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [showForwardLocationDialog, setShowForwardLocationDialog] =
@@ -788,52 +797,44 @@ useEffect(() => {
   if (
     !conversationId ||
     !initialMessagesPositioned ||
-    composerHeight <= 0 ||
-    positionedAfterComposerMeasureRef.current === conversationId
+    composerHeight <= 0
   ) {
     return;
   }
 
-  const frame = requestAnimationFrame(() => {
-    const el = messagesRef.current;
-
-    if (!el) return;
-
-    el.scrollTop = el.scrollHeight;
-
-    positionedAfterComposerMeasureRef.current = conversationId;
-
-    sessionStorage.setItem(
-      `mspace-admin-message-scroll-${conversationId}`,
-      String(el.scrollTop)
-    );
-  });
-
-  return () => cancelAnimationFrame(frame);
+  positionedAfterComposerMeasureRef.current = conversationId;
 }, [id, initialMessagesPositioned, composerHeight]);
 
+
 useEffect(() => {
-  if (composerHeight <= 0 || !initialMessagesPositioned) {
+  if (!initialMessagesPositioned) {
+    return;
+  }
+
+  if (composerHeight <= 0) {
+    return;
+  }
+
+  if (!wasNearBottomBeforeComposerResizeRef.current) {
     return;
   }
 
   const frame = requestAnimationFrame(() => {
-    const el = messagesRef.current;
+    requestAnimationFrame(() => {
+      const el = messagesRef.current;
 
-    if (!el) return;
+      if (!el) return;
 
-    const distanceFromBottom =
-      el.scrollHeight - el.scrollTop - el.clientHeight;
-
-    // Keep the latest message visible if the user was already
-    // at or near the bottom before the composer changed height.
-    if (distanceFromBottom < composerHeight + 100) {
       el.scrollTop = el.scrollHeight;
-    }
+    });
   });
 
   return () => cancelAnimationFrame(frame);
-}, [composerHeight, initialMessagesPositioned]);
+}, [
+  composerHeight,
+  initialMessagesPositioned,
+  showStickerPanel,
+]);
 
 const scrollToLatest = () => {
   const container = messagesRef.current;
@@ -1194,6 +1195,32 @@ useEffect(() => {
 
 const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+useEffect(() => {
+  if (!showAttachmentMenu) {
+    return;
+  }
+
+  if (!initialMessagesPositioned || composerHeight <= 0) {
+    return;
+  }
+
+  if (!wasNearBottomBeforeComposerResizeRef.current) {
+    return;
+  }
+
+  const frame = requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = messagesRef.current;
+
+      if (!el) return;
+
+      el.scrollTop = el.scrollHeight;
+    });
+  });
+
+  return () => cancelAnimationFrame(frame);
+}, [showAttachmentMenu, initialMessagesPositioned, composerHeight]);
+const wasNearBottomBeforeComposerResizeRef = useRef(true);
 const [newMessageCount, setNewMessageCount] = useState(0);
 const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -1206,6 +1233,7 @@ const [locationPreview, setLocationPreview] = useState<{
 } | null>(null);
 
   const messagesRef = useRef<HTMLDivElement>(null);
+  const sendingStickerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
   const composerContainerRef = useRef<HTMLDivElement>(null);
   const positionedAfterComposerMeasureRef = useRef<string | null>(null);
@@ -1943,7 +1971,49 @@ document.removeEventListener(
 };
   }, []);
 
+  
+useLayoutEffect(() => {
+  if (
+    !cacheReady ||
+    initialMessagesPositioned ||
+    composerHeight <= 0
+  ) {
+    return;
+  }
 
+  const conversationId = Array.isArray(id) ? id[0] : id;
+  const el = messagesRef.current;
+
+  if (!conversationId || !el) {
+    return;
+  }
+
+  const savedScroll = sessionStorage.getItem(
+    `mspace-admin-message-scroll-${conversationId}`
+  );
+
+  if (savedScroll !== null) {
+    el.scrollTop = Number(savedScroll);
+  } else {
+    el.scrollTop = el.scrollHeight;
+  }
+
+  wasNearBottomBeforeComposerResizeRef.current = false;
+  positionedAfterComposerMeasureRef.current = conversationId;
+
+  sessionStorage.setItem(
+    `mspace-admin-message-scroll-${conversationId}`,
+    String(el.scrollTop)
+  );
+
+  setInitialMessagesPositioned(true);
+}, [
+  cacheReady,
+  initialMessagesLoadComplete,
+  initialMessagesPositioned,
+  id,
+  composerHeight,
+]);
 
   const startRecording = async () => {
   sendingVoiceRef.current = false;
@@ -2761,22 +2831,7 @@ async function updateAdminOnlineStatus(online: boolean) {
 
            setMessages(visibleCachedMessages);
 
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const el = messagesRef.current;
-    if (!el) return;
 
-    const conversationId = Array.isArray(id) ? id[0] : id;
-    if (!conversationId) return;
-
-    const savedScroll = sessionStorage.getItem(
-      `mspace-admin-message-scroll-${conversationId}`
-    );
-
-    el.scrollTop = el.scrollHeight;
-setInitialMessagesPositioned(true);
-  });
-});
     } catch (error) {
       console.error(
         "MSpace message cache error:",
@@ -2795,6 +2850,9 @@ setInitialMessagesPositioned(true);
 
 if (error) {
   console.error("Admin loadMessages failed:", error);
+  if (requestId === adminMessagesLoadRequestRef.current) {
+    setInitialMessagesLoadComplete(true);
+  }
   return;
 }
 
@@ -2840,34 +2898,12 @@ try {
 }
 
 setMessages(visibleMessages);
+setInitialMessagesLoadComplete(true);
 
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const el = messagesRef.current;
-    if (!el) return;
-
-    const conversationId = Array.isArray(id) ? id[0] : id;
-    // After a page reload, keep the latest message visible.
-// Do not restore an old scroll position over the latest message.
-el.scrollTo({
-  top: el.scrollHeight,
-  behavior: "auto",
-});
-
-if (conversationId) {
-  sessionStorage.setItem(
-    `mspace-admin-message-scroll-${conversationId}`,
-    String(el.scrollTop)
-  );
-}
-
-    hasAutoScrolled.current = true;
-    autoScrollConversationId.current =
-      typeof conversationId === "string" ? conversationId : null;
-
-    setInitialMessagesPositioned(true);
-  });
-});
+const conversationId = Array.isArray(id) ? id[0] : id;
+hasAutoScrolled.current = true;
+autoScrollConversationId.current =
+  typeof conversationId === "string" ? conversationId : null;
 
   console.log("Messages:", data);
 
@@ -2890,16 +2926,21 @@ if (conversationId) {
 
   if (cachedPinnedMessage) {
     try {
-      const parsedPinnedMessage =
-        JSON.parse(cachedPinnedMessage);
+      
+const parsedPinnedMessage =
+  JSON.parse(cachedPinnedMessage);
 
-      setPinnedMessageId(
-        parsedPinnedMessage.message_id
-      );
+const cachedMessage =
+  parsedPinnedMessage.message ||
+  parsedPinnedMessage;
 
-      setPinnedMessage(
-        parsedPinnedMessage.message
-      );
+setPinnedMessageId(
+  parsedPinnedMessage.message_id ||
+    cachedMessage.id ||
+    null
+);
+
+setPinnedMessage(cachedMessage);
     } catch (error) {
       console.error(
         "MSpace pinned message cache error:",
@@ -3312,7 +3353,9 @@ requestAnimationFrame(() => {
 }
 
 async function sendSticker(sticker: string) {
-  if (!id) return;
+  if (!id || sendingStickerRef.current) return;
+
+  sendingStickerRef.current = true;
 
   try {
     const { data, error } = await supabase
@@ -3374,8 +3417,9 @@ async function sendSticker(sticker: string) {
       .select()
       .single();
 
-    if (error) {
+        if (error) {
       console.error("Admin sticker error:", error);
+      sendingStickerRef.current = false;
       return;
     }
 
@@ -3445,8 +3489,10 @@ setMessages((prev) => {
         );
       }
     }
-  } catch (error) {
+    } catch (error) {
     console.error("Admin sticker error:", error);
+  } finally {
+    sendingStickerRef.current = false;
   }
 }
 
@@ -4066,6 +4112,7 @@ if (!screenSizeReady) {
   <LocationPreview
     latitude={locationPreview.latitude}
     longitude={locationPreview.longitude}
+    isDesktop={isDesktop}
     onCancel={() => {
       setShowLocationPreview(false);
       setLocationPreview(null);
@@ -5193,10 +5240,13 @@ onScroll={(e) => {
     paddingTop: 0,
 paddingLeft: 15,
 paddingRight: 15,
-paddingBottom: showStickerPanel
-  ? `calc(38vh + ${composerHeight + 20}px)`
-  : composerHeight + 20,
-    boxSizing: "border-box",
+paddingBottom:
+  !isDesktop && showStickerPanel
+    ? `calc(38vh + ${composerHeight + 20}px)`
+    : !isDesktop && showAttachmentMenu
+      ? `calc(15vh + ${composerHeight + 20}px)`
+      : composerHeight + 20,
+        boxSizing: "border-box",
   }}
 >
 
@@ -5407,6 +5457,16 @@ setMessageFocus={setMessageFocus}
   sendMessage={sendReply}
 
   onAttach={() => {
+  const el = messagesRef.current;
+
+  if (el) {
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+
+    wasNearBottomBeforeComposerResizeRef.current =
+      distanceFromBottom <= 80;
+  }
+
   setShowStickerPanel(false);
   setShowAttachmentMenu(true);
 }}
@@ -5450,6 +5510,18 @@ setMessageFocus={setMessageFocus}
   stickerOpen={showStickerPanel}
 
 onToggleSticker={() => {
+  if (!showStickerPanel) {
+    const el = messagesRef.current;
+
+    if (el) {
+      const distanceFromBottom =
+        el.scrollHeight - el.scrollTop - el.clientHeight;
+
+      wasNearBottomBeforeComposerResizeRef.current =
+        distanceFromBottom <= 80;
+    }
+  }
+
   setShowStickerPanel((prev) => !prev);
 }}
 

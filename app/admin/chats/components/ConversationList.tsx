@@ -333,7 +333,15 @@ function MessageReadReceipt({
   />
 )}
 
-     {drafts[chat.id] && activeConversationId !== chat.id ? (
+     {chat.member_typing ? (
+  <span
+    style={{
+      fontStyle: "italic",
+    }}
+  >
+    Typing...
+  </span>
+) : drafts[chat.id] && activeConversationId !== chat.id ? (
   <span
     style={{
       display: "inline-flex",
@@ -348,14 +356,14 @@ function MessageReadReceipt({
     }}
   >
     <span
-  style={{
-    fontWeight: 700,
-    color: "#000000",
-    flexShrink: 0,
-  }}
->
-  Draft:
-</span>
+      style={{
+        fontWeight: 700,
+        color: "#000000",
+        flexShrink: 0,
+      }}
+    >
+      Draft:
+    </span>
     <span
       style={{
         overflow: "hidden",
@@ -365,14 +373,6 @@ function MessageReadReceipt({
     >
       {drafts[chat.id]}
     </span>
-  </span>
-) : chat.member_typing ? (
-  <span
-    style={{
-      fontStyle: "italic",
-    }}
-  >
-    Typing...
   </span>
 ) : chat.lastMessage ? (
   chat.lastMessage.is_deleted ? (

@@ -437,6 +437,7 @@ const analyserRef = useRef<AnalyserNode | null>(null);
 const audioContextRef = useRef<AudioContext | null>(null);
 const animationFrameRef = useRef<number | null>(null);
 const sendingVoiceRef = useRef(false);
+const sendingStickerRef = useRef(false);
 
 
 
@@ -1381,8 +1382,44 @@ const adminPresenceRefresh = window.setInterval(() => {
         async (payload) => {
   console.log("NEW MESSAGE:", payload);
 
-  if (payload.new?.sender === "admin") {
-  await loadMessages(conversationId);
+  if (
+  payload.new?.sender === "admin" &&
+  payload.new?.deleted_for !== "member"
+) {
+  const newMessage = payload.new as any;
+  const el = messagesRef.current;
+
+  const wasAtBottom =
+    !!el &&
+    el.scrollHeight -
+      el.scrollTop -
+      el.clientHeight < 80;
+
+  setMessages((currentMessages) => {
+    if (
+      currentMessages.some(
+        (message) => message.id === newMessage.id
+      )
+    ) {
+      return currentMessages;
+    }
+
+    return [...currentMessages, newMessage];
+  });
+
+  if (wasAtBottom) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const messagesEl = messagesRef.current;
+        if (!messagesEl) return;
+
+        messagesEl.scrollTo({
+          top: messagesEl.scrollHeight,
+          behavior: "auto",
+        });
+      });
+    });
+  }
 }
 
   // If the member is currently at the bottom,
@@ -1505,13 +1542,15 @@ useLayoutEffect(() => {
       const messagesEl = messagesRef.current;
       if (!messagesEl) return;
 
-      messagesEl.scrollTop = Math.min(
-        savedPosition,
-        Math.max(
-          0,
-          messagesEl.scrollHeight - messagesEl.clientHeight
-        )
-      );
+      const maxScrollTop = Math.max(
+  0,
+  messagesEl.scrollHeight - messagesEl.clientHeight
+);
+
+messagesEl.scrollTop = Math.max(
+  0,
+  maxScrollTop - savedPosition
+);
 
       pendingScrollRestoreRef.current = null;
       hasAutoScrolled.current = true;
@@ -2016,7 +2055,7 @@ if (
   }
 }
 
-await loadMessages(id);
+//await loadMessages(id);//
 
 console.log("Finished updating read status");
 }
@@ -2828,7 +2867,9 @@ const deleteRecording = () => {
 };
 
 async function sendSticker(sticker: string) {
-  if (!conversationId) return;
+  if (!conversationId || sendingStickerRef.current) return;
+
+  sendingStickerRef.current = true;
 
   const messageId = `pending-sticker-${Date.now()}-${Math.random()
     .toString(36)
@@ -2948,6 +2989,8 @@ if (!navigator.onLine) {
     });
   }, 50);
 
+  sendingStickerRef.current = false;
+
   return;
 }
 
@@ -2961,10 +3004,14 @@ try {
 );
 } catch (error) {
   console.error("Sticker error:", error);
+  sendingStickerRef.current = false;
   return;
 }
 
-if (!data) return;
+if (!data) {
+  sendingStickerRef.current = false;
+  return;
+}
 
 const elapsed = Date.now() - pendingStartedAt;
 const remaining = Math.max(0, 2000 - elapsed);
@@ -3014,6 +3061,7 @@ setTimeout(() => {
     behavior: "smooth",
   });
 }, 50);
+sendingStickerRef.current = false;
 }
 
 
@@ -4888,8 +4936,7 @@ if (
     height: "100dvh",
     width: "100vw",
 
-    touchAction: "none",
-overscrollBehavior: "none",
+
   }}
 >
       {/* Header */}
@@ -4913,10 +4960,13 @@ overscrollBehavior: "none",
   const el = messagesRef.current;
 
   if (el && memberId) {
-    sessionStorage.setItem(
-      MEMBER_CHAT_SCROLL_KEY,
-      String(el.scrollTop)
-    );
+    const distanceFromBottom =
+  el.scrollHeight - el.scrollTop - el.clientHeight;
+
+sessionStorage.setItem(
+  MEMBER_CHAT_SCROLL_KEY,
+  String(Math.max(0, distanceFromBottom))
+);
   }
 
   router.back();
@@ -5069,7 +5119,6 @@ paddingBottom: showStickerPanel
     ? "210px"
     : `${composerHeight + 16}px`,
 
-  overscrollBehavior: "contain",
 }}
   >
     <div

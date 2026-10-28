@@ -276,6 +276,11 @@ const [locationViewer, setLocationViewer] = useState<{
 const [messageFocusOffset, setMessageFocusOffset] = useState(0);
 
 const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+const [hoverButtonPosition, setHoverButtonPosition] = useState<{
+  messageId: string;
+  left: number;
+  top: number;
+} | null>(null);
 
 const menuAudioContextRef = useRef<AudioContext | null>(null);
 const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -928,15 +933,33 @@ const locationCoordinates = isReplyLocation
   ref={(el) => {
     messageRefs.current[msg.id] = el;
   }}
+  data-message-row={String(msg.id)}
 
-  onMouseEnter={() => {
+  onMouseEnter={(e) => {
   if (currentUser === "admin" && isDesktop) {
+    const row = e.currentTarget as HTMLDivElement;
+    const bubble = row.querySelector(
+      "[data-message-bubble]"
+    ) as HTMLDivElement | null;
+
+    if (bubble) {
+      const rowRect = row.getBoundingClientRect();
+      const bubbleRect = bubble.getBoundingClientRect();
+
+      setHoverButtonPosition({
+        messageId: String(msg.id),
+        left: bubbleRect.right - rowRect.left - 36,
+        top: bubbleRect.top - rowRect.top + 4,
+      });
+    }
+
     setHoveredMessageId(String(msg.id));
   }
 }}
 onMouseLeave={() => {
   if (currentUser === "admin" && isDesktop) {
     setHoveredMessageId(null);
+    setHoverButtonPosition(null);
   }
 }}
 
@@ -1033,6 +1056,7 @@ userSelect:
 )}
 
           <div
+          data-message-bubble={String(msg.id)}
     style={{
   maxWidth:
   msg.message_type === "location"
@@ -2430,14 +2454,13 @@ decoding="sync"
                 }}
                 style={{
   position: "absolute",
-top: "4px",
-right:
-  msg.sender === currentUser
-    ? "58px"
-    : undefined,
+top:
+  hoverButtonPosition?.messageId === String(msg.id)
+    ? `${hoverButtonPosition.top}px`
+    : "4px",
 left:
-  msg.sender !== currentUser
-    ? "calc(30% + 8px)"
+  hoverButtonPosition?.messageId === String(msg.id)
+    ? `${hoverButtonPosition.left}px`
     : undefined,
 width: "36px",
 height: "36px",
@@ -2446,7 +2469,7 @@ height: "36px",
                   justifyContent: "center",
                   border: "none",
                   borderRadius: "50%",
-background: "rgba(255, 255, 255, 0.72)",
+background: "rgba(255, 255, 255, 0.35)",
 color: "#444444",
 boxShadow: "0 1px 5px rgba(0,0,0,0.14)",
 backdropFilter: "blur(4px)",

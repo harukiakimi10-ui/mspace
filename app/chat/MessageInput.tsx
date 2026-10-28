@@ -169,7 +169,11 @@ onFocus={() => {
 }}
   value={message}
   onChange={onInput}
-  onKeyDown={(e) => {
+ onKeyDown={(e) => {
+  if (!isDesktop && e.key === "Enter") {
+    return;
+  }
+
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
 

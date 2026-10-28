@@ -43,6 +43,7 @@ const t = {
 type LocationPreviewProps = {
   latitude: number;
   longitude: number;
+  isDesktop?: boolean;
   onCancel: () => void;
   onSend: (latitude: number, longitude: number) => void | Promise<void>;
 };
@@ -50,6 +51,7 @@ type LocationPreviewProps = {
 export default function LocationPreview({
   latitude,
   longitude,
+  isDesktop = false,
   onCancel,
   onSend,
 }: LocationPreviewProps) {
@@ -57,6 +59,7 @@ export default function LocationPreview({
     const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
 const [loadingNearby, setLoadingNearby] = useState(false);
@@ -66,6 +69,7 @@ const [selectedNearbyPlaceIndex, setSelectedNearbyPlaceIndex] =
 
 
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const sendingRef = useRef(false);
 const mapInstanceRef = useRef<any>(null);
 const markerRef = useRef<any>(null);
 
@@ -310,13 +314,31 @@ const markerRef = useRef<any>(null);
   }
 };
 
-  const handleSend = async () => {
-    const location = selectedLocationRef.current;
+    const handleSend = async () => {
+    if (sendingRef.current) return;
 
-    await onSend(
-      location.latitude,
-      location.longitude
-    );
+    sendingRef.current = true;
+
+    if (isDesktop) {
+      setSending(true);
+    }
+
+    try {
+      const location = selectedLocationRef.current;
+
+      await onSend(
+        location.latitude,
+        location.longitude
+      );
+    } catch (error) {
+      sendingRef.current = false;
+
+      if (isDesktop) {
+        setSending(false);
+      }
+
+      throw error;
+    }
   };
 
   return (
@@ -843,7 +865,8 @@ borderLeft:
           <button
             type="button"
             onClick={handleSend}
-            style={{
+            disabled={isDesktop && sending}
+          style={{
               width: 100,
               height: 50,
               borderRadius: 14,
@@ -853,7 +876,8 @@ borderLeft:
               color: "#fff",
               fontSize: 16,
               fontWeight: 700,
-              cursor: "pointer",
+              cursor: isDesktop && sending ? "not-allowed" : "pointer",
+              opacity: isDesktop && sending ? 0.6 : 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
