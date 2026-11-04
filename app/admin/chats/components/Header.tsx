@@ -196,6 +196,10 @@ export default function Header() {
   }}
 >
 
+    {isDesktop && (
+    <NotificationButton isAdmin={true} />
+  )}
+
   <div
   style={{
     width: isDesktop ? 112 : "auto",
