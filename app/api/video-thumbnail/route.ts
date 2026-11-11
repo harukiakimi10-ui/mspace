@@ -4,23 +4,21 @@ import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
 import crypto from "crypto";
+import ffmpegPath from "ffmpeg-static";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const ffmpegExecutable = path.join(
-  process.cwd(),
-  "node_modules",
-  "ffmpeg-static",
-  process.platform === "win32"
-    ? "ffmpeg.exe"
-    : "ffmpeg"
-);
 
   let inputPath = "";
   let outputPath = "";
 
   try {
+    const ffmpegExecutable = ffmpegPath;
+
+if (!ffmpegExecutable) {
+  throw new Error("FFmpeg executable path could not be resolved.");
+}
     const formData = await request.formData();
     const video = formData.get("video");
 

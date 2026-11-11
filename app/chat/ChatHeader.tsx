@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 import { ChevronLeft } from "lucide-react";
 
@@ -108,35 +109,7 @@ useEffect(() => {
 </button>
 
 
-      {profilePhoto && (
-  <img
-  src={
-    profilePhoto ||
-    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
-  }
-
-  draggable={false}
-  onContextMenu={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }}
-  onError={(e) => {
-    e.currentTarget.src =
-      "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg";
-  }}
-  alt={profileName || "Profile"}
-  style={{
-    width: 45,
-    height: 45,
-    borderRadius: "50%",
-    objectFit: "cover",
-    marginRight: 12,
-    WebkitTouchCallout: "none",
-    WebkitUserSelect: "none",
-    userSelect: "none",
-  }}
-/>
-)}
+      <div style={{ marginRight: 12 }}><ProfileAvatar name={profileName || "Admin"} photoUrl={profilePhoto} size={45} /></div>
 
       <div>
         <div

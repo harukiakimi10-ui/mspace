@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
@@ -43,6 +43,7 @@ type Props = {
   conversations: Conversation[];
   selectedConversationId?: string;
   hideReadReceiptsForEveryone?: boolean;
+  syncingConversationIds?: string[];
 };
 
 function formatConversationDate(dateString: string) {
@@ -95,6 +96,7 @@ export default function ConversationList({
   conversations,
   selectedConversationId,
   hideReadReceiptsForEveryone = false,
+  syncingConversationIds = [],
 }: Props) {
 
   const router = useRouter();
@@ -133,7 +135,7 @@ const activeConversationId =
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
-useEffect(() => {
+useLayoutEffect(() => {
   const savedDrafts: Record<string, string> = {};
 
   conversations.forEach((chat) => {
@@ -325,7 +327,9 @@ function MessageReadReceipt({
 }}
     >
 
-{!chat.member_typing && !drafts[chat.id] && (
+{!chat.member_typing &&
+  !drafts[chat.id] &&
+  !syncingConversationIds.includes(chat.id) && (
   <MessageReadReceipt
     message={chat.lastMessage}
     hideReadReceipts={chat.member?.hide_read_receipts === true}
@@ -373,6 +377,15 @@ function MessageReadReceipt({
     >
       {drafts[chat.id]}
     </span>
+    </span>
+) : syncingConversationIds.includes(chat.id) ? (
+  <span
+    style={{
+      fontStyle: "italic",
+      color: "#777",
+    }}
+  >
+    Loading...
   </span>
 ) : chat.lastMessage ? (
   chat.lastMessage.is_deleted ? (
@@ -500,7 +513,8 @@ function MessageReadReceipt({
 )}
     </span>
 
-    {(chat.unreadCount ?? 0) > 0 && (
+    {!syncingConversationIds.includes(chat.id) &&
+  (chat.unreadCount ?? 0) > 0 && (
   <div
     style={{
       minWidth: 20,

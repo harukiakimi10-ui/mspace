@@ -207,8 +207,11 @@ const t = {
         return;
       }
 
-      photoUrl =
-        `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/${data.path}`;
+      const { data: publicUrlData } = supabase.storage
+         .from("avatars")
+         .getPublicUrl(data.path);
+
+          photoUrl = publicUrlData.publicUrl;
     }
 
     const { error } = await supabase

@@ -12,9 +12,12 @@ import { createClient } from "@/utils/supabase/client";
 import { MessagesSquare } from "lucide-react";
 import NotificationButton from "../NotificationButton";
 import ProfileAvatar from "@/app/chat/ProfileAvatar";
+import { getMessages } from "@/app/chat/services/messageService";
 
 import {
   MessageCircleMore,
+  Copy,
+  Info,
   ChevronLeft,
   ChevronRight,
   X,
@@ -98,6 +101,10 @@ const [cacheReady, setCacheReady] = useState(false);
 
   const [memberName, setMemberName] = useState("");
 const [memberPhoto, setMemberPhoto] = useState("");
+const [recoveryCode, setRecoveryCode] = useState("");
+const [showRecoveryInfo, setShowRecoveryInfo] = useState(false);
+const [showRecoveryExplanation, setShowRecoveryExplanation] = useState(false);
+const recoveryCodeRequestedRef = useRef(false);
   const [selectedPhoto, setSelectedPhoto] = useState("");
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -168,7 +175,19 @@ const fullscreenVideoRefs =
   const [touchStartX, setTouchStartX] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCountCacheKey = `mspace-unread-count-${typeof window !== "undefined" ? localStorage.getItem("mspace_member_id") ?? "default" : "default"}`;
+
+const [unreadCount, setUnreadCount] = useState(() => {
+  if (typeof window === "undefined") return 0;
+
+  try {
+    return Number(
+      localStorage.getItem(unreadCountCacheKey)
+    ) || 0;
+  } catch {
+    return 0;
+  }
+});
  useEffect(() => {
   const updateNetworkStatus = () => {
     setIsOffline(!navigator.onLine);
@@ -264,6 +283,22 @@ const t = {
       "Welcome to my personal space. View my exclusive photos, watch my latest videos and chat with me directly.",
     copyright: "All Rights Reserved",
     offline: "No internet connection",
+    recoveryCode: "Recovery code:",
+    copyRecoveryCode: "Copy recovery code",
+    recoveryCopied: "Recovery code copied.",
+    recoveryCopyFailed: "Unable to copy the recovery code.",
+    recoveryInfo: "Click to learn more about your recovery code",
+    recoveryTitle: "Your MSpace recovery code",
+    recoveryDescription:
+  "Your recovery code gives you another way to access your original MSpace account.",
+     recoveryRestoreTitle: "Recover your account:",
+     recoveryRestoreDescription:
+  "If you change or lose your device, use your registered name and recovery code to restore your original account and chat history.",
+     recoveryLoginTitle: "Log back in:",
+     recoveryLoginDescription:
+  "If MSpace logs you out, use your registered name and recovery code to access your existing account again.",
+     recoveryWarning: "Do not share your recovery code with anyone.",
+     gotIt: "Got it",
   },
 
   zh: {
@@ -277,6 +312,22 @@ const t = {
       "欢迎来到我的个人空间。查看我的独家照片、观看最新视频，并直接与我聊天。",
     copyright: "版权所有",
     offline: "网络不可用，请检查网络",
+     recoveryCode: "恢复码：",
+    copyRecoveryCode: "复制恢复码",
+    recoveryCopied: "恢复码已复制。",
+    recoveryCopyFailed: "无法复制恢复码。",
+    recoveryInfo: "点击了解更多关于恢复码的信息",
+    recoveryTitle: "您的星域恢复码",
+    recoveryDescription:
+  "恢复码为您提供另一种访问原始星域账户的方式。",
+    recoveryRestoreTitle: "恢复您的账户：",
+    recoveryRestoreDescription:
+  "如果您更换或丢失设备，可以使用注册姓名和恢复码恢复原来的账户及聊天记录。",
+    recoveryLoginTitle: "重新登录：",
+    recoveryLoginDescription:
+  "如果您被星域登出，可以使用注册姓名和恢复码重新访问现有账户。",
+    recoveryWarning: "请勿与任何人分享您的恢复码。",
+    gotIt: "知道了",
   },
 }[language];
 
@@ -297,6 +348,17 @@ const t = {
   return () => clearInterval(interval);
 }, []);
 
+useEffect(() => {
+  const memberId = localStorage.getItem("mspace_member_id");
+
+  if (!memberId) return;
+
+  const acknowledged = localStorage.getItem(
+    `mspace-recovery-info-read-${memberId}`
+  );
+
+  setShowRecoveryInfo(acknowledged !== "true");
+}, []);
 
  useEffect(() => {
   const handler = (e: any) => {
@@ -364,8 +426,12 @@ useEffect(() => {
         schema: "public",
         table: "messages",
       },
-      () => {
+            (payload) => {
         loadUnreadCount();
+
+        if (payload.new?.sender === "admin") {
+          syncMemberMessageCache();
+        }
       }
     )
     .subscribe();
@@ -423,6 +489,7 @@ async function loadInitialData() {
     loadPhotos(),
     loadVideos(),
     loadUnreadCount(),
+    syncMemberMessageCache(),
   ]);
 
   setLoading(false);
@@ -726,6 +793,28 @@ if (!member) {
       return;
     }
   }
+  // Load the recovery code once after account and device checks pass.
+  if (!recoveryCodeRequestedRef.current) {
+    recoveryCodeRequestedRef.current = true;
+
+    try {
+      const response = await fetch("/api/member/recovery-code", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      const result = await response.json();
+
+      if (response.ok && /^\d{4}$/.test(result.recoveryCode)) {
+        setRecoveryCode(result.recoveryCode);
+      } else {
+        console.error("Recovery code could not be loaded.");
+      }
+    } catch (error) {
+      console.error("Recovery-code request failed:", error);
+    }
+  }
 }
 
 async function trackVisit() {
@@ -797,23 +886,105 @@ async function openChat() {
   router.push("/chat");
 }
 
-async function loadUnreadCount() {
+async function syncMemberMessageCache() {
   const memberId = localStorage.getItem("mspace_member_id");
 
-  if (!memberId) return;
+  if (!memberId || !navigator.onLine) return;
 
-  const { data: conversation } = await supabase
+  const { data: conversation, error } = await supabase
     .from("conversations")
     .select("id")
     .eq("member_id", memberId)
     .maybeSingle();
 
-  if (!conversation) {
-    setUnreadCount(0);
+  if (error || !conversation) {
+    if (error) {
+      console.error("Message cache conversation error:", error);
+    }
     return;
   }
 
-  const { count } = await supabase
+  try {
+    const messages = await getMessages(conversation.id);
+
+    if (!Array.isArray(messages)) return;
+
+    const latestMessages = messages.filter(
+      (msg: any) => msg.deleted_for !== "member"
+    );
+
+    const cacheKey = `mspace-chat-messages-${memberId}`;
+
+    let cachedMessages: any[] = [];
+
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      const parsed = cached ? JSON.parse(cached) : [];
+
+      if (Array.isArray(parsed)) {
+        cachedMessages = parsed;
+      }
+    } catch {
+      console.error("Could not read existing message cache.");
+    }
+
+    const messagesById = new Map(
+      cachedMessages.map((msg: any) => [msg.id, msg])
+    );
+
+    latestMessages.forEach((msg: any) => {
+      messagesById.set(msg.id, msg);
+    });
+
+    const mergedMessages = Array.from(messagesById.values())
+      .filter((msg: any) => msg.deleted_for !== "member")
+      .sort(
+        (a: any, b: any) =>
+          new Date(a.created_at).getTime() -
+          new Date(b.created_at).getTime()
+      );
+
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify(mergedMessages)
+    );
+
+    console.log(
+      "MEMBER MESSAGE CACHE SYNCED:",
+      mergedMessages.length
+    );
+  } catch (error) {
+    console.error("Member message cache sync failed:", error);
+  }
+}
+
+async function loadUnreadCount() {
+  const memberId = localStorage.getItem("mspace_member_id");
+
+  if (!memberId) return;
+
+  const { data: conversation, error: conversationError } =
+    await supabase
+      .from("conversations")
+      .select("id")
+      .eq("member_id", memberId)
+      .maybeSingle();
+
+  if (conversationError) {
+    console.error(
+      "Unread conversation query error:",
+      conversationError
+    );
+    return;
+  }
+
+  if (!conversation) {
+    setUnreadCount(0);
+    localStorage.setItem(unreadCountCacheKey, "0");
+    return;
+  }
+
+  const { count, error: countError } = await supabase
     .from("messages")
     .select("*", {
       count: "exact",
@@ -823,8 +994,24 @@ async function loadUnreadCount() {
     .eq("sender", "admin")
     .eq("is_read", false);
 
- console.log("Unread count:", count);
-  setUnreadCount(count ?? 0);
+  if (countError) {
+    console.error(
+      "Unread message count query error:",
+      countError
+    );
+    return;
+  }
+
+  const updatedCount = count ?? 0;
+
+  console.log("Unread count:", updatedCount);
+
+  setUnreadCount(updatedCount);
+
+  localStorage.setItem(
+    unreadCountCacheKey,
+    String(updatedCount)
+  );
 }
 
 
@@ -1083,14 +1270,15 @@ useEffect(() => {
   style={{
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-start",
+
     background: "#f9fafb",
     border: "1px solid #e5e7eb",
     borderRadius: "16px",
     padding: "6px 10px 6px 6px",
     marginTop: "12px",
     marginBottom: "10px",
-    width: "fit-content",
+    width: "calc(100% - 10px)",
+    justifyContent: "space-between",
 marginLeft: "5px",
 marginRight: "0",
     boxSizing: "border-box",
@@ -1132,7 +1320,195 @@ marginRight: "0",
       color="#6b7280"
     />
   </button>
+  <div style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexShrink: 0,
+    marginLeft: "auto",
+  }}>
+    <span style={{ fontSize: "12px", color: "#6b7280" }}>
+      {t.recoveryCode}
+    </span>
+    <strong style={{
+      fontSize: "16px",
+      letterSpacing: "2px",
+      color: "#111827",
+    }}>
+     {recoveryCode || (
+  <span
+    style={{
+      display: "inline-block",
+      width: "12px",
+      height: "12px",
+      border: "2px solid #ddd6fe",
+      borderTop: "2px solid #7c3aed",
+      borderRadius: "50%",
+      animation: "spin 0.8s linear infinite",
+      verticalAlign: "middle",
+    }}
+  />
+)}
+    </strong>
+    <button
+      type="button"
+      disabled={!recoveryCode}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(recoveryCode);
+          alert(t.recoveryCopied);
+        } catch {
+          alert(t.recoveryCopyFailed);
+        }
+      }}
+        aria-label={t.copyRecoveryCode}
+        title={t.copyRecoveryCode}
+      style={{
+        border: "1px solid #e5e7eb",
+        background: "#ffffff",
+        borderRadius: "8px",
+        padding: "7px",
+        display: "flex",
+        alignItems: "center",
+        cursor: recoveryCode ? "pointer" : "not-allowed",
+        opacity: recoveryCode ? 1 : 0.5,
+      }}
+    >
+      <Copy size={16} color="#6b7280" />
+    </button>
+  </div>
 </div>
+
+{showRecoveryInfo && (
+  <div
+    style={{
+      position: "relative",
+      width: "95%",
+      maxWidth: "1400px",
+      margin: "10px auto 14px",
+      boxSizing: "border-box",
+    }}
+  >
+    {/* Arrow pointing up toward the recovery code */}
+    <div
+      style={{
+        position: "absolute",
+        right: "28px",
+        top: "-8px",
+        width: "15px",
+        height: "15px",
+        background: "#faf5ff",
+        borderTop: "1px solid #c4b5fd",
+        borderLeft: "1px solid #c4b5fd",
+        transform: "rotate(45deg)",
+      }}
+    />
+
+    <button
+      type="button"
+      onClick={() => setShowRecoveryExplanation(true)}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "13px 15px",
+        border: "1px solid #c4b5fd",
+        borderRadius: "12px",
+        background: "#faf5ff",
+        color: "#6d28d9",
+        fontSize: "14px",
+        fontWeight: 700,
+        textAlign: "left",
+        cursor: "pointer",
+        boxSizing: "border-box",
+      }}
+    >
+      <Info size={19} color="#7c3aed" strokeWidth={2.2} />
+      <span style={{ flex: 1 }}>
+        {t.recoveryInfo}
+      </span>
+      <ChevronRight size={19} />
+    </button>
+  </div>
+)}
+
+{showRecoveryExplanation && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 10000,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "420px",
+        background: "#ffffff",
+        borderRadius: "18px",
+        padding: "24px",
+        boxShadow: "0 15px 45px rgba(0,0,0,0.2)",
+      }}
+    >
+      <h3 style={{ color: "#6d28d9", marginTop: 0 }}>
+        {t.recoveryTitle}
+      </h3>
+
+      <p style={{ color: "#374151", lineHeight: 1.7 }}>
+    {t.recoveryDescription}
+</p>
+
+<p style={{ color: "#374151", lineHeight: 1.7 }}>
+  <strong>{t.recoveryRestoreTitle}</strong> {t.recoveryRestoreDescription}
+</p>
+
+<p style={{ color: "#374151", lineHeight: 1.7 }}>
+  <strong>{t.recoveryLoginTitle}</strong> {t.recoveryLoginDescription}
+</p>
+
+      <p style={{ color: "#6b7280", fontSize: "13px" }}>
+         {t.recoveryWarning}
+      </p>
+
+      <button
+        type="button"
+        onClick={() => {
+          const memberId = localStorage.getItem("mspace_member_id");
+
+          if (memberId) {
+            localStorage.setItem(
+              `mspace-recovery-info-read-${memberId}`,
+              "true"
+            );
+          }
+
+          setShowRecoveryExplanation(false);
+          setShowRecoveryInfo(false);
+        }}
+        style={{
+          width: "100%",
+          padding: "13px",
+          marginTop: "12px",
+          border: "none",
+          borderRadius: "10px",
+          background: "#7c3aed",
+          color: "#ffffff",
+          fontSize: "15px",
+          fontWeight: 700,
+          cursor: "pointer",
+        }}
+      >
+        {t.gotIt}
+      </button>
+    </div>
+  </div>
+)}
 
 {/* PROFILE SECTION */}
 
@@ -1161,41 +1537,26 @@ marginRight: "0",
   }}
 >
 
-  <img
-  src={
-    profilePhoto ||
-    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
-  }
-  loading="eager"
-  decoding="sync"
-  alt="Donald Lee"
-  onError={async (e) => {
-    const image = e.currentTarget;
-
-    if (image.dataset.fallbackApplied === "true") {
-      return;
-    }
-
-    image.dataset.fallbackApplied = "true";
-
-    if (profilePhoto) {
-      const cachedUrl = await getCachedMediaUrl(profilePhoto);
-
-      if (cachedUrl !== profilePhoto) {
-        image.src = cachedUrl;
-      }
-    }
-  }}
+<div
   style={{
-  width: isMobile ? "90px" : "160px",
-  height: isMobile ? "90px" : "160px",
-  borderRadius: "50%",
-  objectFit: "cover",
-  marginTop: isMobile ? "0px" : "0px",
-    border: "6px solid #ede9fe",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+    width: isMobile ? 102 : 172,
+    height: isMobile ? 102 : 172,
+    borderRadius: "50%",
+    border: "6px solid #ffffff",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.16)",
+    overflow: "hidden",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   }}
-/>
+>
+  <ProfileAvatar
+    name={profileName || "Member"}
+    photoUrl={profilePhoto}
+    size={isMobile ? 90 : 160}
+  />
+</div>
 
 <div
   style={{
@@ -2000,7 +2361,7 @@ ref={isAndroid ? mediaNavRef : undefined}
           cursor: "pointer",
         }}
       >
-        {language === "zh" ? "知道了" : "Got it"}
+        {t.gotIt}
       </button>
     </div>
   </div>

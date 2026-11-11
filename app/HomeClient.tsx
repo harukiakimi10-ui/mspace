@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import {
+  ArrowLeft,
+  ArrowRight,
   Play,
   WifiOff,
   Image,
@@ -14,6 +16,7 @@ import {
   UserRoundPlus,
 } from "lucide-react";
 import { createId } from "@/lib/createId";
+import ProfileAvatar from "@/app/chat/ProfileAvatar";
 
 
 type HomeData = {
@@ -22,6 +25,7 @@ type HomeData = {
   recentPhotos: string[];
   latestVideo: string;
   latestThumbnail: string;
+  ownerProfilePhoto: string;
 };
 
 export default function Home({
@@ -54,8 +58,13 @@ const [videoCount, setVideoCount] = useState(
   initialHomeData.videoCount
 );
 
-  const [loading, setLoading] = useState(false);
-  const [restoring, setRestoring] = useState(true);
+ const [loading, setLoading] = useState(false);
+const [restoring, setRestoring] = useState(true);
+
+const [showRecoveryForm, setShowRecoveryForm] = useState(false);
+const [recoveryName, setRecoveryName] = useState("");
+const [recoveryCode, setRecoveryCode] = useState("");
+const [recovering, setRecovering] = useState(false);
 
   const [mounted, setMounted] = useState(false);
 const [isOffline, setIsOffline] = useState(false);
@@ -115,7 +124,35 @@ const t = {
     copyright: "All Rights Reserved",
     appName: "MSpace",
     offline: "No internet connection",
-    ownerSpace: "Happiness's",
+    ownerSpace: "Huang Dingxiang's",
+    recoveryLogin: "Log in / Recover existing account",
+    recoveryLoginDesc: "Already a member? Access your account using your recovery code.",
+    recoveryTitle: "Recover your MSpace account",
+    recoveryDesc: "Enter your registered name and four-digit recovery code.",
+    backToJoin: "Back to Join MSpace",
+    registeredMemberName: "Registered member name",
+    recoveryCodePlaceholder: "Four-digit recovery code",
+    recovering: "Recovering account...",
+    recoverAccount: "Recover account",
+    enterRecoveryCode: "Please enter your four-digit recovery code.",
+    recoveryFailed: "Account recovery failed. Please check your details.",
+    recoveryConnectionError: "Unable to recover your account. Please check your connection and try again.",
+    enterRegisteredName: "Please enter your registered member name.",
+    incorrectRecoveryDetails: "The registered name or recovery code is incorrect.",
+    recoveryDeviceError: "Unable to verify this device.",
+    recoveryDeviceBlocked: "This device is blocked from accessing MSpace.",
+    recoveryRestoreError: "Unable to restore this account.",
+    recoveryGeneralError: "Unable to complete account recovery.",
+    recoveryRequestError: "Unable to verify recovery request.",
+    recoveryTooManyAttempts: "Too many failed attempts. Please try again later.",
+    recoveryRequiredFields: "Enter your registered name, recovery code and device information.",
+    recoveryInvalidInfo: "Invalid recovery information.",
+    recoveryConnectionVerify: "Unable to verify this connection. Please try again.",
+    recoveryServerConfig: "Server configuration is incomplete.",
+    recoveryVerifyInfo: "Unable to verify recovery information.",
+    recoveryProcessError: "Unable to process recovery request.",
+    recoveryMemberVerify: "Unable to verify member account.",
+    recoveryMemberUnavailable: "This member account is unavailable.",
   },
   zh: {
     join: "加入星域",
@@ -147,7 +184,35 @@ const t = {
     copyright: "版权所有",
     appName: "星域",
     offline: "网络不可用，请检查网络",
-    ownerSpace: "幸福的",
+    ownerSpace: "黄定襄的",
+    recoveryLogin: "登录 / 恢复现有账户",
+    recoveryLoginDesc: "已经是会员？使用您的恢复码访问账户。",
+    recoveryTitle: "恢复您的星域账户",
+    recoveryDesc: "请输入您注册时使用的姓名和四位数恢复码。",
+    backToJoin: "返回加入星域",
+    registeredMemberName: "注册会员姓名",
+    recoveryCodePlaceholder: "四位数恢复码",
+    recovering: "正在恢复账户...",
+    recoverAccount: "恢复账户",
+    enterRecoveryCode: "请输入您的四位数恢复码。",
+    recoveryFailed: "账户恢复失败，请检查您填写的信息。",
+    recoveryConnectionError: "无法恢复您的账户，请检查网络连接后重试。",
+    enterRegisteredName: "请输入您注册时使用的会员姓名。",
+    incorrectRecoveryDetails: "注册姓名或恢复码不正确。",
+    recoveryDeviceError: "无法验证此设备。",
+    recoveryDeviceBlocked: "此设备已被禁止访问星域。",
+    recoveryRestoreError: "无法恢复此账户。",
+    recoveryGeneralError: "无法完成账户恢复。",
+    recoveryRequestError: "无法验证账户恢复请求。",
+    recoveryTooManyAttempts: "尝试次数过多，请稍后再试。",
+    recoveryRequiredFields: "请输入您注册的姓名、恢复码和设备信息。",
+    recoveryInvalidInfo: "恢复信息无效。",
+    recoveryConnectionVerify: "无法验证当前连接，请重试。",
+    recoveryServerConfig: "服务器配置不完整。",
+    recoveryVerifyInfo: "无法验证恢复信息。",
+    recoveryProcessError: "无法处理账户恢复请求。",
+    recoveryMemberVerify: "无法验证会员账户。",
+    recoveryMemberUnavailable: "此会员账户不可用。",
   },
 }[language];
 
@@ -515,28 +580,7 @@ async function joinMSpace() {
       return;
     }
 
-    // 4. Check whether this name belongs to a banned account.
-    const {
-      data: existingMember,
-      error: nameCheckError,
-    } = await supabase
-      .from("members")
-      .select("member_id, name, banned")
-      .eq("name", trimmedName)
-      .maybeSingle();
-
-    if (nameCheckError) {
-      console.error("Name check failed:", nameCheckError);
-      alert(`${t.error}: ${nameCheckError.message}`);
-      return;
-    }
-
-    if (existingMember?.banned) {
-      alert(t.bannedAccount);
-      return;
-    }
-
-    // 5. Restore an existing account on this device.
+    // 4. Restore an existing account on this device.
     const {
       data: deviceMember,
       error: deviceCheckError,
@@ -553,19 +597,33 @@ async function joinMSpace() {
     }
 
     if (deviceMember) {
-      if (deviceMember.banned) {
-        alert(t.bannedAccount);
-        return;
-      }
+  if (deviceMember.banned) {
+    alert(t.bannedAccount);
+    return;
+  }
 
-      localStorage.setItem(
-        "mspace_member_id",
-        deviceMember.member_id
-      );
+  // Restore the secure server session for this device.
+  const sessionCreated = await createMemberServerSession(
+    deviceMember.member_id,
+    deviceId
+  );
 
-      router.push("/members");
-      return;
-    }
+  // Preserve the member ID if session creation fails.
+  localStorage.setItem(
+    "mspace_member_id",
+    deviceMember.member_id
+  );
+
+  if (!sessionCreated) {
+    alert(
+      "Your account was found, but your secure session could not be restored. Please check your connection and try again."
+    );
+    return;
+  }
+
+  router.push("/members");
+  return;
+}
 
     // 6. Upload the optional profile photo.
     let photoUrl = "";
@@ -659,6 +717,114 @@ async function joinMSpace() {
   } finally {
     // Always release the Join button, including on failure.
     setLoading(false);
+  }
+}
+
+async function recoverMemberAccount() {
+  if (recovering) return;
+
+  const trimmedName = recoveryName.trim();
+  const trimmedCode = recoveryCode.trim();
+
+  if (!trimmedName) {
+    alert(t.enterRegisteredName);
+    return;
+  }
+
+  if (!/^\d{4}$/.test(trimmedCode)) {
+    alert(t.enterRecoveryCode);
+    return;
+  }
+
+  setRecovering(true);
+
+  try {
+    const response = await fetch("/api/member/recover", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "same-origin",
+      cache: "no-store",
+      body: JSON.stringify({
+        name: trimmedName,
+        code: trimmedCode,
+        deviceId:
+          localStorage.getItem("mspace_device_id") ||
+          crypto.randomUUID(),
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.authenticated !== true) {
+  const errorMessages: Record<string, string> = {
+    "Enter your registered name, recovery code and device information.":
+      t.recoveryRequiredFields,
+
+    "Invalid recovery information.":
+      t.recoveryInvalidInfo,
+
+    "Unable to verify this connection. Please try again.":
+      t.recoveryConnectionVerify,
+
+    "Server configuration is incomplete.":
+      t.recoveryServerConfig,
+
+    "Unable to verify recovery request.":
+      t.recoveryRequestError,
+
+    "Too many failed attempts. Please try again later.":
+      t.recoveryTooManyAttempts,
+
+    "Unable to verify recovery information.":
+      t.recoveryVerifyInfo,
+
+    "Unable to process recovery request.":
+      t.recoveryProcessError,
+
+    "The registered name or recovery code is incorrect.":
+      t.incorrectRecoveryDetails,
+
+    "Unable to verify member account.":
+      t.recoveryMemberVerify,
+
+    "This member account is unavailable.":
+      t.recoveryMemberUnavailable,
+
+    "Unable to verify this device.":
+      t.recoveryDeviceError,
+
+    "This device is blocked from accessing MSpace.":
+      t.recoveryDeviceBlocked,
+
+    "Unable to restore this account.":
+      t.recoveryRestoreError,
+
+    "Unable to complete account recovery.":
+      t.recoveryGeneralError,
+  };
+
+  const apiError =
+    typeof result.error === "string" ? result.error : "";
+
+  alert(
+    errorMessages[apiError] ||
+      t.recoveryFailed
+  );
+
+  return;
+}
+
+    localStorage.setItem("mspace_member_id", result.memberId);
+    localStorage.setItem("mspace_device_id", result.deviceId);
+
+    router.replace("/members");
+  } catch (error) {
+    console.error("Account recovery failed:", error);
+    alert(t.recoveryConnectionError);
+  } finally {
+    setRecovering(false);
   }
 }
 
@@ -808,24 +974,17 @@ onClick={() => {
 
 
  <div className="profile-row">
-
-  <img
-  suppressHydrationWarning
-  src="https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%2012.15.29%20PM.jpeg"
-  alt="Donald Lee"
-  style={{
-    width: "160px",
-    height: "160px",
-    borderRadius: "50%",
-    objectFit: "cover",
-    border: "6px solid white",
-    boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-  }}
-/>
+  <div className="owner-avatar-frame">
+    <ProfileAvatar
+      name={t.ownerSpace || "Admin"}
+      photoUrl={initialHomeData.ownerProfilePhoto}
+      size={148}
+    />
+  </div>
 
   <div className="profile-info">
-
     <p
+
       style={{
         color: "#7c3aed",
         fontWeight: "600",
@@ -1163,8 +1322,13 @@ onClick={() => {
     padding: "16px",
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
     border: "1px solid #f1f1f1",
+    position: "relative",
+    overflow: "hidden",
   }}
 >
+
+  {!showRecoveryForm ? (
+  <>
 
   <p
     style={{
@@ -1402,6 +1566,149 @@ onClick={() => {
   )}
 </>
 </button>
+      <div
+    style={{
+      marginTop: "14px",
+      padding: "12px",
+      background: "#f3e8ff",
+      border: "1px solid #d8b4fe",
+      borderRadius: "12px",
+      textAlign: "center",
+    }}
+  >
+    <button
+      type="button"
+      onClick={() => setShowRecoveryForm(true)}
+      style={{
+        width: "100%",
+        border: "none",
+        background: "transparent",
+        color: "#6d28d9",
+        fontSize: "15px",
+        fontWeight: "700",
+        cursor: "pointer",
+        padding: "5px",
+      }}
+    >
+      <span>{t.recoveryLogin}</span>
+<span
+  style={{
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  marginLeft: "5px",
+  color: "#7c3aed",
+}}
+>
+  <ArrowRight size={19} strokeWidth={2.8} />
+</span>
+    </button>
+    <p style={{ margin: "3px 0 0", color: "#7c3aed", fontSize: "12px" }}>
+      {t.recoveryLoginDesc}
+    </p>
+  </div>
+    </>
+  ) : (
+  <div
+    style={{
+      padding: "18px 4px 8px",
+      background: "#ffffff",
+      textAlign: "left",
+    }}
+  >
+    <button
+  type="button"
+  onClick={() => setShowRecoveryForm(false)}
+  style={{
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "9px",
+    border: "1px solid #ddd6fe",
+    background: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
+    color: "#6d28d9",
+    fontSize: "14px",
+    fontWeight: "700",
+    cursor: "pointer",
+    padding: "9px 15px",
+    borderRadius: "12px",
+    marginBottom: "18px",
+    boxShadow: "0 3px 8px rgba(109,40,217,0.08)",
+    transition: "all 0.2s ease",
+  }}
+>
+  <ArrowLeft size={17} strokeWidth={2.5} />
+  {t.backToJoin}
+</button>
+
+    <h3 style={{ margin: "0 0 6px", fontSize: "19px", color: "#111827" }}>
+      {t.recoveryTitle}
+    </h3>
+
+    <p style={{ margin: "0 0 16px", fontSize: "13px", color: "#6b7280" }}>
+      {t.recoveryDesc}
+    </p>
+
+    <input
+      type="text"
+      value={recoveryName}
+      onChange={(event) => setRecoveryName(event.target.value)}
+      placeholder={t.registeredMemberName}
+      autoComplete="name"
+      maxLength={200}
+      style={{
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "12px",
+        border: "1px solid #d1d5db",
+        borderRadius: "8px",
+        marginBottom: "12px",
+        fontSize: "15px",
+      }}
+    />
+
+    <input
+      type="text"
+      inputMode="numeric"
+      value={recoveryCode}
+      onChange={(event) =>
+        setRecoveryCode(event.target.value.replace(/\D/g, "").slice(0, 4))
+      }
+      placeholder={t.recoveryCodePlaceholder}
+      maxLength={4}
+      autoComplete="off"
+      style={{
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "12px",
+        border: "1px solid #d1d5db",
+        borderRadius: "8px",
+        marginBottom: "14px",
+        fontSize: "15px",
+        letterSpacing: "3px",
+      }}
+    />
+
+    <button
+      type="button"
+      onClick={recoverMemberAccount}
+      disabled={recovering}
+      style={{
+        width: "100%",
+        padding: "13px",
+        background: "linear-gradient(90deg,#7c3aed,#9333ea)",
+        color: "#ffffff",
+        border: "none",
+        borderRadius: "9px",
+        fontSize: "16px",
+        fontWeight: "700",
+        cursor: recovering ? "not-allowed" : "pointer",
+        opacity: recovering ? 0.7 : 1,
+      }}
+    >
+      {recovering ? t.recovering : t.recoverAccount}
+    </button>
+  </div>
+)}
 
   <p
   style={{
@@ -1461,7 +1768,7 @@ onClick={() => {
     fontSize: "13px",
   }}
 >
- ©️ 2026 {language === "zh" ? "幸福" : "Happiness"}. {t.copyright}
+ ©️ 2026 {language === "zh" ? "黄定襄" : "Huang Dingxiang"}. {t.copyright}
 </p>
 </footer>
 

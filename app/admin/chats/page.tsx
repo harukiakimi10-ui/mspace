@@ -50,6 +50,57 @@ const [messages, setMessages] = useState<any[]>([]);
 const [reply, setReply] = useState("");
 const [onlineCount, setOnlineCount] = useState(0);
 const [conversationSearch, setConversationSearch] = useState("");
+const [syncingConversationIds, setSyncingConversationIds] =
+  useState<string[]>([]);
+  useEffect(() => {
+  try {
+    const stored = sessionStorage.getItem(
+      "mspace-admin-syncing-conversations"
+    );
+
+    if (stored) {
+      const parsed = JSON.parse(stored);
+
+      if (Array.isArray(parsed)) {
+        setSyncingConversationIds(parsed);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to restore sync status:", error);
+  }
+
+  const handleConversationSync = (event: Event) => {
+    const customEvent = event as CustomEvent<{
+      conversationId: string;
+      syncing: boolean;
+    }>;
+
+    const { conversationId, syncing } = customEvent.detail;
+
+    setSyncingConversationIds((current) => {
+      if (syncing) {
+        return current.includes(conversationId)
+          ? current
+          : [...current, conversationId];
+      }
+
+      return current.filter((id) => id !== conversationId);
+    });
+  };
+
+  window.addEventListener(
+    "mspace-admin-conversation-sync",
+    handleConversationSync
+  );
+
+  return () => {
+    window.removeEventListener(
+      "mspace-admin-conversation-sync",
+      handleConversationSync
+    );
+  };
+}, []);
+
 const [hideReadReceiptsForEveryone, setHideReadReceiptsForEveryone] =
   useState(false);
   useEffect(() => {
@@ -113,6 +164,8 @@ const unreadCount = conversations.filter(
 ).length;
 
 function scheduleConversationRefresh() {
+  conversationsLoadRequestId++;
+
   if (conversationRefreshTimeout.current) {
     clearTimeout(conversationRefreshTimeout.current);
   }
@@ -191,21 +244,65 @@ useEffect(() => {
             table: "messages",
           },
           (payload) => {
-            console.log(
-              "Admin conversation realtime message:",
-              payload.eventType
-            );
+  console.log(
+    "Admin conversation realtime message:",
+    payload.eventType
+  );
 
-            scheduleConversationRefresh();
+  const newMessage = payload.new as any;
 
-            if (
-              selectedConversation &&
-              (payload.new as any)?.conversation_id ===
-                selectedConversation.id
-            ) {
-              void loadMessages(selectedConversation.id);
-            }
-          }
+  if (
+    payload.eventType === "INSERT" &&
+    newMessage?.sender === "member"
+  ) {
+    void (async () => {
+      const { data: conversation, error } = await supabase
+        .from("conversations")
+        .select("id, hidden_from_admin")
+        .eq("id", newMessage.conversation_id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          "Failed to check hidden conversation:",
+          error
+        );
+        scheduleConversationRefresh();
+        return;
+      }
+
+      if (conversation?.hidden_from_admin) {
+        const { data: restored, error: restoreError } =
+          await supabase
+            .from("conversations")
+            .update({ hidden_from_admin: false })
+            .eq("id", conversation.id)
+            .eq("hidden_from_admin", true)
+            .select("id")
+            .maybeSingle();
+
+        if (restoreError || !restored) {
+          console.error(
+            "Failed to restore hidden conversation:",
+            restoreError
+          );
+          return;
+        }
+      }
+
+      scheduleConversationRefresh();
+    })();
+  } else {
+    scheduleConversationRefresh();
+  }
+
+  if (
+    selectedConversation &&
+    newMessage?.conversation_id === selectedConversation.id
+  ) {
+    void loadMessages(selectedConversation.id);
+  }
+}
         )
         .on(
           "postgres_changes",
@@ -215,15 +312,18 @@ useEffect(() => {
             table: "conversations",
           },
           (payload) => {
-            console.log(
-              "Admin conversation realtime update:",
-              payload.eventType
-            );
+           console.log("ADMIN CONVERSATION UPDATE DETAILS:", {
+  newUpdatedAt: (payload.new as any)?.updated_at,
+  oldUpdatedAt: (payload.old as any)?.updated_at,
+  newMemberTyping: (payload.new as any)?.member_typing,
+  old: payload.old,
+  new: payload.new,
+});
 
             const updatedConversation = payload.new as any;
 
-            setConversations((current) =>
-              current.map((conversation) =>
+                setConversations((current) => {
+              const updated = current.map((conversation) =>
                 conversation.id === updatedConversation.id
                   ? {
                       ...conversation,
@@ -231,10 +331,71 @@ useEffect(() => {
                         updatedConversation.member_typing,
                     }
                   : conversation
-              )
-            );
+              );
+
+              // Synchronize typing status in the shared cache.
+              try {
+                localStorage.setItem(
+                  "mspace-admin-conversations",
+                  JSON.stringify(updated)
+                );
+              } catch (error) {
+                console.error(
+                  "Admin conversation typing cache update failed:",
+                  error
+                );
+              }
+
+              return updated;
+            });
+
+            scheduleConversationRefresh();
+
           }
         )
+        .on(
+  "postgres_changes",
+  {
+    event: "DELETE",
+    schema: "public",
+    table: "conversations",
+  },
+  (payload) => {
+    const deletedConversation = payload.old as any;
+
+    console.log(
+      "ADMIN CONVERSATION DELETED REALTIME:",
+      deletedConversation?.id
+    );
+
+    if (!deletedConversation?.id) return;
+
+        setConversations((current) => {
+
+      const updated = current.filter(
+        (conversation) =>
+          conversation.id !== deletedConversation.id
+      );
+
+      // Remove the deleted conversation from the shared cache.
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updated)
+        );
+      } catch (error) {
+        console.error(
+          "Admin conversation deletion cache update failed:",
+          error
+        );
+      }
+
+      return updated;
+    });
+
+    scheduleConversationRefresh();
+  }
+)
         .on(
           "postgres_changes",
           {
@@ -257,8 +418,8 @@ console.log(
   ).length
 );
 
-            setConversations((current) => {
-              const updatedConversations = current.map(
+      setConversations((current) => {
+     const updatedConversations = current.map(
                 (conversation) =>
                   conversation.member?.member_id ===
                   updatedMember?.member_id
@@ -294,10 +455,26 @@ console.log(
                   return now - onlineAt < 2 * 60 * 1000;
                 }).length;
 
-              setOnlineCount(activeOnlineCount);
+                            setOnlineCount(activeOnlineCount);
+
+              // Keep the shared conversation cache synchronized.
+              try {
+                localStorage.setItem(
+                  "mspace-admin-conversations",
+                  JSON.stringify(updatedConversations)
+                );
+              } catch (error) {
+                console.error(
+                  "Admin member status cache update failed:",
+                  error
+                );
+              }
 
               return updatedConversations;
             });
+
+            scheduleConversationRefresh();
+
           }
         )
        .subscribe((status) => {
@@ -455,12 +632,16 @@ function restoreCachedConversations() {
 
     if (!Array.isArray(parsed)) return false;
 
-    setConversations(parsed);
+    const visibleCachedConversations = parsed.filter(
+  (c: any) => c.hidden_from_admin !== true
+);
+
+setConversations(visibleCachedConversations);
 
     const now = Date.now();
 
     setOnlineCount(
-      parsed.filter((c: any) => {
+      visibleCachedConversations.filter((c: any) => {
         if (!c.member?.is_online || !c.member?.online_at) {
           return false;
         }
@@ -491,9 +672,10 @@ async function loadConversations() {
 
   console.time("loadConversations");
   const { data, error } = await supabase
-    .from("conversations")
-    .select("*")
-    .order("updated_at", { ascending: false });
+  .from("conversations")
+  .select("*")
+  .eq("hidden_from_admin", false)
+  .order("updated_at", { ascending: false });
   console.log("Conversation count:", data?.length);
 console.log(data);
 
@@ -517,12 +699,21 @@ await Promise.all(
   .eq("member_id", conversation.member_id)
   .single();
 
-    const { count } = await supabase
+        let unreadQuery = supabase
       .from("messages")
       .select("*", { count: "exact", head: true })
       .eq("conversation_id", conversation.id)
       .eq("sender", "member")
       .eq("is_read", false);
+
+    if (conversation.admin_cleared_at) {
+      unreadQuery = unreadQuery.gt(
+        "created_at",
+        conversation.admin_cleared_at
+      );
+    }
+
+    const { count } = await unreadQuery;
 
    const {
   data: recentMessages,
@@ -533,6 +724,11 @@ await Promise.all(
     "id, content, message_type, sender, created_at, file_duration, is_deleted, is_read, deleted_for"
   )
   .eq("conversation_id", conversation.id)
+  .gt(
+    "created_at",
+    conversation.admin_cleared_at ||
+      "1970-01-01T00:00:00.000Z"
+  )
   .order("created_at", { ascending: false })
   .limit(50);
 
@@ -556,7 +752,17 @@ if (recentMessagesError) {
       (item: any) => item.id === conversation.id
     );
 
-    lastMessage = cachedConversation?.lastMessage ?? null;
+    const cachedLastMessage = cachedConversation?.lastMessage;
+
+lastMessage =
+  cachedLastMessage &&
+  (
+    !conversation.admin_cleared_at ||
+    new Date(cachedLastMessage.created_at).getTime() >
+      new Date(conversation.admin_cleared_at).getTime()
+  )
+    ? cachedLastMessage
+    : null;
   } catch (error) {
     console.error(
       "Failed to restore cached preview:",
@@ -1008,6 +1214,7 @@ return isDesktop ? (
             conversations={filteredConversations}
             selectedConversationId={selectedConversation?.id}
             hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
+            syncingConversationIds={syncingConversationIds}
           />
         </div>
       </div>
@@ -1129,6 +1336,7 @@ return isDesktop ? (
       <ConversationList
         conversations={conversations}
         hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
+        syncingConversationIds={syncingConversationIds}
       />
     </div>
   </div>

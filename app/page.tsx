@@ -36,6 +36,12 @@ export default async function Page() {
     .limit(1)
     .maybeSingle();
 
+    const { data: ownerProfile } = await supabase
+    .from("settings")
+    .select("profile_photo")
+    .eq("id", 1)
+    .maybeSingle();
+
   return (
     <HomeClient
       initialHomeData={{
@@ -45,6 +51,7 @@ export default async function Page() {
           recentPhotos?.map((photo) => photo.image_url) ?? [],
         latestVideo: latestVideo?.video_url ?? "",
         latestThumbnail: latestVideo?.thumbnail_url ?? "",
+        ownerProfilePhoto: ownerProfile?.profile_photo ?? "",
       }}
     />
   );

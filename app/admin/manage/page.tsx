@@ -249,8 +249,12 @@ async function uploadPhoto() {
   return;
 }
 
-  const photoUrl =
-    `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/photos/${fileName}`;
+    const { data: publicUrlData } =
+    supabase.storage
+      .from("photos")
+      .getPublicUrl(fileName);
+
+  const photoUrl = publicUrlData.publicUrl;
 
   const { error } = await supabase
     .from("photos")
@@ -308,13 +312,19 @@ async function uploadVideo() {
     alert(thumbnailError.message);
     return;
   }
+  const { data: videoPublicData } =
+    supabase.storage
+      .from("videos")
+      .getPublicUrl(videoFileName);
 
-  const videoUrl =
-    `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/videos/${videoFileName}`;
+  const { data: thumbnailPublicData } =
+    supabase.storage
+      .from("Thumbnails")
+      .getPublicUrl(thumbnailFileName);
 
-  const thumbnailUrl =
-    `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/Thumbnails/${thumbnailFileName}`;
-
+  const videoUrl = videoPublicData.publicUrl;
+  const thumbnailUrl = thumbnailPublicData.publicUrl;
+  
   const { error } = await supabase
     .from("videos")
     .insert({
@@ -491,8 +501,12 @@ async function saveSettings() {
       return;
     }
 
-    photoUrl =
-      `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/photos/${fileName}`;
+        const { data: publicUrlData } =
+      supabase.storage
+        .from("photos")
+        .getPublicUrl(fileName);
+
+    photoUrl = publicUrlData.publicUrl;
   }
 
   const { error } = await supabase

@@ -249,17 +249,53 @@ const publicKey =
         );
       }
 
-      let subscription =
-        await registration.pushManager.getSubscription();
+  let oldEndpoint: string | null = null;
 
-      if (!subscription) {
-        subscription =
-          await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey:
-              urlBase64ToUint8Array(publicKey),
-          });
-      }
+      let subscription =
+  await registration.pushManager.getSubscription();
+
+const expectedKey =
+  urlBase64ToUint8Array(publicKey);
+
+// Check whether the existing browser subscription
+// uses the current FlashSpace VAPID public key.
+if (subscription) {
+  const existingKey =
+    subscription.options.applicationServerKey;
+
+  const existingBytes = existingKey
+    ? new Uint8Array(existingKey)
+    : null;
+
+  const keyMatches =
+    existingBytes !== null &&
+    existingBytes.length === expectedKey.length &&
+    existingBytes.every(
+      (byte, index) => byte === expectedKey[index]
+    );
+
+  if (!keyMatches) {
+    // Remove only this browser's outdated subscription.
+    oldEndpoint = subscription.endpoint;
+    const removed = await subscription.unsubscribe();
+
+    if (!removed) {
+      throw new Error(
+        "Could not remove the outdated push subscription."
+      );
+    }
+
+    subscription = null;
+  }
+}
+
+if (!subscription) {
+  subscription =
+    await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: expectedKey,
+    });
+}
 
       const memberId =
   localStorage.getItem("mspace_member_id");
@@ -288,6 +324,7 @@ const finalMemberId = isAdmin
           body: JSON.stringify({
             memberId: finalMemberId,
             subscription,
+            oldEndpoint,
           }),
         }
       );

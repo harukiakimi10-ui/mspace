@@ -37,6 +37,7 @@ export async function POST(request: Request) {
 
     const subscription = body.subscription;
     const memberId = body.memberId;
+    const oldEndpoint = body.oldEndpoint;
 
     if (!memberId) {
       return Response.json(
@@ -268,6 +269,25 @@ else {
     savedSubscription = data;
   }
 }
+
+    // Remove the outdated subscription from this browser only.
+    if (
+      oldEndpoint &&
+      oldEndpoint !== subscription.endpoint
+    ) {
+      const { error: cleanupError } = await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("member_id", validMemberId)
+        .eq("endpoint", oldEndpoint);
+
+      if (cleanupError) {
+        console.error(
+          "Old push subscription cleanup error:",
+          cleanupError
+        );
+      }
+    }
 
     console.log(
       "MSpace push subscription saved for member:",

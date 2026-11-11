@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import AdminSessionRenewal from "./components/AdminSessionRenewal";
+import AdminConversationSync from "./components/AdminConversationSync";
 
 export const metadata: Metadata = {
   title: "MSpace Admin",
@@ -15,9 +16,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-  <>
-    <AdminSessionRenewal />
-    {children}
-  </>
-);
+    <>
+      <AdminSessionRenewal />
+      <AdminConversationSync />
+      {children}
+    </>
+  );
 }

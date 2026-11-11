@@ -74,10 +74,11 @@ export default function DeleteConversationDialog({
             lineHeight: 1.6,
           }}
         >
-          Are you sure you want to delete this conversation?
-          <br />
-          <br />
-          All messages will be permanently deleted.
+          Are you sure you want to delete this conversation for everyone?
+
+<br />
+<br />
+All existing messages will be permanently deleted for both you and the member. The member can still start a new conversation.
         </p>
 
         <div

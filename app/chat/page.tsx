@@ -318,7 +318,12 @@ const [audioChunks, setAudioChunks] =
   const [pendingUploads, setPendingUploads] = useState<any[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const activeUploadsRef = useRef<Record<string, tus.Upload>>({});
-  const [newMessageCount, setNewMessageCount] = useState(0);
+  const newMessageCount = messages.filter(
+  (message) =>
+    message.sender === "admin" &&
+    message.is_read === false &&
+    message.deleted_for !== "member"
+).length;
   
 
 
@@ -806,53 +811,84 @@ if (cachedPinnedMessage) {
   }
 
   // Verify the member session before refreshing online chat data.
-  try {
-    const sessionResponse = await fetch(
+try {
+  const sessionResponse = await fetch(
+    "/api/member/session",
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+
+  if (sessionResponse.status === 401) {
+    const memberId = localStorage.getItem("mspace_member_id");
+    const deviceId = localStorage.getItem("mspace_device_id");
+
+    if (!memberId || !deviceId) {
+      window.location.replace("/");
+      return;
+    }
+
+    // Renew the session through server-side verification.
+    const renewalResponse = await fetch(
       "/api/member/session",
       {
-        method: "GET",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
         cache: "no-store",
+        body: JSON.stringify({ memberId, deviceId }),
       }
     );
 
-    if (sessionResponse.status === 401) {
-      localStorage.removeItem("mspace_member_id");
-      localStorage.removeItem("mspace_device_id");
-      localStorage.removeItem("mspace-member-photo");
-      localStorage.removeItem(CHAT_CACHE_KEY);
-      localStorage.removeItem(MESSAGE_CACHE_KEY);
-      localStorage.removeItem(PIN_CACHE_KEY);
-      localStorage.removeItem(OUTBOX_CACHE_KEY);
+    if (!renewalResponse.ok) {
+      console.error(
+        "Member session renewal failed:",
+        renewalResponse.status
+      );
 
       window.location.replace("/");
       return;
     }
 
-    if (!sessionResponse.ok) {
-      console.error(
-        "Unable to verify member session:",
-        sessionResponse.status
-      );
-            setStartupComplete(true);
+    const renewalResult = await renewalResponse.json();
+
+    if (renewalResult.authenticated !== true) {
+      console.error("Member session renewal was not authenticated.");
+      window.location.replace("/");
       return;
     }
-    } catch (error) {
+
+    console.log("Member server session successfully renewed.");
+  } else if (!sessionResponse.ok) {
     console.error(
-      "Member session verification failed:",
-      error
+      "Unable to verify member session:",
+      sessionResponse.status
     );
+
     setStartupComplete(true);
     return;
   }
-
-  // Normal online startup
-  await Promise.all([
-    loadConversation(),
-    loadProfile(),
-    loadAdminStatus(),
-  ]);
+} catch (error) {
+  console.error(
+    "Member session verification failed:",
+    error
+  );
 
   setStartupComplete(true);
+  return;
+}
+
+// Normal online startup
+await Promise.all([
+  loadConversation(),
+  loadProfile(),
+  loadAdminStatus(),
+]);
+
+setStartupComplete(true);
 }
 
 useLayoutEffect(() => {
@@ -863,55 +899,64 @@ useLayoutEffect(() => {
   void bootstrapChat();
 }, []);
 
+
 useEffect(() => {
-  const composer = composerRef.current;
-  const textarea = messageInputRef.current;
+  if (!showComposer) return;
 
-  if (!composer) return;
+  let observer: ResizeObserver | null = null;
+  let retryFrame: number | null = null;
+  let cancelled = false;
 
-    const updateHeight = () => {
-    const composerHeightNow =
-      composer.getBoundingClientRect().height;
+  const attachObserver = () => {
+    if (cancelled) return;
 
-    const textareaHeightNow =
-      textarea?.getBoundingClientRect().height ?? 0;
+    const composer = composerRef.current;
 
-    const messagesEl = messagesRef.current;
+    if (!composer) {
+      retryFrame = requestAnimationFrame(attachObserver);
+      return;
+    }
 
-    setComposerHeight((previous) => {
-      if (previous !== composerHeightNow && messagesEl) {
-        const distanceFromBottom =
-          messagesEl.scrollHeight -
-          messagesEl.scrollTop -
-          messagesEl.clientHeight;
+    const measureComposer = () => {
+      const height = composer.getBoundingClientRect().height;
 
-        wasNearBottomBeforeComposerResizeRef.current =
-          distanceFromBottom <= 80;
+      if (height > 0) {
+        const messagesEl = messagesRef.current;
+
+        setComposerHeight((previous) => {
+          if (previous !== height && messagesEl) {
+            const distanceFromBottom =
+              messagesEl.scrollHeight -
+              messagesEl.scrollTop -
+              messagesEl.clientHeight;
+
+            wasNearBottomBeforeComposerResizeRef.current =
+              distanceFromBottom <= 80;
+          }
+
+          return previous === height ? previous : height;
+        });
       }
+    };
 
-      return previous === composerHeightNow
-        ? previous
-        : composerHeightNow;
-    });
+    measureComposer();
 
-    console.log("MEMBER CHAT SIZES:", {
-      composer: composerHeightNow,
-      textarea: textareaHeightNow,
-    });
+    observer = new ResizeObserver(measureComposer);
+    observer.observe(composer);
   };
 
-  updateHeight();
+  retryFrame = requestAnimationFrame(attachObserver);
 
-  const observer = new ResizeObserver(updateHeight);
-  observer.observe(composer);
+  return () => {
+    cancelled = true;
 
-  if (textarea) {
-    observer.observe(textarea);
-  }
+    if (retryFrame !== null) {
+      cancelAnimationFrame(retryFrame);
+    }
 
-  return () => observer.disconnect();
-}, [showComposer, showStickerPanel]);
-
+    observer?.disconnect();
+  };
+}, [showComposer]);
 
 useEffect(() => {
   if (pendingScrollRestoreRef.current !== null) {
@@ -1395,7 +1440,7 @@ const adminPresenceRefresh = window.setInterval(() => {
       el.scrollTop -
       el.clientHeight < 80;
 
-  setMessages((currentMessages) => {
+    setMessages((currentMessages) => {
     if (
       currentMessages.some(
         (message) => message.id === newMessage.id
@@ -1404,7 +1449,22 @@ const adminPresenceRefresh = window.setInterval(() => {
       return currentMessages;
     }
 
-    return [...currentMessages, newMessage];
+    const nextMessages = [...currentMessages, newMessage];
+
+    try {
+      localStorage.setItem(
+        MESSAGE_CACHE_KEY,
+        JSON.stringify(
+          nextMessages.filter(
+            (message) => message.deleted_for !== "member"
+          )
+        )
+      );
+    } catch (error) {
+      console.error("MEMBER MESSAGE CACHE UPDATE ERROR:", error);
+    }
+
+    return nextMessages;
   });
 
   if (wasAtBottom) {
@@ -1436,13 +1496,6 @@ const adminPresenceRefresh = window.setInterval(() => {
   const isNearBottom = distanceFromBottom <= 80;
 
   if (
-  !isNearBottom &&
-  payload.new?.sender === "admin"
-) {
-  setNewMessageCount((count) => count + 1);
-}
-
-  if (
   payload.new?.sender === "admin" &&
   document.visibilityState === "visible" &&
   document.hasFocus() &&
@@ -1462,10 +1515,42 @@ const adminPresenceRefresh = window.setInterval(() => {
     table: "messages",
     filter: `conversation_id=eq.${conversationId}`,
   },
-  async (payload) => {
-  console.log("MESSAGE UPDATE REALTIME:", payload);
-  await loadMessages(conversationId);
-}
+
+    async (payload) => {
+    console.log("MESSAGE UPDATE REALTIME:", payload);
+
+    const updatedMessage = payload.new as any;
+
+    setMessages((currentMessages) => {
+      const nextMessages = currentMessages.map((message) =>
+        message.id === updatedMessage.id
+          ? {
+              ...message,
+              ...updatedMessage,
+            }
+          : message
+      );
+
+      try {
+        localStorage.setItem(
+          MESSAGE_CACHE_KEY,
+          JSON.stringify(
+            nextMessages.filter(
+              (message) => message.deleted_for !== "member"
+            )
+          )
+        );
+      } catch (error) {
+        console.error("MEMBER MESSAGE CACHE UPDATE ERROR:", error);
+      }
+
+      return nextMessages;
+    });
+
+    // Refresh from Supabase to reconcile with the latest database state.
+    await loadMessages(conversationId);
+  }
+
 )
 
 .on(
@@ -1551,6 +1636,14 @@ messagesEl.scrollTop = Math.max(
   0,
   maxScrollTop - savedPosition
 );
+
+console.log("MEMBER CHAT SCROLL RESTORED:", {
+  scrollHeight: messagesEl.scrollHeight,
+  scrollTop: messagesEl.scrollTop,
+  clientHeight: messagesEl.clientHeight,
+  maxScrollTop,
+  savedPosition,
+});
 
       pendingScrollRestoreRef.current = null;
       hasAutoScrolled.current = true;
@@ -1669,10 +1762,11 @@ localStorage.setItem(
 
 console.log("Conversation state:", conversation);
  
-  setInitialLoad(true);
+ setInitialLoad(true);
 
+await loadMessages(conversation.id);
 
-  await loadMessages(conversation.id);
+setInitialLoad(false);
 
 setTimeout(async () => {
   await markMessagesAsRead(conversation.id);
@@ -1974,99 +2068,122 @@ if (message) {
 }
 
 async function markMessagesAsRead(id: string) {
-console.log("markMessagesAsRead called");
+  console.log("markMessagesAsRead called");
+
   if (
     document.visibilityState !== "visible" ||
     !document.hasFocus()
   ) {
     return;
   }
-console.log("Updating messages to read...");
-  await supabase
-    .from("messages")
-    .update({ is_read: true })
-    .eq("conversation_id", id)
-    .eq("sender", "admin")
-    .eq("is_read", false);
 
-    // Update the MSpace Home Screen badge
-const { count: unreadCount, error: unreadCountError } =
-  await supabase
-    .from("messages")
-    .select("*", {
-      count: "exact",
-      head: true,
-    })
-    .eq("conversation_id", id)
-    .eq("sender", "admin")
-    .eq("is_read", false);
+  const el = messagesRef.current;
 
-if (unreadCountError) {
-  console.error(
-    "MSpace member unread badge count error:",
-    unreadCountError
-  );
-} else {
-  try {
-  const count = unreadCount ?? 0;
+  if (!el) {
+    return;
+  }
+
+  const distanceFromBottom =
+    el.scrollHeight -
+    el.scrollTop -
+    el.clientHeight;
+
+  if (distanceFromBottom > 80) {
+    console.log(
+      "Messages remain unread: chat is not at the bottom."
+    );
+    return;
+  }
+
+  console.log("Updating messages to read...");
+
+      const { data: updatedMessages, error: updateError } =
+    await supabase
+      .from("messages")
+      .update({ is_read: true })
+      .eq("conversation_id", id)
+      .eq("sender", "admin")
+      .eq("is_read", false)
+      .select("id");
+
+  console.log("Mark messages as read result:", {
+    updatedCount: updatedMessages?.length ?? 0,
+    updateError,
+  });
+
+  // Update the MSpace Home Screen badge
+  const { count: unreadCount, error: unreadCountError } =
+    await supabase
+      .from("messages")
+      .select("*", {
+        count: "exact",
+        head: true,
+      })
+      .eq("conversation_id", id)
+      .eq("sender", "admin")
+      .eq("is_read", false);
+
+  if (unreadCountError) {
+    console.error(
+      "MSpace member unread badge count error:",
+      unreadCountError
+    );
+  } else {
+    try {
+      const count = unreadCount ?? 0;
+
+      if (
+        "setAppBadge" in navigator &&
+        typeof navigator.setAppBadge === "function"
+      ) {
+        if (
+          "setAppBadge" in navigator &&
+          typeof navigator.setAppBadge === "function"
+        ) {
+          await navigator.setAppBadge(count);
+        }
+      }
+
+      console.log(
+        "MSpace member badge updated:",
+        count
+      );
+    } catch (error) {
+      console.error(
+        "MSpace member badge update error:",
+        error
+      );
+    }
+  }
 
   if (
-    "setAppBadge" in navigator &&
-    typeof navigator.setAppBadge === "function"
+    typeof navigator !== "undefined" &&
+    "serviceWorker" in navigator
   ) {
-    if (
-  "setAppBadge" in navigator &&
-  typeof navigator.setAppBadge === "function"
-) {
-  await navigator.setAppBadge(count);
-}
+    try {
+      const registration =
+        await navigator.serviceWorker.ready;
+
+      registration.active?.postMessage({
+        type: "MSPACE_CLOSE_READ_NOTIFICATIONS",
+        conversationId: id,
+      });
+    } catch (error) {
+      console.error(
+        "MSpace member close notifications error:",
+        error
+      );
+    }
   }
 
-  console.log(
-    "MSpace member badge updated:",
-    count
-  );
-} catch (error) {
-  console.error(
-    "MSpace member badge update error:",
-    error
-  );
-}
-}
+  //await loadMessages(id);//
 
-  
-if (
-  typeof navigator !== "undefined" &&
-  "serviceWorker" in navigator
-) {
-  try {
-    const registration =
-      await navigator.serviceWorker.ready;
-
-    registration.active?.postMessage({
-      type: "MSPACE_CLOSE_READ_NOTIFICATIONS",
-      conversationId: id,
-    });
-  } catch (error) {
-    console.error(
-      "MSpace member close notifications error:",
-      error
-    );
-  }
-}
-
-//await loadMessages(id);//
-
-console.log("Finished updating read status");
+  console.log("Finished updating read status");
 }
 
 
 function resetComposer() {
   setMessage("");
-
-  if (messageInputRef.current) {
-    messageInputRef.current.style.height = "46px";
-  }
 
   setShowEmojiPicker(false);
   setShowFullEmojiPicker(false);
@@ -2111,6 +2228,14 @@ async function sendMessage() {
   .slice(2)}`;
 
 const messageContent = message;
+
+const messagesContainer = messagesRef.current;
+
+const shouldAutoScroll = messagesContainer
+  ? messagesContainer.scrollHeight -
+      messagesContainer.scrollTop -
+      messagesContainer.clientHeight <= 80
+  : false;
 
 const pendingStartedAt = Date.now();
 
@@ -2182,11 +2307,22 @@ setMessages((prev) => [
   temporaryMessage,
 ]);
 
-console.log("TEXT TEMP MESSAGE CREATED:", temporaryMessage);
+if (shouldAutoScroll) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = messagesRef.current;
 
-await new Promise<void>((resolve) =>
-  requestAnimationFrame(() => resolve())
-);
+      if (!el) return;
+
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  });
+}
+
+console.log("TEXT TEMP MESSAGE CREATED:", temporaryMessage);
 
 const existingOutbox =
   localStorage.getItem(OUTBOX_CACHE_KEY);
@@ -2261,6 +2397,59 @@ setMessages((prev) => [
   data,
 ]);
 
+setTimeout(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
+
+// Update message cache only after successful Supabase send.
+try {
+  const cachedMessages =
+    localStorage.getItem(MESSAGE_CACHE_KEY);
+
+  let cached: any[] = [];
+
+  if (cachedMessages !== null) {
+    const parsed = JSON.parse(cachedMessages);
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid member message cache");
+    }
+
+    cached = parsed;
+  }
+
+  const updatedCache = [
+    ...cached.filter((msg) => msg.id !== data.id),
+    data,
+  ].filter(
+    (msg) => msg.deleted_for !== "member"
+  );
+
+  updatedCache.sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() -
+      new Date(b.created_at).getTime()
+  );
+
+  localStorage.setItem(
+    MESSAGE_CACHE_KEY,
+    JSON.stringify(updatedCache)
+  );
+
+  console.log("MEMBER MESSAGE CACHE UPDATED:", {
+    messageId: data.id,
+    cachedMessageCount: updatedCache.length,
+  });
+} catch (error) {
+  console.error(
+    "MEMBER MESSAGE CACHE UPDATE ERROR:",
+    error
+  );
+}
+
 setPendingMessageIds((prev) =>
   prev.filter((id) => id !== messageId)
 );
@@ -2301,16 +2490,6 @@ if (!(isAndroid && stickerPanelIsOpen)) {
   });
 }
 
-setTimeout(() => {
-  const el = messagesRef.current;
-
-  if (!el) return;
-
-  el.scrollTo({
-    top: el.scrollHeight,
-    behavior: "smooth",
-  });
-}, 50);
 }
 
 async function syncPendingMessages() {
@@ -2871,6 +3050,14 @@ async function sendSticker(sticker: string) {
 
   sendingStickerRef.current = true;
 
+  const messagesContainer = messagesRef.current;
+
+const shouldAutoScroll = messagesContainer
+  ? messagesContainer.scrollHeight -
+      messagesContainer.scrollTop -
+      messagesContainer.clientHeight <= 80
+  : false;
+
   const messageId = `pending-sticker-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}`;
@@ -2946,6 +3133,21 @@ async function sendSticker(sticker: string) {
   ...prev,
   temporarySticker,
 ]);
+
+if (shouldAutoScroll) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = messagesRef.current;
+
+      if (!el) return;
+
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  });
+}
 
 const existingOutbox =
   localStorage.getItem(OUTBOX_CACHE_KEY);
@@ -3027,6 +3229,53 @@ setMessages((prev) => [
   data,
 ]);
 
+setTimeout(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
+
+// Cache only the successfully sent sticker.
+try {
+  const cachedMessages =
+    localStorage.getItem(MESSAGE_CACHE_KEY);
+
+  let cached: any[] = [];
+
+  if (cachedMessages !== null) {
+    const parsed = JSON.parse(cachedMessages);
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid member message cache");
+    }
+
+    cached = parsed;
+  }
+
+  const updatedCache = [
+    ...cached.filter((msg) => msg.id !== data.id),
+    data,
+  ].filter(
+    (msg) => msg.deleted_for !== "member"
+  );
+
+  updatedCache.sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() -
+      new Date(b.created_at).getTime()
+  );
+
+  localStorage.setItem(
+    MESSAGE_CACHE_KEY,
+    JSON.stringify(updatedCache)
+  );
+
+  console.log("MEMBER STICKER CACHE UPDATED:", data.id);
+} catch (error) {
+  console.error("MEMBER STICKER CACHE UPDATE ERROR:", error);
+}
+
 setPendingMessageIds((prev) =>
   prev.filter((id) => id !== messageId)
 );
@@ -3054,13 +3303,6 @@ if (currentOutbox) {
 // Clear the reply composer after sending
 setReplyMessage(null);
 setReplyPreview("");
-
-setTimeout(() => {
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "smooth",
-  });
-}, 50);
 sendingStickerRef.current = false;
 }
 
@@ -3721,6 +3963,62 @@ if (error) {
 }
 
 
+// Cache successfully uploaded photos and videos only.
+if (
+  insertedMessage &&
+  (
+    insertedMessage.message_type === "image" ||
+    insertedMessage.message_type === "video"
+  )
+) {
+  try {
+    const cachedMessages =
+      localStorage.getItem(MESSAGE_CACHE_KEY);
+
+    let cached: any[] = [];
+
+    if (cachedMessages !== null) {
+      const parsed = JSON.parse(cachedMessages);
+
+      if (!Array.isArray(parsed)) {
+        throw new Error("Invalid member message cache");
+      }
+
+      cached = parsed;
+    }
+
+    const updatedCache = [
+      ...cached.filter(
+        (msg) => msg.id !== insertedMessage.id
+      ),
+      insertedMessage,
+    ].filter(
+      (msg) => msg.deleted_for !== "member"
+    );
+
+    updatedCache.sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() -
+        new Date(b.created_at).getTime()
+    );
+
+    localStorage.setItem(
+      MESSAGE_CACHE_KEY,
+      JSON.stringify(updatedCache)
+    );
+
+    console.log(
+      `MEMBER ${insertedMessage.message_type.toUpperCase()} CACHE UPDATED:`,
+      insertedMessage.id
+    );
+  } catch (cacheError) {
+    console.error(
+      "MEMBER MEDIA CACHE UPDATE ERROR:",
+      cacheError
+    );
+  }
+}
+
 
 
 /*
@@ -3805,6 +4103,13 @@ async function sendVoiceMessage(duration: number) {
   if (sendingVoiceRef.current) return;
 
   sendingVoiceRef.current = true;
+  const messagesContainer = messagesRef.current;
+
+const shouldAutoScroll = messagesContainer
+  ? messagesContainer.scrollHeight -
+      messagesContainer.scrollTop -
+      messagesContainer.clientHeight <= 80
+  : false;
 
   const activeConversationId =
     conversationId ??
@@ -3948,16 +4253,24 @@ setMessages((prev) => [
   temporaryVoiceMessage,
 ]);
 
+if (shouldAutoScroll) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = messagesRef.current;
+
+      if (!el) return;
+
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  });
+}
+
 deleteRecording();
 
 recordedAudioRef.current = null;
-
-requestAnimationFrame(() => {
-  messagesRef.current?.scrollTo({
-    top: messagesRef.current.scrollHeight,
-    behavior: "smooth",
-  });
-});
 
 await saveOfflineUpload({
   id: voiceUploadId,
@@ -4010,23 +4323,65 @@ setMessages((prev) => [
   insertedMessage,
 ]);
 
+setTimeout(() => {
+  messagesRef.current?.scrollTo({
+    top: messagesRef.current.scrollHeight,
+    behavior: "smooth",
+  });
+}, 50);
+
+// Cache only the successfully uploaded voice message.
+try {
+  const cachedMessages =
+    localStorage.getItem(MESSAGE_CACHE_KEY);
+
+  let cached: any[] = [];
+
+  if (cachedMessages !== null) {
+    const parsed = JSON.parse(cachedMessages);
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid member message cache");
+    }
+
+    cached = parsed;
+  }
+
+  const updatedCache = [
+    ...cached.filter(
+      (msg) => msg.id !== insertedMessage.id
+    ),
+    insertedMessage,
+  ].filter(
+    (msg) => msg.deleted_for !== "member"
+  );
+
+  updatedCache.sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() -
+      new Date(b.created_at).getTime()
+  );
+
+  localStorage.setItem(
+    MESSAGE_CACHE_KEY,
+    JSON.stringify(updatedCache)
+  );
+
+  console.log(
+    "MEMBER VOICE CACHE UPDATED:",
+    insertedMessage.id
+  );
+} catch (error) {
+  console.error(
+    "MEMBER VOICE CACHE UPDATE ERROR:",
+    error
+  );
+}
+
 await deleteOfflineUpload(voiceUploadId);
 
 requestAnimationFrame(() => {
   messageInputRef.current?.focus();
-});
-
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const el = messagesRef.current;
-
-    if (!el) return;
-
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: "smooth",
-    });
-  });
 });
 
 } finally {
@@ -4472,6 +4827,61 @@ setMessages(prev => [
   ...prev.filter(message => message.id !== messageId),
   data,
 ]);
+
+// Cache only the successfully sent location message.
+try {
+  const cachedMessages =
+    localStorage.getItem(MESSAGE_CACHE_KEY);
+
+  let cached: any[] = [];
+
+  if (cachedMessages !== null) {
+    const parsed = JSON.parse(cachedMessages);
+
+    if (!Array.isArray(parsed)) {
+      throw new Error("Invalid member message cache");
+    }
+
+    cached = parsed;
+  }
+
+  const updatedCache = [
+    ...cached.filter(
+      (msg) => msg.id !== data.id
+    ),
+    data,
+  ].filter(
+    (msg) => msg.deleted_for !== "member"
+  );
+
+  updatedCache.sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() -
+      new Date(b.created_at).getTime()
+  );
+
+  localStorage.setItem(
+    MESSAGE_CACHE_KEY,
+    JSON.stringify(updatedCache)
+  );
+
+  console.log(
+    "MEMBER LOCATION CACHE UPDATED:",
+    data.id
+  );
+} catch (error) {
+  console.error(
+    "MEMBER LOCATION CACHE UPDATE ERROR:",
+    error
+  );
+}
+
+setPendingMessageIds((prev) =>
+  prev.filter((id) => id !== messageId)
+);
+
+setShowLocationPreview(false);
+setLocationPreview(null);
 
   setPendingMessageIds((prev) =>
     prev.filter((id) => id !== messageId)
@@ -4962,6 +5372,13 @@ if (
   if (el && memberId) {
     const distanceFromBottom =
   el.scrollHeight - el.scrollTop - el.clientHeight;
+  console.log("MEMBER CHAT SCROLL SAVED:", {
+  scrollHeight: el.scrollHeight,
+  scrollTop: el.scrollTop,
+  clientHeight: el.clientHeight,
+  distanceFromBottom,
+  composerHeight,
+});
 
 sessionStorage.setItem(
   MEMBER_CHAT_SCROLL_KEY,
@@ -5084,11 +5501,18 @@ sessionStorage.setItem(
       el.clientHeight;
 
     const isAtBottom = distanceFromBottom <= 80;
+    console.log("MEMBER CHAT SCROLL CHECK:", {
+  distanceFromBottom,
+  isAtBottom,
+  initialLoad,
+  conversationId: conversation?.id,
+  focused: document.hasFocus(),
+  visibility: document.visibilityState,
+});
 
     setShowScrollButton(!isAtBottom);
 
-    if (isAtBottom) {
-      setNewMessageCount(0);
+    if (isAtBottom && !initialLoad) {
 
       if (
         conversation?.id &&
@@ -5107,6 +5531,7 @@ sessionStorage.setItem(
 
   overflowY: "auto",
   overflowX: "hidden",
+  overflowAnchor: "none",
 
   WebkitOverflowScrolling: "touch",
 
@@ -5210,6 +5635,7 @@ onOpenLink={(url) => {
   hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   pendingMessageIds={pendingMessageIds}
   profileName={profileName}
+  adminAvatarId="admin"
   adminPhoto={profilePhoto}
   memberPhoto={memberPhoto}
   playMenuSound={playMenuSound}
@@ -5258,8 +5684,6 @@ setMessageFocus={setMessageFocus}
     e.preventDefault();
   }}
     onClick={() => {
-    setNewMessageCount(0);
-
     messagesRef.current?.scrollTo({
       top: messagesRef.current.scrollHeight,
       behavior: "smooth",

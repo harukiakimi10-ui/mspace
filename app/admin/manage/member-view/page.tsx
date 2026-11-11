@@ -127,6 +127,106 @@ const videoThumbnailUrls = useMemo(() => {
   );
 }, [videoThumbnailFiles]);
 
+async function generateVideoThumbnail(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const url = URL.createObjectURL(file);
+
+    let settled = false;
+
+    const cleanup = () => {
+      video.onloadedmetadata = null;
+      video.onseeked = null;
+      video.onerror = null;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+      URL.revokeObjectURL(url);
+    };
+
+    const fail = (message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error(message));
+    };
+
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+
+    video.onloadedmetadata = () => {
+      if (
+        !video.videoWidth ||
+        !video.videoHeight ||
+        !Number.isFinite(video.duration)
+      ) {
+        fail("Video metadata or dimensions are invalid.");
+        return;
+      }
+
+      // Seek slightly into the video to avoid a black opening frame.
+      video.currentTime = Math.min(1, video.duration * 0.1);
+    };
+
+    video.onseeked = () => {
+      if (settled) return;
+
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(640 / video.videoWidth, 1);
+
+      canvas.width = Math.max(
+        1,
+        Math.round(video.videoWidth * scale)
+      );
+
+      canvas.height = Math.max(
+        1,
+        Math.round(video.videoHeight * scale)
+      );
+
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        fail("Unable to create thumbnail canvas.");
+        return;
+      }
+
+      context.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      canvas.toBlob(
+        (blob) => {
+          if (settled) return;
+
+          if (!blob) {
+            fail("Unable to generate video thumbnail.");
+            return;
+          }
+
+          settled = true;
+          cleanup();
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.85
+      );
+    };
+
+    video.onerror = () => {
+      fail("Unable to read video for thumbnail generation.");
+    };
+
+    video.src = url;
+    video.load();
+  });
+}
+
 async function uploadSelectedVideos() {
   if (videoPreviewFiles.length === 0) {
     alert("Please select a video first.");
@@ -157,31 +257,9 @@ async function uploadSelectedVideos() {
         "MB"
       );
 
-      // Step 2: Generate thumbnail on the server
-      const formData = new FormData();
-
-      formData.append("video", compressedFile);
-
-      const thumbnailResponse = await fetch(
-        "/api/video-thumbnail",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!thumbnailResponse.ok) {
-        const errorData =
-          await thumbnailResponse.json();
-
-        throw new Error(
-          errorData.error ||
-            "Thumbnail generation failed."
-        );
-      }
-
-      const thumbnailBlob =
-        await thumbnailResponse.blob();
+     // Step 2: Generate thumbnail in the browser
+const thumbnailBlob =
+  await generateVideoThumbnail(compressedFile);
 
       // Step 3: Create unique filenames
       const id = crypto.randomUUID();
@@ -1171,8 +1249,12 @@ if (!file) {
       return;
     }
 
-    const photoUrl =
-      `https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/photos/${fileName}`;
+        const { data: publicUrlData } =
+      supabase.storage
+        .from("photos")
+        .getPublicUrl(fileName);
+
+    const photoUrl = publicUrlData.publicUrl;
 
     const { error } = await supabase
       .from("photos")
@@ -1699,55 +1781,32 @@ setActiveAction("videos");
   const thumbnailPromises = files.map(
   async (file) => {
     try {
-      console.log(
-        "Starting preview thumbnail generation:",
-        file.name,
-        file.size
-      );
+  console.log(
+    "Starting preview thumbnail generation:",
+    file.name,
+    file.size
+  );
 
-      const formData = new FormData();
+  const blob = await generateVideoThumbnail(file);
 
-      formData.append("video", file);
-
-      const response = await fetch(
-        "/api/video-thumbnail",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      console.log(
-        "Preview thumbnail response:",
-        file.name,
-        response.status,
-        response.ok
-      );
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const blob = await response.blob();
-
-      return new File(
-        [blob],
-        `thumbnail-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}.jpg`,
-        {
-          type: "image/jpeg",
-        }
-      );
-    } catch (error) {
-      console.error(
-        "Preview thumbnail generation failed:",
-        file.name,
-        error
-      );
-
-      return null;
+  return new File(
+    [blob],
+    `thumbnail-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}.jpg`,
+    {
+      type: "image/jpeg",
     }
+  );
+} catch (error) {
+  console.error(
+    "Preview thumbnail generation failed:",
+    file.name,
+    error
+  );
+
+  return null;
+}
   }
 );
 
@@ -2743,39 +2802,36 @@ disabled={savingProfile}
   }}
 >
 
+ {profilePhoto && (
   <img
-  src={
-    profilePhoto ||
-    "https://trmbblhdiolnbdnhlepv.supabase.co/storage/v1/object/public/avatars/WhatsApp%20Image%202025-02-22%20at%201.43.05%20PM.jpeg"
-  }
-  alt="Donald Lee"
-  onError={async (e) => {
-    const image = e.currentTarget;
+    src={profilePhoto}
+    alt="Donald Lee"
+    onError={async (e) => {
+      const image = e.currentTarget;
 
-    if (image.dataset.fallbackApplied === "true") {
-      return;
-    }
+      if (image.dataset.fallbackApplied === "true") {
+        return;
+      }
 
-    image.dataset.fallbackApplied = "true";
+      image.dataset.fallbackApplied = "true";
 
-    if (profilePhoto) {
       const cachedUrl = await getCachedMediaUrl(profilePhoto);
 
       if (cachedUrl !== profilePhoto) {
         image.src = cachedUrl;
       }
-    }
-  }}
-  style={{
-  width: isMobile ? "90px" : "160px",
-  height: isMobile ? "90px" : "160px",
-  borderRadius: "50%",
-  objectFit: "cover",
-  marginTop: isMobile ? "0px" : "0px",
-    border: "6px solid #ede9fe",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-  }}
-/>
+    }}
+    style={{
+      width: isMobile ? "90px" : "160px",
+      height: isMobile ? "90px" : "160px",
+      borderRadius: "50%",
+      objectFit: "cover",
+      marginTop: "0px",
+      border: "6px solid #ede9fe",
+      boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+    }}
+  />
+)}
 
 <div
   style={{
@@ -3447,79 +3503,55 @@ boxSizing: "border-box",
 <button
   type="button"
   onClick={async () => {
-    if (photoViewerCurrentIndex === null) return;
+  if (photoViewerCurrentIndex === null) return;
 
-    const photo = photos[photoViewerCurrentIndex];
+  const photo = photos[photoViewerCurrentIndex];
+  if (!photo) return;
 
-    if (!photo) return;
+  const confirmed = window.confirm("Delete this photo?");
+  if (!confirmed) return;
 
-    const confirmed = window.confirm(
-      "Delete this photo?"
+  try {
+    const response = await fetch("/api/admin/delete-photo", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ photoId: photo.id }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(result.error || "Unable to delete this photo.");
+      return;
+    }
+
+    const nextIndex =
+      photos.length <= 1
+        ? null
+        : photoViewerCurrentIndex >= photos.length - 1
+          ? photos.length - 2
+          : photoViewerCurrentIndex;
+
+    setPhotos((prev) =>
+      prev.filter((item) => item.id !== photo.id)
     );
 
-    if (!confirmed) return;
-
-    try {
-      const photoPath = photo.image_url.split(
-        "/photos/"
-      )[1];
-
-      if (photoPath) {
-        const { error: storageError } =
-          await supabase.storage
-            .from("photos")
-            .remove([photoPath]);
-
-        if (storageError) {
-          console.error(
-            "Photo storage delete error:",
-            storageError
-          );
-          return;
-        }
-      }
-
-      const { error: databaseError } =
-        await supabase
-          .from("photos")
-          .delete()
-          .eq("id", photo.id);
-
-      if (databaseError) {
-        console.error(
-          "Photo database delete error:",
-          databaseError
-        );
-        return;
-      }
-
-      const nextIndex =
-  photos.length <= 1
-    ? null
-    : photoViewerCurrentIndex! >= photos.length - 1
-      ? photos.length - 2
-      : photoViewerCurrentIndex!;
-
-setPhotos((prev) =>
-  prev.filter((item) => item.id !== photo.id)
-);
-
-if (nextIndex === null) {
-  setSelectedIndex(null);
-  setPhotoViewerCurrentIndex(null);
-} else {
-  setSelectedIndex(nextIndex);
-  setPhotoViewerCurrentIndex(nextIndex);
-}
-
-  
-    } catch (error) {
-      console.error(
-        "Delete photo error:",
-        error
-      );
+    if (nextIndex === null) {
+      setSelectedIndex(null);
+      setPhotoViewerCurrentIndex(null);
+    } else {
+      setSelectedIndex(nextIndex);
+      setPhotoViewerCurrentIndex(nextIndex);
     }
-  }}
+
+    alert("Photo deleted successfully!");
+  } catch (error) {
+    console.error("Delete photo error:", error);
+    alert("Unable to delete this photo. Please try again.");
+  }
+}}
   style={{
     position: "fixed",
     top: "20px",
@@ -3933,98 +3965,55 @@ if (videoToPlay) {
 <button
   type="button"
   onClick={async () => {
-    if (selectedVideoIndex === null) return;
+  if (selectedVideoIndex === null) return;
 
-    const video = videos[selectedVideoIndex];
+  const video = videos[selectedVideoIndex];
+  if (!video) return;
 
-    if (!video) return;
+  const confirmed = window.confirm("Delete this video?");
+  if (!confirmed) return;
 
-    const confirmed = window.confirm(
-      "Delete this video?"
+  try {
+    const response = await fetch("/api/admin/delete-video", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ videoId: video.id }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(result.error || "Unable to delete this video.");
+      return;
+    }
+
+    const nextIndex =
+      videos.length <= 1
+        ? null
+        : selectedVideoIndex >= videos.length - 1
+          ? videos.length - 2
+          : selectedVideoIndex;
+
+    setVideos((prev) =>
+      prev.filter((item) => item.id !== video.id)
     );
 
-    if (!confirmed) return;
-
-    try {
-      const videoPath = video.video_url.split(
-        "/videos/"
-      )[1];
-
-      if (videoPath) {
-        const { error: storageError } =
-          await supabase.storage
-            .from("videos")
-            .remove([videoPath]);
-
-        if (storageError) {
-          console.error(
-            "Video storage delete error:",
-            storageError
-          );
-          return;
-        }
-      }
-
-      if (video.thumbnail_url) {
-        const thumbnailPath =
-          video.thumbnail_url.split(
-            "/Thumbnails/"
-          )[1];
-
-        if (thumbnailPath) {
-          const { error: thumbnailError } =
-            await supabase.storage
-              .from("Thumbnails")
-              .remove([thumbnailPath]);
-
-          if (thumbnailError) {
-            console.error(
-              "Thumbnail delete error:",
-              thumbnailError
-            );
-          }
-        }
-      }
-
-      const { error: databaseError } =
-        await supabase
-          .from("videos")
-          .delete()
-          .eq("id", video.id);
-
-      if (databaseError) {
-        console.error(
-          "Video database delete error:",
-          databaseError
-        );
-        return;
-      }
-
-      const nextIndex =
-        videos.length <= 1
-          ? null
-          : selectedVideoIndex >= videos.length - 1
-            ? videos.length - 2
-            : selectedVideoIndex;
-
-      setVideos((prev) =>
-        prev.filter((item) => item.id !== video.id)
-      );
-
-      if (nextIndex === null) {
-        setSelectedVideoIndex(null);
-        setVideoViewerControlsVisible(null);
-      } else {
-        setSelectedVideoIndex(nextIndex);
-        setVideoViewerControlsVisible(null);
-      }
-    } catch (error) {
-      console.error(
-        "Delete video error:",
-        error
-      );
+    if (nextIndex === null) {
+      setSelectedVideoIndex(null);
+      setVideoViewerControlsVisible(null);
+    } else {
+      setSelectedVideoIndex(nextIndex);
+      setVideoViewerControlsVisible(null);
     }
-  }}
+
+    alert("Video deleted successfully!");
+  } catch (error) {
+    console.error("Delete video error:", error);
+    alert("Unable to delete this video. Please try again.");
+  }
+}}
   style={{
     position: "fixed",
     top: "20px",

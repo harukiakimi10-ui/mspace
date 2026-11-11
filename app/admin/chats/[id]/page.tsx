@@ -200,6 +200,7 @@ async function saveMemberOnlineStatusPrivacy(nextValue: boolean) {
     }
   });
 
+// Detect desktop screen size
 useEffect(() => {
   const checkDesktop = () => {
     setIsDesktop(window.innerWidth >= 1024);
@@ -246,8 +247,8 @@ useEffect(() => {
 
   setHideReadReceipts(hideReadReceiptsValue);
 
-  setDesktopConversations((currentConversations) =>
-    currentConversations.map((chat) =>
+    setDesktopConversations((currentConversations) => {
+    const updated = currentConversations.map((chat) =>
       chat.member_id === memberId
         ? {
             ...chat,
@@ -259,8 +260,23 @@ useEffect(() => {
               : chat.member,
           }
         : chat
-    )
-  );
+    );
+
+    // Synchronize read-receipt privacy in the shared cache.
+    try {
+      localStorage.setItem(
+        "mspace-admin-conversations",
+        JSON.stringify(updated)
+      );
+    } catch (error) {
+      console.error(
+        "Read-receipt privacy cache update failed:",
+        error
+      );
+    }
+
+    return updated;
+  });
 }
     } catch (error) {
       console.error(
@@ -383,13 +399,14 @@ console.log("DESKTOP CONVERSATION LOAD START:", requestId);
     try {
 
       // Get the latest conversations from Supabase
-      const { data: conversations, error } =
-        await supabase
-          .from("conversations")
-          .select("*")
-          .order("updated_at", {
-            ascending: false,
-          });
+     const { data: conversations, error } =
+  await supabase
+    .from("conversations")
+    .select("*")
+    .eq("hidden_from_admin", false)
+    .order("updated_at", {
+      ascending: false,
+    });
 
       if (error) {
         console.error(
@@ -1128,6 +1145,7 @@ const generateLocalVideoThumbnail = (
 const [showImageViewer, setShowImageViewer] = useState(false);
 const [viewerImage, setViewerImage] = useState("");
 const [viewerName, setViewerName] = useState("");
+const [showProfilePhotoViewer, setShowProfilePhotoViewer] = useState(false);
 
 const [showVideoViewer, setShowVideoViewer] = useState(false);
 const [viewerVideo, setViewerVideo] = useState("");
@@ -1420,6 +1438,7 @@ setPinnedMessageId(
         );
 
         setMessages(visibleCachedMessages);
+        setInitialMessagesLoadComplete(true);
       }
     } catch (error) {
       console.error(
@@ -1577,14 +1596,31 @@ if (newMessage.conversation_id === id) {
       container.scrollTop -
       container.clientHeight < 80;
 
-  setMessages((currentMessages) => {
+    setMessages((currentMessages) => {
     const alreadyExists = currentMessages.some(
       (message) => message.id === newMessage.id
     );
+
     if (alreadyExists) {
       return currentMessages;
     }
-    return [...currentMessages, newMessage];
+
+    const nextMessages = [...currentMessages, newMessage];
+
+    try {
+      localStorage.setItem(
+        `mspace-messages-${id}`,
+        JSON.stringify(
+          nextMessages.filter(
+            (message) => message.deleted_for !== "admin"
+          )
+        )
+      );
+    } catch (error) {
+      console.error("ADMIN MESSAGE CACHE UPDATE ERROR:", error);
+    }
+
+    return nextMessages;
   });
 
   if (wasAtBottom) {
@@ -1617,13 +1653,37 @@ console.log("🔥 SIDEBAR REALTIME UPDATE:", {
 
 if (!conversationExists) {
   void (async () => {
-    const { data: conversation } = await supabase
+    let { data: conversation } = await supabase
       .from("conversations")
       .select("*")
       .eq("id", newMessage.conversation_id)
       .maybeSingle();
 
     if (!conversation) return;
+
+    if (conversation.hidden_from_admin) {
+      // Only a new member message can restore a hidden conversation.
+      if (newMessage.sender !== "member") return;
+
+      const { data: restoredConversation, error: restoreError } =
+        await supabase
+          .from("conversations")
+          .update({ hidden_from_admin: false })
+          .eq("id", conversation.id)
+          .eq("hidden_from_admin", true)
+          .select("*")
+          .maybeSingle();
+
+      if (restoreError || !restoredConversation) {
+        console.error(
+          "Failed to restore hidden conversation:",
+          restoreError
+        );
+        return;
+      }
+
+      conversation = restoredConversation;
+    }
 
     const { data: member } = await supabase
       .from("members")
@@ -1646,7 +1706,7 @@ if (!conversationExists) {
         ? "📍 Location"
         : newMessage.content || "";
 
-    setDesktopConversations((current) => {
+        setDesktopConversations((current) => {
       if (
         current.some(
           (chat) => chat.id === conversation.id
@@ -1655,7 +1715,7 @@ if (!conversationExists) {
         return current;
       }
 
-      return [
+      const updated = [
         {
           ...conversation,
           member,
@@ -1670,6 +1730,21 @@ if (!conversationExists) {
         },
         ...current,
       ];
+
+      // Save the newly added conversation to the shared cache.
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updated)
+        );
+      } catch (error) {
+        console.error(
+          "New conversation cache update failed:",
+          error
+        );
+      }
+
+      return updated;
     });
   })();
 
@@ -1748,6 +1823,19 @@ if (!conversationExists) {
         return bTime - aTime;
       });
 
+            // Save the updated conversation list to the shared cache.
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updated)
+        );
+      } catch (error) {
+        console.error(
+          "Message INSERT conversation cache update failed:",
+          error
+        );
+      }
+
       return updated;
     });
   }
@@ -1758,20 +1846,35 @@ if (!conversationExists) {
     const updatedMessage = payload.new as any;
 
     // Update the message inside the open chat.
-    setMessages((currentMessages) =>
-      currentMessages.map((message) =>
-        message.id === updatedMessage.id
-          ? {
-              ...message,
-              ...updatedMessage,
-            }
-          : message
+    setMessages((currentMessages) => {
+  const nextMessages = currentMessages.map((message) =>
+    message.id === updatedMessage.id
+      ? {
+          ...message,
+          ...updatedMessage,
+        }
+      : message
+  );
+
+  try {
+    localStorage.setItem(
+      `mspace-messages-${id}`,
+      JSON.stringify(
+        nextMessages.filter(
+          (message) => message.deleted_for !== "admin"
+        )
       )
     );
+  } catch (error) {
+    console.error("ADMIN MESSAGE CACHE UPDATE ERROR:", error);
+  }
 
-    // Update the conversation-list preview immediately.
-    setDesktopConversations((currentConversations) =>
-      currentConversations.map((chat) =>
+  return nextMessages;
+});
+
+        // Update the conversation-list preview immediately.
+    setDesktopConversations((currentConversations) => {
+      const updated = currentConversations.map((chat) =>
         chat.id === updatedMessage.conversation_id &&
         chat.lastMessage?.id === updatedMessage.id
           ? {
@@ -1782,8 +1885,23 @@ if (!conversationExists) {
               },
             }
           : chat
-      )
-    );
+      );
+
+      // Save the updated conversation preview to the shared cache.
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updated)
+        );
+      } catch (error) {
+        console.error(
+          "Message UPDATE conversation cache error:",
+          error
+        );
+      }
+
+      return updated;
+    });
   }
 
   // Badge when a new member message arrives
@@ -1843,6 +1961,39 @@ if (!conversationExists) {
       )
     );
 
+        // Keep the shared conversation cache synchronized.
+    try {
+      const cached = JSON.parse(
+        localStorage.getItem("mspace-admin-conversations") || "[]"
+      );
+
+      if (Array.isArray(cached)) {
+        const updatedCache = cached.map((chat: any) =>
+          chat.member?.member_id === updatedMember?.member_id
+            ? {
+                ...chat,
+                member: {
+                  ...chat.member,
+                  is_online: updatedMember.is_online,
+                  online_at: updatedMember.online_at,
+                  last_seen: updatedMember.last_seen,
+                },
+              }
+            : chat
+        );
+
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updatedCache)
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Member status cache update failed:",
+        error
+      );
+    }
+
     // Update the currently open member
     if (
       updatedMember?.member_id !==
@@ -1897,14 +2048,45 @@ if (!conversationExists) {
 
     if (updatedConversation.member_typing) {
       memberTypingTimeout.current = setTimeout(() => {
-        setConversation((prev: any) =>
-          prev?.id === id
-            ? { ...prev, member_typing: false }
-            : prev
-        );
+  setConversation((prev: any) =>
+    prev?.id === id
+      ? { ...prev, member_typing: false }
+      : prev
+  );
 
-        memberTypingTimeout.current = null;
-      }, 5000);
+  // Clear expired typing status in the desktop sidebar.
+  setDesktopConversations((currentConversations) =>
+    currentConversations.map((chat) =>
+      chat.id === id
+        ? { ...chat, member_typing: false }
+        : chat
+    )
+  );
+
+  // Keep the shared conversation cache synchronized.
+  try {
+    const cached = JSON.parse(
+      localStorage.getItem("mspace-admin-conversations") || "[]"
+    );
+
+    if (Array.isArray(cached)) {
+      const updatedCache = cached.map((chat: any) =>
+        chat.id === id
+          ? { ...chat, member_typing: false }
+          : chat
+      );
+
+      localStorage.setItem(
+        "mspace-admin-conversations",
+        JSON.stringify(updatedCache)
+      );
+    }
+  } catch (error) {
+    console.error("Typing timeout cache update failed:", error);
+  }
+
+  memberTypingTimeout.current = null;
+}, 5000);
     }
   }
 
@@ -1920,6 +2102,35 @@ if (!conversationExists) {
         : chat
     )
   );
+
+    // Synchronize conversation typing status in the shared cache.
+  try {
+    const cached = JSON.parse(
+      localStorage.getItem("mspace-admin-conversations") || "[]"
+    );
+
+    if (Array.isArray(cached)) {
+      const updatedCache = cached.map((chat: any) =>
+        chat.id === updatedConversation?.id
+          ? {
+              ...chat,
+              member_typing: updatedConversation.member_typing,
+            }
+          : chat
+      );
+
+      localStorage.setItem(
+        "mspace-admin-conversations",
+        JSON.stringify(updatedCache)
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Conversation typing cache update failed:",
+      error
+    );
+  }
+
 }
   )
 
@@ -1973,13 +2184,22 @@ document.removeEventListener(
 
   
 useLayoutEffect(() => {
+  console.log("ADMIN POSITION EFFECT:", {
+  cacheReady,
+  initialMessagesLoadComplete,
+  initialMessagesPositioned,
+  conversationId: id,
+  messagesContainerExists: !!messagesRef.current,
+  messageCount: messages.length,
+});
   if (
-    !cacheReady ||
-    initialMessagesPositioned ||
-    composerHeight <= 0
-  ) {
-    return;
-  }
+  !screenSizeReady || 
+  !cacheReady ||
+  !initialMessagesLoadComplete ||
+  initialMessagesPositioned
+) {
+  return;
+}
 
   const conversationId = Array.isArray(id) ? id[0] : id;
   const el = messagesRef.current;
@@ -1988,31 +2208,37 @@ useLayoutEffect(() => {
     return;
   }
 
-  const savedScroll = sessionStorage.getItem(
-    `mspace-admin-message-scroll-${conversationId}`
-  );
+  const savedScroll = localStorage.getItem(
+  `mspace-admin-message-scroll-${conversationId}`
+);
 
-  if (savedScroll !== null) {
-    el.scrollTop = Number(savedScroll);
-  } else {
-    el.scrollTop = el.scrollHeight;
-  }
+const wasAtBottom = localStorage.getItem(
+  `mspace-admin-message-at-bottom-${conversationId}`
+);
+
+if (wasAtBottom === "true") {
+  el.scrollTop = el.scrollHeight;
+} else if (savedScroll !== null) {
+  el.scrollTop = Number(savedScroll);
+} else {
+  el.scrollTop = el.scrollHeight;
+}
 
   wasNearBottomBeforeComposerResizeRef.current = false;
   positionedAfterComposerMeasureRef.current = conversationId;
 
-  sessionStorage.setItem(
-    `mspace-admin-message-scroll-${conversationId}`,
-    String(el.scrollTop)
-  );
+  localStorage.setItem(
+  `mspace-admin-message-scroll-${conversationId}`,
+  String(el.scrollTop)
+);
 
   setInitialMessagesPositioned(true);
 }, [
+  screenSizeReady,
   cacheReady,
   initialMessagesLoadComplete,
   initialMessagesPositioned,
   id,
-  composerHeight,
 ]);
 
   const startRecording = async () => {
@@ -2711,8 +2937,8 @@ async function loadConversation() {
     await supabase
       .from("members")
       .select(
-       "name, photo_url, is_online, last_seen, hide_read_receipts"
-    )
+  "member_id, name, photo_url, is_online, last_seen, hide_read_receipts"
+)
       .eq("member_id", data.member_id)
       .single();
 
@@ -2808,6 +3034,27 @@ async function updateAdminOnlineStatus(online: boolean) {
 
   if (!id) return;
 
+  let adminClearedAt = conversation?.admin_cleared_at ?? null;
+
+if (!conversation) {
+  const { data: cutoffConversation, error: cutoffError } =
+    await supabase
+      .from("conversations")
+      .select("admin_cleared_at")
+      .eq("id", id)
+      .maybeSingle();
+
+  if (cutoffError || !cutoffConversation) {
+    console.error(
+      "Failed to load admin conversation cutoff:",
+      cutoffError
+    );
+    return;
+  }
+
+  adminClearedAt = cutoffConversation.admin_cleared_at ?? null;
+}
+
   const cacheKey = `mspace-messages-${id}`;
 
   const cachedMessages = localStorage.getItem(cacheKey);
@@ -2816,9 +3063,18 @@ async function updateAdminOnlineStatus(online: boolean) {
     try {
       const parsedMessages = JSON.parse(cachedMessages);
 
-      const visibleCachedMessages = parsedMessages.filter(
-        (msg: any) => msg.deleted_for !== "admin"
-      );
+     const clearedAt = adminClearedAt
+  ? new Date(adminClearedAt).getTime()
+  : null;
+
+const visibleCachedMessages = parsedMessages.filter(
+  (msg: any) =>
+    msg.deleted_for !== "admin" &&
+    (
+      clearedAt === null ||
+      new Date(msg.created_at).getTime() > clearedAt
+    )
+);
 
       console.log(
   "ADMIN CACHE DIAGNOSTIC:",
@@ -2842,11 +3098,19 @@ async function updateAdminOnlineStatus(online: boolean) {
     }
   }
 
-  const { data, error } = await supabase
+  let messagesQuery = supabase
   .from("messages")
   .select("*")
-  .eq("conversation_id", id)
-  .order("created_at", { ascending: true });
+  .eq("conversation_id", id);
+
+if (adminClearedAt) {
+  messagesQuery = messagesQuery.gt("created_at", adminClearedAt);
+}
+
+const { data, error } = await messagesQuery.order(
+  "created_at",
+  { ascending: true }
+);
 
 if (error) {
   console.error("Admin loadMessages failed:", error);
@@ -3012,12 +3276,23 @@ setPinnedMessage(cachedMessage);
   }
 
   setPinnedMessageId(pin.message_id);
-  setPinnedMessage(message || null);
+setPinnedMessage(message || null);
 
-  console.log(
-    "ADMIN PIN STATE SET:",
-    message
+// Save the fetched pinned message for immediate restoration
+if (message) {
+  localStorage.setItem(
+    pinnedCacheKey,
+    JSON.stringify({
+      message_id: pin.message_id,
+      message,
+    })
   );
+}
+
+console.log(
+  "ADMIN PIN STATE SET:",
+  message
+);
 }
 
 
@@ -3041,17 +3316,32 @@ async function markMessagesAsRead() {
     return;
   }
 
-    setDesktopConversations((currentConversations) =>
-  currentConversations.map((chat) =>
-    chat.id === id
-      ? {
-          ...chat,
-          unreadCount: 0,
-          has_unread: false,
-        }
-      : chat
-  )
-);
+        setDesktopConversations((currentConversations) => {
+      const updated = currentConversations.map((chat) =>
+        chat.id === id
+          ? {
+              ...chat,
+              unreadCount: 0,
+              has_unread: false,
+            }
+          : chat
+      );
+
+      // Synchronize the cleared unread count in the shared cache.
+      try {
+        localStorage.setItem(
+          "mspace-admin-conversations",
+          JSON.stringify(updated)
+        );
+      } catch (error) {
+        console.error(
+          "Mark-as-read conversation cache update failed:",
+          error
+        );
+      }
+
+      return updated;
+    });
 
     // Update the MSpace Home Screen badge
 const { count: unreadCount, error: unreadCountError } =
@@ -3500,21 +3790,30 @@ setMessages((prev) => {
 async function deleteConversation() {
   if (!conversation) return;
 
+  try {
+    const response = await fetch("/api/admin/delete-conversation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        conversationId: conversation.id,
+      }),
+    });
 
-  const { data, error } = await supabase
-    .from("conversations")
-    .delete()
-    .eq("id", conversation.id)
-    .select();
+    const result = await response.json().catch(() => null);
 
-  if (error) {
-    alert(error.message);
-    return;
+    if (!response.ok) {
+      alert(result?.error || "Unable to delete this conversation.");
+      return;
+    }
+
+    setShowDeleteDialog(false);
+    router.push("/admin/chats");
+  } catch (error) {
+    console.error("Delete conversation request failed:", error);
+    alert("Unable to delete this conversation. Please try again.");
   }
-
-  setShowDeleteDialog(false);
-
-router.push("/admin/chats");
 }
 
 function formatTime(date: string) {
@@ -3960,9 +4259,10 @@ return insertedMessage;
 async function loadUnreadConversationCount() {
   console.log("🔔 Checking unread conversations...");
   const { data: conversations, error: conversationsError } =
-    await supabase
-      .from("conversations")
-      .select("id");
+  await supabase
+    .from("conversations")
+    .select("id")
+    .eq("hidden_from_admin", false);
 
   if (conversationsError) {
     console.error(
@@ -4705,17 +5005,19 @@ if (savedScroll !== null) {
 </div>
 )}
 
-      <ProfileAvatar
-  name={
-    member?.member_id ||
-    member?.name ||
-    id ||
-    "Member"
-  }
+<ProfileAvatar
+  name={member?.member_id || member?.name || id || "Member"}
   photoUrl={member?.photo_url}
-   size={isDesktop ? 40 : 45}
+  size={isDesktop ? 40 : 45}
 />
-      <div>
+      <div
+  onClick={() => {
+    if (member?.member_id) {
+      window.location.href = `/admin/manage/members/${member.member_id}?fromChat=${id}`;
+    }
+  }}
+  style={{ cursor: "pointer" }}
+>
   <div
   style={{
     fontWeight: 600,
@@ -5052,7 +5354,8 @@ if (savedScroll !== null) {
       type="button"
       onClick={() => {
         setShowMenu(false);
-        deleteConversation();
+        setShowDeleteDialog(true);
+
       }}
       style={{
         width: "100%",
@@ -5205,11 +5508,21 @@ onScroll={(e) => {
   const conversationId = Array.isArray(id) ? id[0] : id;
 
   if (conversationId) {
-    sessionStorage.setItem(
-      `mspace-admin-message-scroll-${conversationId}`,
-      String(el.scrollTop)
-    );
+    localStorage.setItem(
+  `mspace-admin-message-scroll-${conversationId}`,
+  String(el.scrollTop)
+);
   }
+
+  if (conversationId) {
+  const distanceFromBottom =
+    el.scrollHeight - el.scrollTop - el.clientHeight;
+
+  localStorage.setItem(
+    `mspace-admin-message-at-bottom-${conversationId}`,
+    String(distanceFromBottom < 80)
+  );
+}
 
   const distanceFromBottom =
     el.scrollHeight -
@@ -5295,6 +5608,8 @@ paddingBottom:
   hideReadReceiptsForEveryone={hideReadReceiptsForEveryone}
   pendingMessageIds={pendingMessageIds}
   profileName={member?.name || "Member"}
+  memberAvatarId={member?.member_id || id}
+  adminAvatarId="admin"
   adminPhoto={adminProfilePhoto}
   memberPhoto={member?.photo_url || ""}
   playMenuSound={playMenuSound}
@@ -5555,6 +5870,17 @@ onCloseStickerPanel={() => {
 }}
 
   onInput={(e) => {
+      const container = messagesRef.current;
+
+  if (container) {
+    const distanceFromBottom =
+      container.scrollHeight -
+      container.scrollTop -
+      container.clientHeight;
+
+    wasNearBottomBeforeComposerResizeRef.current =
+      distanceFromBottom <= 80;
+  }
   const value = e.target.value;
 
   e.target.style.height = "0px";
@@ -5956,6 +6282,13 @@ setMessages((prev) => {
 }
 
 }}
+/>
+
+<ImageViewer
+  open={showProfilePhotoViewer}
+  image={member?.photo_url || ""}
+  name={member?.name || "Member"}
+  onClose={() => setShowProfilePhotoViewer(false)}
 />
 
 <MediaViewer

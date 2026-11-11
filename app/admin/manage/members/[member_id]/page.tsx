@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import ImageViewer from "@/app/chat/ImageViewer";
 import { createClient } from "@/utils/supabase/client";
 import {
   MessageCircleMore,
@@ -19,6 +20,11 @@ import ProfileAvatar from "@/app/chat/ProfileAvatar";
 export default function MemberDetailsPage() {
   const params = useParams();
   const memberId = params.member_id as string;
+
+  const searchParams = useSearchParams();
+const fromChat = searchParams.get("fromChat");
+
+const [showProfilePhotoViewer, setShowProfilePhotoViewer] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [member, setMember] = useState<any>(null);
@@ -162,7 +168,11 @@ setIsAdmin(true);
 >
   <button
     onClick={() => {
-  window.location.href = "/admin/manage/visitors";
+  if (fromChat) {
+    window.location.href = `/admin/chats/${fromChat}`;
+  } else {
+    window.location.href = "/admin/manage/visitors";
+  }
 }}
     style={{
       width: "42px",
@@ -299,11 +309,23 @@ setIsAdmin(true);
               gap: "18px",
             }}
           >
-            <ProfileAvatar
-              name={member.name || "Member"}
-              photoUrl={member.photo_url}
-              size={92}
-            />
+            <div
+  onClick={() => {
+    if (member.photo_url) {
+      setShowProfilePhotoViewer(true);
+    }
+  }}
+  style={{
+    cursor: member.photo_url ? "pointer" : "default",
+    flexShrink: 0,
+  }}
+>
+  <ProfileAvatar
+    name={member.name || "Member"}
+    photoUrl={member.photo_url}
+    size={92}
+  />
+</div>
 
             <div
               style={{
@@ -730,9 +752,17 @@ setIsAdmin(true);
                 </div>
               ))}
             </div>
-          )}
+                    )}
         </div>
       </div>
+
+      <ImageViewer
+        open={showProfilePhotoViewer}
+        image={member.photo_url || ""}
+        name={member.name || "Member"}
+        onClose={() => setShowProfilePhotoViewer(false)}
+      />
+
     </div>
   );
   }

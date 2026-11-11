@@ -45,3 +45,22 @@ certificates*.crt
 rootCA.crt
 
 .vercel
+
+# China diagnostic and temporary test pages
+/app/china-chunk-check/
+/app/china-js-test/
+/app/china-native-js-test/
+/app/china-react-cache-test/
+/app/china-react-diagnostic/
+/app/china-react-early-diagnostic/
+/app/china-react-test/
+/app/china-test/
+
+/public/china-direct-js-test.html
+/public/china-direct-js-test.
+
+# Local developer instructions and test endpoint
+/AGENTS.md
+/CLAUDE.md
+/app/api/push/test/
+/public/china-direct-js-test.js

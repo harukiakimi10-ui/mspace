@@ -34,6 +34,8 @@ type MessagesProps = {
   pendingMessageIds: string[];
 
   profileName: string;
+  memberAvatarId?: string;
+  adminAvatarId?: string;
   adminPhoto: string;
   memberPhoto: string;
   playMenuSound: (unlockOnly?: boolean) => void;
@@ -220,6 +222,8 @@ export default function Messages({
   hideReadReceiptsForEveryone = false,
   pendingMessageIds,
   profileName,
+  memberAvatarId,
+  adminAvatarId,
   adminPhoto,
   memberPhoto,
   playMenuSound,
@@ -859,6 +863,11 @@ const isFocused =
     ? adminPhoto
     : memberPhoto;
 
+    const avatarIdentity =
+  msg.sender === "admin"
+    ? adminAvatarId || "admin"
+    : memberAvatarId || profileName || "Member";
+
   const isPending =
   (pendingMessageIds?.includes(msg.id) ?? false) ||
   msg.pending === true ||
@@ -1048,7 +1057,7 @@ userSelect:
     }}
   >
     <ProfileAvatar
-      name={profileName || "Member"}
+      name={avatarIdentity}
       photoUrl={avatarUrl}
       size={45}
     />
@@ -2503,7 +2512,7 @@ backdropFilter: "blur(4px)",
     }}
   >
     <ProfileAvatar
-      name={profileName || "Member"}
+      name={avatarIdentity}
       photoUrl={avatarUrl}
       size={45}
     />
